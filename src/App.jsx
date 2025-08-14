@@ -24,6 +24,7 @@ import Confetti from 'react-confetti';
 import { createDeck, shuffleDeck } from './utils/deck';
 import { getCardSVGContent } from './utils/cardSVG';
 import soundEffects, { playSoundEffect } from './utils/soundEffects';
+import { ensurePlayersArray } from './utils/gameUtils';
 import { ArrowLeft, ChevronRight, Play, Settings, Award, Shield, Wifi, Bot, X, Users, Plus, Crown, Clock } from 'lucide-react';
 import './App.css';
 // getCardSVGContent is imported from utils/cardSVG.js
@@ -695,7 +696,7 @@ const App = () => {
       const unsubscribe = onValue(userRef, snapshot => {
         if (snapshot.exists()) {
           const firebaseData = snapshot.val();
-          console.log('👤 Firebase real-time update received:', firebaseData);
+          // console.log('👤 Firebase real-time update received:', firebaseData);
           
           // Merge Firebase data with current user data
           const updatedUserData = {
@@ -706,7 +707,7 @@ const App = () => {
           
           // Only update if data actually changed
           if (JSON.stringify(updatedUserData) !== JSON.stringify(currentUser)) {
-            console.log('👤 Updating user data from Firebase sync');
+            // console.log('👤 Updating user data from Firebase sync');
             setCurrentUser(updatedUserData);
           }
         }
@@ -718,12 +719,12 @@ const App = () => {
   // Room cleanup function
   const cleanupInactiveRooms = async () => {
     try {
-      console.log('🧹 Starting room cleanup...');
+      // console.log('🧹 Starting room cleanup...');
       const roomsRef = ref(db, 'rooms');
       const snapshot = await get(roomsRef);
       
       if (!snapshot.exists()) {
-        console.log('🧹 No rooms to clean up');
+        // console.log('🧹 No rooms to clean up');
         return;
       }
       
@@ -741,28 +742,28 @@ const App = () => {
         
         // Check if room is older than 6 hours
         if (roomCreatedAt < sixHoursAgo) {
-          console.log(`🧹 Room ${roomId} is older than 6 hours, marking for deletion`);
+          // console.log(`🧹 Room ${roomId} is older than 6 hours, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
         
         // Check if room is stuck in starting phase for more than 5 minutes
         if (room.status === 'waiting' && lastActivity < fiveMinutesAgo) {
-          console.log(`🧹 Room ${roomId} is stuck in waiting phase for more than 5 minutes, marking for deletion`);
+          // console.log(`🧹 Room ${roomId} is stuck in waiting phase for more than 5 minutes, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
         
         // Check if room is in countdown but no activity for 5+ minutes
         if (room.status === 'countdown' && lastActivity < fiveMinutesAgo) {
-          console.log(`🧹 Room ${roomId} is stuck in countdown for more than 5 minutes, marking for deletion`);
+          // console.log(`🧹 Room ${roomId} is stuck in countdown for more than 5 minutes, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
         
         // Check if room is playing but no activity for 5+ minutes
         if (room.status === 'playing' && lastActivity < fiveMinutesAgo) {
-          console.log(`🧹 Room ${roomId} has been inactive for more than 5 minutes, marking for deletion`);
+          // console.log(`🧹 Room ${roomId} has been inactive for more than 5 minutes, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
@@ -770,7 +771,7 @@ const App = () => {
       
       // Delete inactive rooms
       if (roomsToDelete.length > 0) {
-        console.log(`🧹 Deleting ${roomsToDelete.length} inactive rooms:`, roomsToDelete);
+        // console.log(`🧹 Deleting ${roomsToDelete.length} inactive rooms:`, roomsToDelete);
         
         const deletePromises = roomsToDelete.map(roomId => {
           const roomRef = ref(db, `rooms/${roomId}`);
@@ -778,9 +779,9 @@ const App = () => {
         });
         
         await Promise.all(deletePromises);
-        console.log(`🧹 Successfully deleted ${roomsToDelete.length} inactive rooms`);
+        // console.log(`🧹 Successfully deleted ${roomsToDelete.length} inactive rooms`);
     } else {
-        console.log('🧹 No inactive rooms found');
+        // console.log('🧹 No inactive rooms found');
       }
       
     } catch (error) {
@@ -830,12 +831,12 @@ const App = () => {
       // Set up real-time leaderboard listener
       const lbRef = ref(db, 'leaderboard/users');
       const unsubscribe = onValue(lbRef, snapshot => {
-        console.log('📊 Leaderboard real-time update received');
+        // console.log('📊 Leaderboard real-time update received');
         if (snapshot.exists()) {
           const snapshotData = snapshot.val();
           if (snapshotData) {
             const data = Object.values(snapshotData);
-            console.log('📊 Leaderboard users:', data.length, 'users found');
+            // console.log('📊 Leaderboard users:', data.length, 'users found');
             
             const sorted = data
               .sort((a, b) => (b.xp || 0) - (a.xp || 0)) // Sort by XP (highest first)
@@ -849,7 +850,7 @@ const App = () => {
                 xp: u.xp || 0
               }));
             
-            console.log('📊 Real-time leaderboard updated:', sorted.length, 'players');
+            // console.log('📊 Real-time leaderboard updated:', sorted.length, 'players');
             setLeaderboardData(sorted);
           } else {
             setLeaderboardData([]);
@@ -869,9 +870,9 @@ const App = () => {
   useEffect(() => {
     if (currentRoom) {
       const roomRef = ref(db, `rooms/${currentRoom.id}`);
-      console.log('🔥 Setting up Firebase room listener for room:', currentRoom.id);
+      // console.log('🔥 Setting up Firebase room listener for room:', currentRoom.id);
       const unsubscribe = onValue(roomRef, snapshot => {
-        console.log('🔥 Firebase room update received for room:', currentRoom.id, 'Data:', snapshot.val());
+        // console.log('🔥 Firebase room update received for room:', currentRoom.id, 'Data:', snapshot.val());
         if (snapshot.exists()) {
           const roomData = {
             id: currentRoom.id,
@@ -895,14 +896,14 @@ const App = () => {
             const newGameData = roomData.gameData;
             
             // Update gameData immediately - animations will be handled separately
-            console.log('🔥 Updating gameData from Firebase:', newGameData);
+            // console.log('🔥 Updating gameData from Firebase:', newGameData);
             setGameData(newGameData);
             stopBackgroundMusic();
             setGameState('game');
             
             // Handle dealingCards phase transition
             if (newGameData.gamePhase === 'dealingCards') {
-              console.log('🎴 Multiplayer game started - cards already dealt, showing immediately');
+              // console.log('🎴 Multiplayer game started - cards already dealt, showing immediately');
               // Change game phase to playing immediately since cards are already dealt
               if (currentRoom) {
                 update(ref(db, `rooms/${currentRoom.id}/gameData`), {
@@ -913,7 +914,7 @@ const App = () => {
             }
             
             // Only update gameData if no animations were triggered
-            console.log('🔥 Updating gameData from Firebase (no animations):', newGameData);
+            // console.log('🔥 Updating gameData from Firebase (no animations):', newGameData);
             setGameData(newGameData);
             stopBackgroundMusic();
             setGameState('game');
@@ -936,13 +937,13 @@ const App = () => {
     
     if (!prevGameData) return; // Skip first render
     
-    console.log('🎴 Animation useEffect triggered - checking for animations...');
+    // console.log('🎴 Animation useEffect triggered - checking for animations...');
     
     // Detect opponent moves using the animations module
     const moves = detectOpponentMoves(prevGameData, gameData, currentUser);
     
     if (moves.cardPlay || moves.cardDraw.length > 0) {
-      console.log('🎴 Detected opponent moves:', moves);
+      // console.log('🎴 Detected opponent moves:', moves);
       
       // Create wrappers for functions that use current context
       const getVisualPlayerMappingWrapper = () => getVisualPlayerMapping(currentRoom, currentUser);
@@ -959,11 +960,11 @@ const App = () => {
       );
       
       if (animations.length > 0) {
-        console.log('🎴 Starting animations:', animations);
+        // console.log('🎴 Starting animations:', animations);
         
         // Start animations with completion callback
         startAnimations(animations, setAnimatingCards, () => {
-          console.log('🎴 All animations completed');
+          // console.log('🎴 All animations completed');
           // Update play pile positions after animation
           if (moves.cardPlay) {
             getPlayPilePosition(gameData.playPile.length - 1, true);
@@ -1136,17 +1137,17 @@ const App = () => {
         ...sanitizedUserData,
         lastActive: serverTimestamp()
       });
-      console.log('✅ User data synced to Firebase');
+      // console.log('✅ User data synced to Firebase');
       
       // Sync to Honeycomb based on data source
       if (publicKey && wallet && signMessage && connected) {
-        console.log('🔗 Wallet connected, attempting Honeycomb sync...', {
-          hasPublicKey: !!publicKey,
-          hasWallet: !!wallet,
-          hasSignMessage: !!signMessage,
-          isConnected: connected,
-          publicKeyAddress: publicKey?.toBase58()
-        });
+        // console.log('🔗 Wallet connected, attempting Honeycomb sync...', {
+        //   hasPublicKey: !!publicKey,
+        //   hasWallet: !!wallet,
+        //   hasSignMessage: !!signMessage,
+        //   isConnected: connected,
+        //   publicKeyAddress: publicKey?.toBase58()
+        // });
         
         if (currentSource === 'firebase_with_honeycomb_sync') {
           // Sync Firebase data to Honeycomb (Firebase is primary)
@@ -1166,24 +1167,24 @@ const App = () => {
                 bestWinStreak: userData.bestWinStreak
               }
             );
-            console.log('✅ Firebase data synced to Honeycomb');
+            // console.log('✅ Firebase data synced to Honeycomb');
           } catch (honeycombError) {
             console.warn('⚠️ Failed to sync Firebase data to Honeycomb:', honeycombError.message);
           }
         } else if (currentSource === 'honeycomb_only') {
           // New user from Honeycomb - no need to sync back since we just synced to Firebase
-          console.log('✅ New user data synced from Honeycomb to Firebase');
+          // console.log('✅ New user data synced from Honeycomb to Firebase');
         } else if (currentSource === 'new') {
           // Brand new user - no Honeycomb profile yet, so no sync needed
-          console.log('✅ New user created in Firebase only');
+          // console.log('✅ New user created in Firebase only');
         }
       } else {
-        console.log('⚠️ Wallet not fully connected, skipping Honeycomb sync:', {
-          hasPublicKey: !!publicKey,
-          hasWallet: !!wallet,
-          hasSignMessage: !!signMessage,
-          isConnected: connected
-        });
+        // console.log('⚠️ Wallet not fully connected, skipping Honeycomb sync:', {
+        //   hasPublicKey: !!publicKey,
+        //   hasWallet: !!wallet,
+        //   hasSignMessage: !!signMessage,
+        //   isConnected: connected
+        // });
       }
       
       // Update leaderboard
@@ -2130,9 +2131,12 @@ const App = () => {
     if (prevGameData?.playPile && newGameData?.playPile && newGameData.playPile.length > prevGameData.playPile.length) {
       const lastCard = newGameData.playPile[newGameData.playPile.length - 1];
       
+      const prevPlayers = ensurePlayersArray(prevGameData.players);
+      const newPlayers = ensurePlayersArray(newGameData.players);
+      
       // Determine who played by card count difference
-      let playerWhoPlayed = (prevGameData.players || []).findIndex(p => 
-        (p.cards || []).length > (((newGameData.players || []).find(np => np.id === p.id))?.cards || []).length
+      let playerWhoPlayed = prevPlayers.findIndex(p => 
+        (p.cards || []).length > ((newPlayers.find(np => np.id === p.id))?.cards || []).length
       );
       
       // Fallback to currentPlayer if no difference found
@@ -2140,7 +2144,7 @@ const App = () => {
         playerWhoPlayed = newGameData.currentPlayer;
       }
       
-      const currentUserIndex = (newGameData.players || []).findIndex(p => p.id === currentUser?.id);
+      const currentUserIndex = newPlayers.findIndex(p => p.id === currentUser?.id);
       
       if (playerWhoPlayed !== -1 && playerWhoPlayed !== currentUserIndex) {
         moves.cardPlay = {
@@ -2153,9 +2157,12 @@ const App = () => {
 
     // Detect card draws
     if (prevGameData?.players && newGameData?.players) {
-      (newGameData.players || []).forEach((newPlayer, playerIndex) => {
-        const oldPlayer = (prevGameData.players || []).find(p => p.id === newPlayer.id);
-        if (oldPlayer && newPlayer.cards.length > oldPlayer.cards.length && playerIndex !== (newGameData.players || []).findIndex(p => p.id === currentUser?.id)) {
+      const prevPlayers = ensurePlayersArray(prevGameData.players);
+      const newPlayers = ensurePlayersArray(newGameData.players);
+      
+      newPlayers.forEach((newPlayer, playerIndex) => {
+        const oldPlayer = prevPlayers.find(p => p.id === newPlayer.id);
+        if (oldPlayer && newPlayer.cards.length > oldPlayer.cards.length && playerIndex !== newPlayers.findIndex(p => p.id === currentUser?.id)) {
           const cardsDifference = newPlayer.cards.length - oldPlayer.cards.length;
           moves.cardDraw.push({
             playerIndex,
@@ -2552,13 +2559,7 @@ const App = () => {
     if (!currentRoom) return { actualToVisual: {}, visualToActual: {} };
     
     // Convert room players object to array
-    const roomPlayers = currentRoom.players || {};
-    const playersArray = Object.values(roomPlayers);
-    
-    if (!Array.isArray(playersArray)) {
-      console.warn('Room players is not an array:', roomPlayers);
-      return { actualToVisual: {}, visualToActual: {} };
-    }
+    const playersArray = ensurePlayersArray(currentRoom.players);
     
     const currentUserIndex = playersArray.findIndex(p => p.id === currentUser?.id);
     
@@ -2637,30 +2638,32 @@ const App = () => {
   };
 
   const getNextPlayer = gameData => {
+    const nextPlayers = ensurePlayersArray(gameData.players);
     let nextPlayer = gameData.currentPlayer;
     let playersToSkip = gameData.skipNextPlayer ? 1 : 0;
     do {
-      nextPlayer = (nextPlayer + 1) % gameData.players.length;
-    } while (gameData.players[nextPlayer].eliminated);
+      nextPlayer = (nextPlayer + 1) % nextPlayers.length;
+    } while (nextPlayers[nextPlayer].eliminated);
     while (playersToSkip > 0) {
       do {
-        nextPlayer = (nextPlayer + 1) % gameData.players.length;
-      } while (gameData.players[nextPlayer].eliminated);
+        nextPlayer = (nextPlayer + 1) % nextPlayers.length;
+      } while (nextPlayers[nextPlayer].eliminated);
       playersToSkip--;
     }
     return nextPlayer;
   };
 
   const nextTurn = gameData => {
+    const turnPlayers = ensurePlayersArray(gameData.players);
     let nextPlayer = gameData.currentPlayer;
     let playersToSkip = gameData.skipNextPlayer ? 1 : 0;
     do {
-      nextPlayer = (nextPlayer + 1) % gameData.players.length;
-    } while (gameData.players[nextPlayer].eliminated);
+      nextPlayer = (nextPlayer + 1) % gamePlayers.length;
+    } while (gamePlayers[nextPlayer].eliminated);
     while (playersToSkip > 0) {
       do {
-        nextPlayer = (nextPlayer + 1) % gameData.players.length;
-      } while (gameData.players[nextPlayer].eliminated);
+        nextPlayer = (nextPlayer + 1) % gamePlayers.length;
+      } while (gamePlayers[nextPlayer].eliminated);
       playersToSkip--;
     }
     gameData.currentPlayer = nextPlayer;
@@ -2675,7 +2678,8 @@ const App = () => {
       };
     }
     setGameData({ ...gameData });
-    if (gameData.players[nextPlayer].isAI) {
+    const gamePlayers = ensurePlayersArray(gameData.players);
+    if (gamePlayers[nextPlayer].isAI) {
       setTimeout(() => {
         setIsAITurnInProgress(true);
         setTimeout(() => {
@@ -2688,7 +2692,8 @@ const App = () => {
   };
 
   const endRound = gameData => {
-    const activePlayers = gameData.players.filter(p => !p.eliminated);
+    const gamePlayers = ensurePlayersArray(gameData.players);
+    const activePlayers = gamePlayers.filter(p => !p.eliminated);
     const playersWithTotals = activePlayers.map(p => ({
       ...p,
       cardTotal: calculateCardTotal(p.cards),
@@ -2715,14 +2720,15 @@ const App = () => {
       roundEndData: roundEndInfo,
       gamePhase: 'roundEnd'
     };
-    const eliminatedPlayerInNewData = (newGameData.players || []).find(p => p.id === eliminatedPlayer.id);
+    const newPlayers = ensurePlayersArray(newGameData.players);
+    const eliminatedPlayerInNewData = newPlayers.find(p => p.id === eliminatedPlayer.id);
     if (eliminatedPlayerInNewData) {
       eliminatedPlayerInNewData.eliminated = true;
     }
     newGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
     const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
     newGameData.gameLog[newGameData.roundNumber] = [...currentRoundLog, `Round ${newGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${maxTotal} total card points`];
-    const remainingPlayers = newGameData.players.filter(p => !p.eliminated);
+    const remainingPlayers = newPlayers.filter(p => !p.eliminated);
     if (remainingPlayers.length <= 1) {
       newGameData.gamePhase = 'gameEnd';
       const finalWinner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundWinner;
@@ -2738,7 +2744,7 @@ const App = () => {
       setTimeout(() => {
         const deck = createDeck();
         const shuffledNewDeck = shuffleDeck(deck);
-        const remainingPlayers = newGameData.players.filter(p => !p.eliminated);
+        const remainingPlayers = newPlayers.filter(p => !p.eliminated);
         const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
         remainingPlayers.forEach(player => {
           player.cards = shuffledNewDeck.splice(0, cardsPerPlayer);
@@ -2789,7 +2795,8 @@ const App = () => {
   };
 
   const aiTurn = async gameData => {
-    if (!gameData.players[gameData.currentPlayer].isAI || isAnyAnimationInProgress) {
+    const aiPlayers = ensurePlayersArray(gameData.players);
+    if (!aiPlayers[gameData.currentPlayer].isAI || isAnyAnimationInProgress) {
       setIsAITurnInProgress(false);
       return;
     }
@@ -2926,7 +2933,8 @@ const App = () => {
       setIsAITurnInProgress(false);
       return;
     }
-    const currentPlayer = gameData.players[gameData.currentPlayer];
+    const handlePlayers = ensurePlayersArray(gameData.players);
+    const currentPlayer = handlePlayers[gameData.currentPlayer];
     if (!currentPlayer.isAI || currentPlayer.eliminated) {
       setIsAITurnInProgress(false);
       return;

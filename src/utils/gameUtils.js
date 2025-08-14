@@ -1,5 +1,13 @@
 // Game utility functions for Whot game
 
+// Helper function to ensure players data is always an array
+export const ensurePlayersArray = (players) => {
+  if (!players) return [];
+  if (Array.isArray(players)) return players;
+  if (typeof players === 'object') return Object.values(players);
+  return [];
+};
+
 // Get play pile position for a card
 export const getPlayPilePosition = (index, updatePositions = false) => {
   // This function should be implemented based on your existing logic
@@ -36,13 +44,7 @@ export const getVisualPlayerMapping = (currentRoom, currentUser) => {
   if (!currentRoom) return { actualToVisual: {}, visualToActual: {} };
   
   // Convert room players object to array
-  const roomPlayers = currentRoom.players || {};
-  const playersArray = Object.values(roomPlayers);
-  
-  if (!Array.isArray(playersArray)) {
-    console.warn('Room players is not an array:', roomPlayers);
-    return { actualToVisual: {}, visualToActual: {} };
-  }
+  const playersArray = ensurePlayersArray(currentRoom.players);
   
   const currentUserIndex = playersArray.findIndex(p => p.id === currentUser?.id);
   

@@ -660,56 +660,56 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
   try {
     const walletAddress = publicKey.toBase58();
     
-    console.log('🔍 Checking Honeycomb user profile...');
-    console.log('🔍 Using configured project and API endpoint');
+    // console.log('🔍 Checking Honeycomb user profile...');
+    // console.log('🔍 Using configured project and API endpoint');
     
     // Find the user by wallet address
-    console.log('🔍 Calling findUsers...');
+    // console.log('🔍 Calling findUsers...');
     const users = await client.findUsers({
       wallets: [walletAddress]
     });
     
-    console.log('🔍 findUsers response:', {
-      userCount: users?.user?.length || 0,
-      responseType: typeof users,
-      responseKeys: users ? Object.keys(users) : null
-    });
+    // console.log('🔍 findUsers response:', {
+    //   userCount: users?.user?.length || 0,
+    //   responseType: typeof users,
+    //   responseKeys: users ? Object.keys(users) : null
+    // });
     
     if (users.user.length === 0) {
-      console.log('❌ No user found for wallet - user needs to be created');
+      // console.log('❌ No user found for wallet - user needs to be created');
       return { exists: false, needsSync: false, profile: null, needsCreation: true };
     }
     
     const userId = users.user[0].id;
-    console.log('🔍 Found user with ID');
+    // console.log('🔍 Found user with ID');
     
     // Check if user has a profile in our project
-    console.log('🔍 Calling findProfiles...');
+    // console.log('🔍 Calling findProfiles...');
     const profiles = await client.findProfiles({
       userIds: [userId],
       projects: [PROJECT_ADDRESS],
       identities: ["main"]
     });
     
-    console.log('🔍 findProfiles response:', {
-      profileCount: profiles?.profile?.length || 0,
-      responseType: typeof profiles,
-      responseKeys: profiles ? Object.keys(profiles) : null
-    });
+    // console.log('🔍 findProfiles response:', {
+    //   profileCount: profiles?.profile?.length || 0,
+    //   responseType: typeof profiles,
+    //   responseKeys: profiles ? Object.keys(profiles) : null
+    // });
     
     const exists = profiles.profile.length > 0;
-    console.log('✅ User profile exists:', exists);
+    // console.log('✅ User profile exists:', exists);
     
     // If profile exists and we have Firebase data, check for data consistency
     if (exists && firebaseUserData) {
-      console.log('🔄 Checking data consistency between Firebase and Honeycomb...');
+      // console.log('🔄 Checking data consistency between Firebase and Honeycomb...');
       const profile = profiles.profile[0];
       
       // Check if Honeycomb profile has all the data from Firebase
       const needsUpdate = await checkProfileDataConsistency(profile, firebaseUserData);
       
       if (needsUpdate) {
-        console.log('⚠️ Data inconsistency detected, prompting user to sync...');
+        // console.log('⚠️ Data inconsistency detected, prompting user to sync...');
         return { exists: true, needsSync: true, profile };
       }
     }
@@ -737,7 +737,7 @@ const APP_WALLET_CONFIG = {
 // Enhanced SOL management with automatic airdrops and app wallet fallback
 export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
   try {
-    console.log('💰 Enhanced SOL management: Checking wallet balance...');
+    // console.log('💰 Enhanced SOL management: Checking wallet balance...');
     
     // Connect to Honeynet RPC
     const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
@@ -746,15 +746,15 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
     const balance = await connection.getBalance(publicKey);
     const solBalance = balance / LAMPORTS_PER_SOL;
     
-    console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
-    console.log('💰 Minimum required:', minSOL, 'SOL');
+    // console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
+    // console.log('💰 Minimum required:', minSOL, 'SOL');
     
     if (solBalance >= minSOL) {
-      console.log('✅ Wallet has sufficient SOL balance');
+      // console.log('✅ Wallet has sufficient SOL balance');
       return { success: true, method: 'none', balance: solBalance };
     }
     
-    console.log('💰 Balance too low, attempting airdrop...');
+    // console.log('💰 Balance too low, attempting airdrop...');
     
     // Step 1: Try web3.js airdrop
     try {
@@ -934,7 +934,7 @@ export const createUserProfileWithSOLManagement = async (publicKey, wallet, sign
 
 // Enhanced profile update with automatic SOL management
 export const updateUserProfileWithSOLManagement = async (publicKey, wallet, signMessage, updates) => {
-  console.log('🚀 Enhanced profile update with SOL management...');
+  // console.log('🚀 Enhanced profile update with SOL management...');
   
   // Validate parameters
   if (!publicKey) {
@@ -1031,50 +1031,53 @@ export const testRPCConnection = async () => {
 // Enhanced profile check with retry mechanism for newly created profiles
 export const checkUserProfileExistsWithRetry = async (publicKey, firebaseUserData = null, maxRetries = 5, delayMs = 3000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    console.log(`🔍 Profile check attempt ${attempt}/${maxRetries}`);
+    // console.log(`🔍 Profile check attempt ${attempt}/${maxRetries}`);
     
     const result = await checkUserProfileExists(publicKey, firebaseUserData);
     
     if (result.exists) {
-      console.log(`✅ Profile found on attempt ${attempt}`);
+      // console.log(`✅ Profile found on attempt ${attempt}`);
       return result;
     }
     
     if (attempt < maxRetries) {
-      console.log(`⏳ Profile not found, waiting ${delayMs}ms before retry...`);
+      // console.log(`⏳ Profile not found, waiting ${delayMs}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
   
-  console.log(`❌ Profile not found after ${maxRetries} attempts`);
+  // console.log(`❌ Profile not found after ${maxRetries} attempts`);
   return { exists: false, needsSync: false, profile: null };
 };
 
 // Enhanced profile update following official docs
 export const updateUserProfile = async ({ publicKey, wallet, signMessage, profileData }) => {
   try {
+    if (!publicKey) {
+      throw new Error('publicKey is required for profile update');
+    }
     const walletAddress = publicKey.toBase58();
     
-    console.log('Updating Honeycomb user profile for:', walletAddress);
+    // console.log('Updating Honeycomb user profile for:', walletAddress);
     
     // Authenticate with Honeycomb first
-    console.log('🔐 Authenticating with Honeycomb...');
+    // console.log('🔐 Authenticating with Honeycomb...');
     let accessToken = null;
     try {
       const { authRequest: { message: authRequest } } = await client.authRequest({
         wallet: walletAddress
       });
-      console.log('📝 Auth request received, signing message...');
+      // console.log('📝 Auth request received, signing message...');
       const encodedMessage = new TextEncoder().encode(authRequest);
       const signedMessage = await signMessage(encodedMessage);
       const signature = bs58.encode(signedMessage);
       
-      console.log('✅ Message signed, confirming authentication...');
+      // console.log('✅ Message signed, confirming authentication...');
       const { authConfirm } = await client.authConfirm({
         wallet: walletAddress,
         signature
       });
-      console.log('✅ Authentication confirmed');
+      // console.log('✅ Authentication confirmed');
       accessToken = authConfirm.accessToken;
     } catch (authError) {
       console.error('❌ Authentication failed:', authError);
