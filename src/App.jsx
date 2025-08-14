@@ -3157,7 +3157,7 @@ const App = () => {
     const roomData = {
       id: newRoomRef.key,
       ownerId: currentUser.id,
-      ownerUsername: currentUser.username,
+      ownerUsername: currentUser?.username || 'Unknown Player',
       players: { [currentUser.id]: { ...currentUser, ready: true } },
       maxPlayers: 4,
       status: 'waiting',
@@ -3264,7 +3264,7 @@ const App = () => {
       
       const players = playersList.map((player, index) => ({
         id: player.id,
-        name: player.username,
+        name: player?.username || 'Unknown Player',
         cards: [],
         isAI: false,
         eliminated: false
@@ -4286,7 +4286,7 @@ const App = () => {
                           )}
                         </div>
                         <div>
-                          <h4 className="text-white font-bold">{player.username}</h4>
+                          <h4 className="text-white font-bold">{player?.username || 'Unknown Player'}</h4>
                           <p className="text-gray-300 text-sm">
                             {player.id === currentRoom.ownerId ? 'Room Owner' : 'Player'}
                           </p>
