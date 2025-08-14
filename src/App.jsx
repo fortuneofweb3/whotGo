@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand, checkAirdropStatus } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
@@ -4039,18 +4039,6 @@ const App = () => {
                       if (publicKey && wallet && signMessage) {
                         setIsCreatingProfile(true);
                         try {
-                          // Check if airdrop is needed first
-                          console.log('💰 Checking airdrop status...');
-                          const airdropStatus = await checkAirdropStatus(publicKey);
-                          
-                          if (airdropStatus.needsAirdrop) {
-                            console.log('💰 Airdrop needed. Current balance:', airdropStatus.currentBalance, 'SOL');
-                            const manualCommand = getManualAirdropCommand(publicKey.toBase58());
-                            alert(`Airdrop needed! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
-                            setIsCreatingProfile(false);
-                            return;
-                          }
-                          
                           // Ensure wallet has SOL
                           console.log('💰 Ensuring wallet has SOL...');
                           try {
@@ -4058,7 +4046,7 @@ const App = () => {
                           } catch (airdropError) {
                             console.error('❌ Airdrop failed:', airdropError);
                             const manualCommand = getManualAirdropCommand(publicKey.toBase58());
-                            alert(`Airdrop failed! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
+                            alert(`Insufficient balance! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
                             setIsCreatingProfile(false);
                             return;
                           }
