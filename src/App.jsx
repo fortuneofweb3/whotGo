@@ -1139,7 +1139,15 @@ const App = () => {
       console.log('✅ User data synced to Firebase');
       
       // Sync to Honeycomb based on data source
-      if (publicKey && wallet && signMessage) {
+      if (publicKey && wallet && signMessage && connected) {
+        console.log('🔗 Wallet connected, attempting Honeycomb sync...', {
+          hasPublicKey: !!publicKey,
+          hasWallet: !!wallet,
+          hasSignMessage: !!signMessage,
+          isConnected: connected,
+          publicKeyAddress: publicKey?.toBase58()
+        });
+        
         if (currentSource === 'firebase_with_honeycomb_sync') {
           // Sync Firebase data to Honeycomb (Firebase is primary)
           try {
@@ -1169,6 +1177,13 @@ const App = () => {
           // Brand new user - no Honeycomb profile yet, so no sync needed
           console.log('✅ New user created in Firebase only');
         }
+      } else {
+        console.log('⚠️ Wallet not fully connected, skipping Honeycomb sync:', {
+          hasPublicKey: !!publicKey,
+          hasWallet: !!wallet,
+          hasSignMessage: !!signMessage,
+          isConnected: connected
+        });
       }
       
       // Update leaderboard

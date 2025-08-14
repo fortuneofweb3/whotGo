@@ -936,8 +936,19 @@ export const createUserProfileWithSOLManagement = async (publicKey, wallet, sign
 export const updateUserProfileWithSOLManagement = async (publicKey, wallet, signMessage, updates) => {
   console.log('🚀 Enhanced profile update with SOL management...');
   
+  // Validate parameters
+  if (!publicKey) {
+    throw new Error('publicKey is required for profile update');
+  }
+  if (!wallet) {
+    throw new Error('wallet is required for profile update');
+  }
+  if (!signMessage) {
+    throw new Error('signMessage is required for profile update');
+  }
+  
   return await executeTransactionWithSOLRetry(
-    () => updateUserProfile(publicKey, wallet, signMessage, updates),
+    () => updateUserProfile({ publicKey, wallet, signMessage, profileData: updates }),
     publicKey,
     3
   );
@@ -947,8 +958,19 @@ export const updateUserProfileWithSOLManagement = async (publicKey, wallet, sign
 export const claimBadgeWithSOLManagement = async (publicKey, wallet, signMessage, badgeIndex) => {
   console.log('🚀 Enhanced badge claiming with SOL management...');
   
+  // Validate parameters
+  if (!publicKey) {
+    throw new Error('publicKey is required for badge claiming');
+  }
+  if (!wallet) {
+    throw new Error('wallet is required for badge claiming');
+  }
+  if (!signMessage) {
+    throw new Error('signMessage is required for badge claiming');
+  }
+  
   return await executeTransactionWithSOLRetry(
-    () => claimBadge(publicKey, wallet, signMessage, badgeIndex),
+    () => claimBadge({ publicKey, wallet, signMessage, badgeIndex }),
     publicKey,
     3
   );
