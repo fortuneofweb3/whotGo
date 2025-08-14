@@ -4053,11 +4053,92 @@ const App = () => {
                           const result = await createUserProfile({ 
                             publicKey, 
                             wallet, 
-                            signMessage 
+                            signMessage,
+                            username: `Player${Math.floor(Math.random() * 10000)}`
                           });
                           if (result.success) {
                             console.log('✅ Profile created successfully');
                             setHoneycombProfileExists(true);
+                            
+                            // Load the created profile data
+                            try {
+                              const loginResult = await loginUserProfile(publicKey);
+                              if (loginResult.exists) {
+                                const walletAddress = publicKey.toBase58();
+                                const userData = {
+                                  id: walletAddress,
+                                  username: loginResult.profile.username || result.userData?.username || `Player${Math.floor(Math.random() * 10000)}`,
+                                  xp: loginResult.profile.xp || 0,
+                                  level: loginResult.profile.level || 1,
+                                  currentLevelXP: (loginResult.profile.xp || 0) % 100, // XP within current level
+                                  xpNeededForNext: 100, // XP needed for next level
+                                  gamesPlayed: loginResult.profile.gamesPlayed || 0,
+                                  gamesWon: loginResult.profile.gamesWon || 0,
+                                  currentWinStreak: loginResult.profile.currentWinStreak || 0,
+                                  bestWinStreak: loginResult.profile.bestWinStreak || 0,
+                                  totalCardsPlayed: loginResult.profile.totalCardsPlayed || 0,
+                                  perfectWins: loginResult.profile.perfectWins || 0,
+                                  achievementsUnlocked: [],
+                                  claimedAchievements: [],
+                                  createdAt: loginResult.profile.createdAt ? new Date(loginResult.profile.createdAt).toISOString() : new Date().toISOString(),
+                                  lastActive: loginResult.profile.lastActive ? new Date(loginResult.profile.lastActive).toISOString() : new Date().toISOString(),
+                                  honeycombProfile: loginResult.profile,
+                                  profilePicture: loginResult.profile.pfp || "https://whotgo.com/default-avatar.png"
+                                };
+                                
+                                setCurrentUser(userData);
+                                initializeAchievements(userData);
+                                
+                                // Also save to Firebase for compatibility
+                                const userRef = ref(db, `users/${walletAddress}`);
+                                await set(userRef, userData);
+                                
+                                // Update leaderboard
+                                const leaderboardRef = ref(db, `leaderboard/users/${walletAddress}`);
+                                const leaderboardData = {
+                                  id: walletAddress,
+                                  username: userData.username,
+                                  xp: userData.xp,
+                                  level: userData.level,
+                                  gamesPlayed: userData.gamesPlayed,
+                                  gamesWon: userData.gamesWon,
+                                  winRate: userData.gamesPlayed > 0 ? (userData.gamesWon / userData.gamesPlayed * 100) : 0,
+                                  totalCardsPlayed: userData.totalCardsPlayed,
+                                  perfectWins: userData.perfectWins,
+                                  currentWinStreak: userData.currentWinStreak,
+                                  bestWinStreak: userData.bestWinStreak,
+                                  lastActive: serverTimestamp()
+                                };
+                                await set(leaderboardRef, leaderboardData);
+                                console.log('✅ New user added to leaderboard');
+                              }
+                            } catch (loginError) {
+                              console.error('❌ Failed to load created profile:', loginError);
+                              // Create a basic user object as fallback
+                              const walletAddress = publicKey.toBase58();
+                              const fallbackUser = {
+                                id: walletAddress,
+                                                                 username: result.userData?.username || `Player${Math.floor(Math.random() * 10000)}`,
+                                xp: 0,
+                                level: 1,
+                                currentLevelXP: 0,
+                                xpNeededForNext: 100,
+                                gamesPlayed: 0,
+                                gamesWon: 0,
+                                currentWinStreak: 0,
+                                bestWinStreak: 0,
+                                totalCardsPlayed: 0,
+                                perfectWins: 0,
+                                achievementsUnlocked: [],
+                                claimedAchievements: [],
+                                createdAt: new Date().toISOString(),
+                                lastActive: new Date().toISOString(),
+                                profilePicture: "https://whotgo.com/default-avatar.png"
+                              };
+                              setCurrentUser(fallbackUser);
+                              initializeAchievements(fallbackUser);
+                            }
+                            
                             // Initialize sounds and start music
                             try {
                               await soundEffects.initializeAfterUserInteraction();
