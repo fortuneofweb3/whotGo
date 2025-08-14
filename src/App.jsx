@@ -956,7 +956,9 @@ const App = () => {
         animationPositions, 
         getVisualPlayerMappingWrapper, 
         getPlayPilePositionWrapper,
-        getTopMarketCardPositionWrapper
+        getTopMarketCardPositionWrapper,
+        currentRoom,
+        currentUser
       );
       
       if (animations.length > 0) {
@@ -2175,13 +2177,13 @@ const App = () => {
     return moves;
   };
 
-  const processOpponentAnimations = (moves, animationPositions, getVisualPlayerMapping, getPlayPilePosition, getTopMarketCardPosition) => {
+  const processOpponentAnimations = (moves, animationPositions, getVisualPlayerMapping, getPlayPilePosition, getTopMarketCardPosition, currentRoom, currentUser) => {
     const animations = [];
 
     // Process card play animation
     if (moves.cardPlay) {
       const { card, playerIndex, playPileLength } = moves.cardPlay;
-      const mapping = getVisualPlayerMapping();
+      const mapping = getVisualPlayerMapping(currentRoom, currentUser);
       const visualPlayerIndex = mapping.actualToVisual[playerIndex] !== undefined ? mapping.actualToVisual[playerIndex] : playerIndex;
       
       const newCardRelativeStyle = getPlayPilePosition(playPileLength - 1, false);
@@ -2208,7 +2210,7 @@ const App = () => {
 
     // Process card draw animations
     moves.cardDraw.forEach(({ playerIndex, cardsCount }) => {
-      const mapping = getVisualPlayerMapping();
+      const mapping = getVisualPlayerMapping(currentRoom, currentUser);
       const visualPlayerIndex = mapping.actualToVisual[playerIndex] !== undefined ? mapping.actualToVisual[playerIndex] : playerIndex;
       
       for (let i = 0; i < cardsCount; i++) {
