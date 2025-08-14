@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, Shield, Clock, Grid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { update, ref } from 'firebase/database';
 import { createDeck, shuffleDeck } from '../utils/deck';
+import { ensurePlayersArray } from '../utils/gameUtils';
 import { db } from '../firebase';
 import WhotShapePopup from './popups/WhotShapePopup';
 import RoundEndPopup from './popups/RoundEndPopup';
@@ -253,7 +254,8 @@ const Game = ({
   }, []);
   const [showWhotChoice, setShowWhotChoice] = React.useState(false);
   const [pendingWhotCard, setPendingWhotCard] = React.useState(null);
-  const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+  const players = ensurePlayersArray(gameData.players);
+  const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
   const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
   
   React.useEffect(() => {
@@ -304,11 +306,12 @@ const Game = ({
     if (!currentRoom || !gameData || !currentUser) {
       return { visualToActual: [0, 1, 2, 3], actualToVisual: { 0: 0, 1: 1, 2: 2, 3: 3 } };
     }
-    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) {
       return { visualToActual: [0, 1, 2, 3], actualToVisual: { 0: 0, 1: 1, 2: 2, 3: 3 } };
     }
-    const totalPlayers = (gameData.players || []).length;
+    const totalPlayers = players.length;
     const visualToActual = [];
     const actualToVisual = {};
     visualToActual[0] = currentUserActualIndex;

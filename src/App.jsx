@@ -2402,7 +2402,8 @@ const App = () => {
       const drawnCard = gameDataToUse.drawPile[gameDataToUse.drawPile.length - 1];
       gameDataToUse.drawPile = gameDataToUse.drawPile.slice(0, -1);
       player.cards = [...player.cards, drawnCard];
-      const playerActualIndex = (gameDataToUse.players || []).findIndex(p => p.id === player.id);
+      const players = ensurePlayersArray(gameDataToUse.players);
+      const playerActualIndex = players.findIndex(p => p.id === player.id);
       let visualPlayerIndex = playerActualIndex;
       if (currentRoom) {
         const mapping = getVisualPlayerMapping();
@@ -2429,7 +2430,7 @@ const App = () => {
       });
       await new Promise(resolve => setTimeout(resolve, 150)); // Increased pause between draw animations
     }
-          const currentUserActualIndex = currentRoom ? (gameDataToUse.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+          const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
     if (player.id === currentUserActualIndex || !currentRoom && player.id === 0) {
       const newTotal = player.cards.length;
       if (newTotal > maxVisiblePlayerCards) setPlayerScrollIndex(newTotal - maxVisiblePlayerCards);
@@ -3249,7 +3250,8 @@ const App = () => {
       console.log('=== handleMultiplayerRoundEnd called ===');
       console.log('Game data:', gameData);
       
-      const activePlayers = gameData.players.filter(p => !p.eliminated);
+      const players = ensurePlayersArray(gameData.players);
+      const activePlayers = players.filter(p => !p.eliminated);
       const playersWithTotals = activePlayers.map(p => ({
         ...p,
         cardTotal: calculateCardTotal(p.cards),
@@ -3291,7 +3293,8 @@ const App = () => {
         gamePhase: 'roundEnd'
       };
       
-      const eliminatedPlayerInNewData = (newGameData.players || []).find(p => p.id === eliminatedPlayer.id);
+      const newPlayers = ensurePlayersArray(newGameData.players);
+      const eliminatedPlayerInNewData = newPlayers.find(p => p.id === eliminatedPlayer.id);
       if (eliminatedPlayerInNewData) {
         eliminatedPlayerInNewData.eliminated = true;
       }
@@ -3319,13 +3322,15 @@ const App = () => {
     if (!roundEndData || !currentRoom) return;
     
     const eliminatedPlayer = roundEndData.eliminatedPlayer;
-    const remainingPlayers = gameData.players.filter(p => !p.eliminated && p.id !== eliminatedPlayer.id);
+    const players = ensurePlayersArray(gameData.players);
+    const remainingPlayers = players.filter(p => !p.eliminated && p.id !== eliminatedPlayer.id);
     
     setGameData(prevData => {
       if (!prevData) return prevData;
       
       const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
-      const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
+      const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
+      const eliminatedPlayerInNewData = nextPlayers.find(p => p.id === eliminatedPlayer.id);
       if (eliminatedPlayerInNewData) {
         eliminatedPlayerInNewData.eliminated = true;
       }
@@ -3392,7 +3397,7 @@ const App = () => {
         ];
         
         // Set current player to first non-eliminated player
-        const firstPlayerIndex = (nextRoundGameData.players || []).findIndex(p => !p.eliminated);
+        const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
         nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
         
         // Update Firebase with next round data
@@ -3431,10 +3436,11 @@ const App = () => {
 
   const handleAutoPlay = async () => {
     if (!gameData || !currentRoom || !currentUser) return;
-    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) return;
-    const currentPlayerData = gameData.players[currentUserActualIndex];
+    const currentPlayerData = players[currentUserActualIndex];
     try {
       const topCard = gameData.playPile[gameData.playPile.length - 1];
       const playableCards = currentPlayerData.cards.filter(card => canPlayCard(card, topCard));
@@ -3457,7 +3463,8 @@ const App = () => {
     const whotCard = { ...pendingWhotCard, chosenShape: shape };
     newGameData.playPile[newGameData.playPile.length - 1] = whotCard;
     if (currentRoom) {
-      const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+      const players = ensurePlayersArray(gameData.players);
+      const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
       const currentPlayer = newGameData.players[currentUserActualIndex];
       newGameData.lastAction = `${currentPlayer.name} - WHOT → ${shape}`;
       newGameData.gameLog = {
@@ -3862,14 +3869,15 @@ const App = () => {
   const playMultiplayerCard = async (cardIndex) => {
     if (!gameData || !currentRoom || !currentUser || isPlayerActionInProgress) return;
     
-    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === currentUser.id);
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = players.findIndex(p => p.id === currentUser.id);
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) {
       console.log('🎴 Not your turn! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
       return;
     }
     
-    const currentPlayerData = gameData.players[currentUserActualIndex];
+    const currentPlayerData = players[currentUserActualIndex];
     const actualCardIndex = cardIndex + playerScrollIndex;
     const card = currentPlayerData.cards[actualCardIndex];
     const topCard = gameData.playPile[gameData.playPile.length - 1];
@@ -4018,13 +4026,14 @@ const App = () => {
     if (!gameData || !currentRoom || isPlayerActionInProgress || isAnyAnimationInProgress || animatingCards.length > 0) return;
     updateGameActivity(); // Track activity for timeout
     
-    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (gameData.currentPlayer !== currentUserActualIndex) {
       console.log('🎴 Not your turn to draw! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
       return;
     }
     
-    const currentPlayer = gameData.players[currentUserActualIndex];
+    const currentPlayer = players[currentUserActualIndex];
     if (currentPlayer.eliminated) return;
     
     setIsPlayerActionInProgress(true);
