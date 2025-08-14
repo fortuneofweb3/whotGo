@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, setupFeePayerWallet, getFeePayerInfo, configureFeePayerWithAddress } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, setupFeePayerWallet, getFeePayerInfo, configureFeePayerWithAddress, createFeePayerWalletAdapter } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';

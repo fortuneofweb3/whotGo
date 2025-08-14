@@ -17,7 +17,7 @@ const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 // Fee payer wallet configuration (for paying transaction fees)
 const FEE_PAYER_WALLET = {
   // This is a dedicated wallet with SOL for paying transaction fees
-  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY || 'HhEQWQdVL9wagu3tHj6vSBAR4YB9UtkuQkiHZ3cLMU1y', // Your funded wallet address
+  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY , // Your funded wallet address
   privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY , // Your private key (base58 encoded)
   useUserAsFeePayer: false, // Set to false to use dedicated fee payer wallet
   isConfigured: true // Set to true when wallet is properly configured
@@ -292,6 +292,9 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     }
     
     // Send the transaction using the client's helper
+    console.log('📝 Sending transaction with wallet adapter...');
+    console.log('📝 Wallet adapter public key:', walletAdapter.publicKey?.toBase58());
+    console.log('📝 Wallet adapter connected:', walletAdapter.connected);
     const response = await sendClientTransactions(client, walletAdapter, txResponse);
     console.log('✅ Honeycomb user profile created successfully');
     console.log('📋 Transaction response:', response);
@@ -822,37 +825,52 @@ export const getFeePayerKeypair = () => {
   }
   
   try {
-    console.log('🔐 Decoding private key...');
     const privateKeyBytes = bs58.decode(FEE_PAYER_WALLET.privateKey);
-    console.log('🔐 Private key decoded, length:', privateKeyBytes.length, 'bytes');
     
     // Validate private key length (should be 64 bytes for Solana)
     if (privateKeyBytes.length !== 64) {
-      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes (expected 64). Please ensure the private key is in base58 format.`);
+      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes (expected 64)`);
     }
     
-    console.log('🔐 Creating keypair from private key...');
     const keypair = Keypair.fromSecretKey(privateKeyBytes);
-    console.log('🔐 Keypair created successfully');
     
     // Verify the keypair matches the configured public key
-    const derivedPublicKey = keypair.publicKey.toBase58();
-    console.log('🔐 Derived public key:', derivedPublicKey);
-    console.log('🔐 Expected public key:', FEE_PAYER_WALLET.publicKey);
-    
-    if (derivedPublicKey !== FEE_PAYER_WALLET.publicKey) {
-      throw new Error(`Private key does not match the configured public key. Derived: ${derivedPublicKey}, Expected: ${FEE_PAYER_WALLET.publicKey}`);
+    if (keypair.publicKey.toBase58() !== FEE_PAYER_WALLET.publicKey) {
+      throw new Error('Private key does not match the configured public key');
     }
     
-    console.log('✅ Fee payer keypair validated successfully');
     return keypair;
   } catch (error) {
     console.error('❌ Fee payer keypair validation failed:', error);
-    if (error.message.includes('Invalid base58')) {
-      throw new Error('Invalid private key format. Please ensure the private key is in base58 encoding.');
-    }
     throw new Error(`Invalid fee payer private key: ${error.message}`);
   }
+};
+
+// Create a fee payer wallet adapter for transaction signing
+export const createFeePayerWalletAdapter = () => {
+  const feePayerKeypair = getFeePayerKeypair();
+  
+  return {
+    publicKey: feePayerKeypair.publicKey,
+    connected: true,
+    connecting: false,
+    disconnect: async () => {},
+    signTransaction: async (transaction) => {
+      console.log('📝 Signing transaction with fee payer keypair...');
+      transaction.partialSign(feePayerKeypair);
+      return transaction;
+    },
+    signAllTransactions: async (transactions) => {
+      console.log('📝 Signing multiple transactions with fee payer keypair...');
+      transactions.forEach(tx => tx.partialSign(feePayerKeypair));
+      return transactions;
+    },
+    signMessage: async (message) => {
+      console.log('📝 Signing message with fee payer keypair...');
+      const signature = bs58.encode(feePayerKeypair.sign(message));
+      return signature;
+    }
+  };
 };
 
 // Set up fee payer wallet manually
