@@ -937,13 +937,13 @@ const App = () => {
     
     if (!prevGameData) return; // Skip first render
     
-    // console.log('🎴 Animation useEffect triggered - checking for animations...');
+    console.log('🎴 Animation useEffect triggered - checking for animations...');
     
     // Detect opponent moves using the animations module
     const moves = detectOpponentMoves(prevGameData, gameData, currentUser);
     
     if (moves.cardPlay || moves.cardDraw.length > 0) {
-      // console.log('🎴 Detected opponent moves:', moves);
+      console.log('🎴 Detected opponent moves:', moves);
       
       // Create wrappers for functions that use current context
       const getVisualPlayerMappingWrapper = () => getVisualPlayerMapping(currentRoom, currentUser);
@@ -962,11 +962,11 @@ const App = () => {
       );
       
       if (animations.length > 0) {
-        // console.log('🎴 Starting animations:', animations);
+        console.log('🎴 Starting animations:', animations);
         
         // Start animations with completion callback
         startAnimations(animations, setAnimatingCards, () => {
-          // console.log('🎴 All animations completed');
+          console.log('🎴 All animations completed');
           // Update play pile positions after animation
           if (moves.cardPlay) {
             getPlayPilePosition(gameData.playPile.length - 1, true);
@@ -2137,9 +2137,15 @@ const App = () => {
       const newPlayers = ensurePlayersArray(newGameData.players);
       
       // Determine who played by card count difference
-      let playerWhoPlayed = prevPlayers.findIndex(p => 
-        (p.cards || []).length > ((newPlayers.find(np => np.id === p.id))?.cards || []).length
-      );
+      let playerWhoPlayed = -1;
+      for (let i = 0; i < prevPlayers.length; i++) {
+        const prevPlayer = prevPlayers[i];
+        const newPlayer = newPlayers.find(np => np.id === prevPlayer.id);
+        if (newPlayer && (prevPlayer.cards || []).length > (newPlayer.cards || []).length) {
+          playerWhoPlayed = i;
+          break;
+        }
+      }
       
       // Fallback to currentPlayer if no difference found
       if (playerWhoPlayed === -1) {
@@ -2148,12 +2154,21 @@ const App = () => {
       
       const currentUserIndex = newPlayers.findIndex(p => p.id === currentUser?.id);
       
+      console.log('🎴 Card play detection:', {
+        playerWhoPlayed,
+        currentUserIndex,
+        lastCard,
+        playPileLength: newGameData.playPile.length,
+        prevPlayPileLength: prevGameData.playPile.length
+      });
+      
       if (playerWhoPlayed !== -1 && playerWhoPlayed !== currentUserIndex) {
         moves.cardPlay = {
           card: lastCard,
           playerIndex: playerWhoPlayed,
           playPileLength: newGameData.playPile.length
         };
+        console.log('🎴 Card play detected for opponent:', moves.cardPlay);
       }
     }
 
