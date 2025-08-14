@@ -715,6 +715,92 @@ const App = () => {
     }
   }, [currentUser?.id]);
 
+  // Room cleanup function
+  const cleanupInactiveRooms = async () => {
+    try {
+      console.log('🧹 Starting room cleanup...');
+      const roomsRef = ref(db, 'rooms');
+      const snapshot = await get(roomsRef);
+      
+      if (!snapshot.exists()) {
+        console.log('🧹 No rooms to clean up');
+        return;
+      }
+      
+      const roomsData = snapshot.val();
+      const now = Date.now();
+      const fiveMinutesAgo = now - (5 * 60 * 1000);
+      const sixHoursAgo = now - (6 * 60 * 60 * 1000);
+      
+      const roomsToDelete = [];
+      
+      Object.keys(roomsData).forEach(roomId => {
+        const room = roomsData[roomId];
+        const roomCreatedAt = room.createdAt || 0;
+        const lastActivity = room.lastActivity || roomCreatedAt;
+        
+        // Check if room is older than 6 hours
+        if (roomCreatedAt < sixHoursAgo) {
+          console.log(`🧹 Room ${roomId} is older than 6 hours, marking for deletion`);
+          roomsToDelete.push(roomId);
+          return;
+        }
+        
+        // Check if room is stuck in starting phase for more than 5 minutes
+        if (room.status === 'waiting' && lastActivity < fiveMinutesAgo) {
+          console.log(`🧹 Room ${roomId} is stuck in waiting phase for more than 5 minutes, marking for deletion`);
+          roomsToDelete.push(roomId);
+          return;
+        }
+        
+        // Check if room is in countdown but no activity for 5+ minutes
+        if (room.status === 'countdown' && lastActivity < fiveMinutesAgo) {
+          console.log(`🧹 Room ${roomId} is stuck in countdown for more than 5 minutes, marking for deletion`);
+          roomsToDelete.push(roomId);
+          return;
+        }
+        
+        // Check if room is playing but no activity for 5+ minutes
+        if (room.status === 'playing' && lastActivity < fiveMinutesAgo) {
+          console.log(`🧹 Room ${roomId} has been inactive for more than 5 minutes, marking for deletion`);
+          roomsToDelete.push(roomId);
+          return;
+        }
+      });
+      
+      // Delete inactive rooms
+      if (roomsToDelete.length > 0) {
+        console.log(`🧹 Deleting ${roomsToDelete.length} inactive rooms:`, roomsToDelete);
+        
+        const deletePromises = roomsToDelete.map(roomId => {
+          const roomRef = ref(db, `rooms/${roomId}`);
+          return remove(roomRef);
+        });
+        
+        await Promise.all(deletePromises);
+        console.log(`🧹 Successfully deleted ${roomsToDelete.length} inactive rooms`);
+      } else {
+        console.log('🧹 No inactive rooms found');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error during room cleanup:', error);
+    }
+  };
+
+  // Set up room cleanup interval (runs every 2 minutes)
+  useEffect(() => {
+    const cleanupInterval = setInterval(cleanupInactiveRooms, 2 * 60 * 1000);
+    
+    // Run initial cleanup after 30 seconds
+    const initialCleanup = setTimeout(cleanupInactiveRooms, 30 * 1000);
+    
+    return () => {
+      clearInterval(cleanupInterval);
+      clearTimeout(initialCleanup);
+    };
+  }, []);
+
   useEffect(() => {
     const roomsRef = ref(db, 'rooms');
     const unsubscribe = onValue(roomsRef, snapshot => {
@@ -4097,54 +4183,7 @@ const App = () => {
     }
   }, [gameState, currentRoom, gameData]);
 
-  // Clean up inactive rooms from Firebase and localStorage
-  const cleanupInactiveRooms = async () => {
-    try {
-      const roomsRef = ref(db, 'rooms');
-      const snapshot = await get(roomsRef);
-      if (!snapshot.exists()) return;
 
-      const now = Date.now();
-      const thresholdMs = 5 * 60 * 1000; // 5 minutes
-      const updates = {};
-
-      snapshot.forEach(roomSnap => {
-        const room = roomSnap.val();
-        const roomId = roomSnap.key;
-        const status = room?.status;
-        const lastActive = typeof room?.lastActive === 'number' ? room.lastActive : 0;
-        
-        // Clean up rooms that are waiting or countdown and haven't been active for 5 minutes
-        const shouldDelete = (status === 'waiting' || status === 'countdown') && 
-                           lastActive && (now - lastActive > thresholdMs);
-        
-        if (shouldDelete) {
-          console.log(`Cleaning up inactive room: ${roomId} (last active: ${new Date(lastActive).toISOString()})`);
-          updates[roomId] = null;
-          
-          // Also clean up any room-related data from localStorage
-          try {
-            localStorage.removeItem(`whotgo_room_${roomId}`);
-            localStorage.removeItem(`whotgo_currentRoom`);
-          } catch (e) {
-            console.warn('Failed to clean up room data from localStorage:', e);
-          }
-        }
-      });
-
-      if (Object.keys(updates).length > 0) {
-        await update(roomsRef, updates);
-      }
-    } catch (error) {
-      console.error('Error cleaning up inactive rooms:', error);
-    }
-  };
-
-  // Periodically clean up inactive rooms (every 2 minutes)
-  useEffect(() => {
-    const cleanupInterval = setInterval(cleanupInactiveRooms, 2 * 60 * 1000);
-    return () => clearInterval(cleanupInterval);
-  }, []);
 
   // Clean up stale room data from localStorage on app startup
   useEffect(() => {

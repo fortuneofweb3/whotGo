@@ -1140,7 +1140,10 @@ const Game = ({
             [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
           };
         }
-        await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
+        await update(ref(db, `rooms/${currentRoom.id}`), {
+          gameData: newGameData,
+          lastActivity: Date.now()
+        });
       }
       setIsPlayerActionInProgress(false);
       setIsAnyAnimationInProgress(false);
@@ -1209,7 +1212,10 @@ const Game = ({
       }
       const nextPlayerIndex = getNextPlayer(newGameData);
       newGameData.currentPlayer = nextPlayerIndex;
-      await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
+      await update(ref(db, `rooms/${currentRoom.id}`), {
+        gameData: newGameData,
+        lastActivity: Date.now()
+      });
       setIsPlayerActionInProgress(false);
       setIsAnyAnimationInProgress(false);
     } catch (error) {
