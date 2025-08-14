@@ -27,7 +27,21 @@ class SoundEffectsManager {
       end: '/assets/sounds/effects/End.mp3'
     };
 
+    console.log('🎵 Sound file paths:', soundFiles);
+
     console.log('🎵 Loading sound files...');
+    
+    // Test if files are accessible
+    for (const [name, path] of Object.entries(soundFiles)) {
+      fetch(path, { method: 'HEAD' })
+        .then(response => {
+          console.log(`🎵 File ${name} accessible: ${response.ok} (${response.status})`);
+        })
+        .catch(error => {
+          console.error(`🎵 File ${name} not accessible:`, error);
+        });
+    }
+    
     const loadPromises = [];
     
     for (const [name, path] of Object.entries(soundFiles)) {
@@ -46,7 +60,12 @@ class SoundEffectsManager {
           
           // Handle load error
           audio.addEventListener('error', (error) => {
-            console.warn(`Failed to load sound: ${name}`, error);
+            console.error(`Failed to load sound: ${name} from ${path}`, error);
+            console.error('Audio error details:', {
+              error: audio.error,
+              networkState: audio.networkState,
+              readyState: audio.readyState
+            });
             resolve(); // Resolve anyway to not block other sounds
           }, { once: true });
           
@@ -64,10 +83,63 @@ class SoundEffectsManager {
     console.log('🎵 Sound loading complete. Loaded sounds:', Object.keys(this.sounds));
   }
 
+  async loadSoundOnDemand(soundName) {
+    const soundFiles = {
+      play: '/assets/sounds/effects/Play.wav',
+      market: '/assets/sounds/effects/Market.wav',
+      shuffle: '/assets/sounds/effects/Shuffle.wav',
+      special: '/assets/sounds/effects/Special.wav',
+      background: '/assets/sounds/effects/Main.mp3',
+      gameMusic: '/assets/sounds/effects/Game.mp3',
+      click: '/assets/sounds/effects/Click.mp3',
+      back: '/assets/sounds/effects/Back.mp3',
+      end: '/assets/sounds/effects/End.mp3'
+    };
+
+    const path = soundFiles[soundName];
+    if (!path) {
+      throw new Error(`Unknown sound: ${soundName}`);
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const audio = new Audio(path);
+        audio.preload = 'auto';
+        audio.volume = this.volume;
+        
+        audio.addEventListener('canplaythrough', () => {
+          this.sounds[soundName] = audio;
+          console.log(`🎵 Loaded sound on demand: ${soundName}`);
+          resolve();
+        }, { once: true });
+        
+        audio.addEventListener('error', (error) => {
+          console.error(`Failed to load sound on demand: ${soundName}`, error);
+          reject(error);
+        }, { once: true });
+        
+      } catch (error) {
+        console.error(`Failed to create audio for on demand: ${soundName}`, error);
+        reject(error);
+      }
+    });
+  }
+
   play(soundName, options = {}) {
     console.log(`🎵 Attempting to play sound: ${soundName}, enabled: ${this.isEnabled}, loaded: ${!!this.sounds[soundName]}, initialized: ${this.isInitialized}`);
-    if (!this.isEnabled || !this.sounds[soundName]) {
-      console.log(`Sound ${soundName} not enabled or not loaded`);
+    if (!this.isEnabled) {
+      console.log(`Sound ${soundName} not enabled`);
+      return;
+    }
+    
+    if (!this.sounds[soundName]) {
+      console.log(`Sound ${soundName} not loaded, attempting to load on demand...`);
+      // Try to load the sound on demand
+      this.loadSoundOnDemand(soundName).then(() => {
+        this.play(soundName, options);
+      }).catch(error => {
+        console.warn(`Failed to load sound ${soundName} on demand:`, error);
+      });
       return;
     }
 
