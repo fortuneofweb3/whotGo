@@ -2551,17 +2551,31 @@ const App = () => {
   const getVisualPlayerMapping = () => {
     if (!currentRoom) return { actualToVisual: {}, visualToActual: {} };
     
-    const roomPlayers = currentRoom.players || [];
-    const currentUserIndex = (roomPlayers || []).findIndex(p => p.id === currentUser?.id);
+    // Convert room players object to array
+    const roomPlayers = currentRoom.players || {};
+    const playersArray = Object.values(roomPlayers);
     
-    if (currentUserIndex === -1) return { actualToVisual: {}, visualToActual: {} };
+    if (!Array.isArray(playersArray)) {
+      console.warn('Room players is not an array:', roomPlayers);
+      return { actualToVisual: {}, visualToActual: {} };
+    }
+    
+    const currentUserIndex = playersArray.findIndex(p => p.id === currentUser?.id);
+    
+    if (currentUserIndex === -1) {
+      console.warn('Current user not found in room players:', {
+        currentUserId: currentUser?.id,
+        playerIds: playersArray.map(p => p.id)
+      });
+      return { actualToVisual: {}, visualToActual: {} };
+    }
     
     const actualToVisual = {};
     const visualToActual = {};
     
     // Map actual player indices to visual positions
-    for (let i = 0; i < roomPlayers.length; i++) {
-      const visualIndex = (i - currentUserIndex + roomPlayers.length) % roomPlayers.length;
+    for (let i = 0; i < playersArray.length; i++) {
+      const visualIndex = (i - currentUserIndex + playersArray.length) % playersArray.length;
       actualToVisual[i] = visualIndex;
       visualToActual[visualIndex] = i;
     }
