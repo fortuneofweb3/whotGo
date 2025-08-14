@@ -51,31 +51,9 @@ const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebu
                             </span>
                           </td>
                                                      <td className="py-4 px-4">
-                             <div className="flex items-center gap-3">
-                               <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center flex-shrink-0">
-                                 {player.profilePicture ? (
-                                   <img 
-                                     src={player.profilePicture} 
-                                     alt="Profile" 
-                                     className="w-full h-full object-cover"
-                                     onError={(e) => {
-                                       e.target.style.display = 'none';
-                                       e.target.nextSibling.style.display = 'flex';
-                                     }}
-                                   />
-                                 ) : (
-                                   <div className="w-full h-full bg-gray-600 flex items-center justify-center text-white text-sm">
-                                     👤
-                                   </div>
-                                 )}
-                                 <div className="w-full h-full bg-gray-600 flex items-center justify-center text-white text-sm" style={{ display: 'none' }}>
-                                   👤
-                                 </div>
-                               </div>
-                               <div>
-                                 <div className={`font-bold text-lg ${player.name === 'You' ? 'text-white' : 'text-white'}`}>
-                                   {player.name}
-                                 </div>
+                             <div>
+                               <div className={`font-bold text-lg ${player.name === 'You' ? 'text-white' : 'text-white'}`}>
+                                 {player.name}
                                </div>
                              </div>
                            </td>
@@ -111,7 +89,7 @@ const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebu
                       onClick={onTestAirdrop}
                       className="px-4 py-2 bg-[#80142C] text-white hover:bg-[#a01d39] text-sm block w-full"
                     >
-                                             🧪 Test Wallet Funding
+                      🧪 Test Airdrop Functionality
                     </button>
                   )}
                 </div>

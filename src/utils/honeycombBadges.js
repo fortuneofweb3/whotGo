@@ -1,4 +1,4 @@
-import { claimBadge, getUserProfile, hasBadge, getBadgeName, BADGE_CRITERIA, executeTransactionWithAutoFunding } from './profile';
+import { claimBadge, getUserProfile, hasBadge, getBadgeName, BADGE_CRITERIA, executeTransactionWithSOLRetry } from './profile';
 
 // Badge achievement conditions and tracking
 export const BADGE_CONDITIONS = {
@@ -106,8 +106,12 @@ export const claimSpecificBadge = async ({ publicKey, wallet, signMessage, badge
   try {
     console.log(`Claiming badge ${badgeIndex}...`);
     
-    // Claim the badge on-chain
-    const result = await claimBadge({ publicKey, wallet, signMessage, badgeIndex });
+    // Use enhanced SOL management for badge claiming
+    const result = await executeTransactionWithSOLRetry(
+      () => claimBadge({ publicKey, wallet, signMessage, badgeIndex }),
+      publicKey,
+      3
+    );
     
     if (result.success) {
       console.log(`Successfully claimed badge: ${badgeIndex}`);
@@ -149,6 +153,17 @@ export const claimSpecificBadge = async ({ publicKey, wallet, signMessage, badge
   }
 };
 
+// Enhanced badge claiming with SOL management
+export const claimSpecificBadgeWithSOLManagement = async ({ publicKey, wallet, signMessage, badgeIndex, currentUser = null }) => {
+  console.log('🚀 Enhanced badge claiming with SOL management...');
+  
+  return await executeTransactionWithSOLRetry(
+    () => claimSpecificBadge({ publicKey, wallet, signMessage, badgeIndex, currentUser }),
+    publicKey,
+    3
+  );
+};
+
 // Update game statistics and check for badges
 export const updateGameStats = async ({ publicKey, wallet, signMessage, gameResult, gameStats, currentUser = null }) => {
   try {
@@ -174,14 +189,14 @@ export const updateGameStats = async ({ publicKey, wallet, signMessage, gameResu
     // Calculate new level based on XP
     newStats.level = Math.floor(newStats.xp / 100) + 1;
     
-    // Update profile with new stats
-    const { updateUserProfile } = await import('./profile');
-    await updateUserProfile({
+    // Update profile with new stats using enhanced SOL management
+    const { updateUserProfileWithSOLManagement } = await import('./profile');
+    await updateUserProfileWithSOLManagement(
       publicKey,
       wallet,
       signMessage,
-      profileData: newStats
-    });
+      newStats
+    );
     
     // Check for unlockable badges (but don't claim them automatically)
     const unlockableBadges = await checkUnlockableBadges({

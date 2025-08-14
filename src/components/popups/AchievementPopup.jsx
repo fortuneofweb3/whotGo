@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getAllBadges, getBadgeProgress, BADGE_CONDITIONS, claimSpecificBadge } from '../../utils/honeycombBadges';
+import { getAllBadges, getBadgeProgress, BADGE_CONDITIONS, claimSpecificBadge, claimSpecificBadgeWithSOLManagement } from '../../utils/honeycombBadges';
 import { getUserProfile } from '../../utils/profile';
 
 const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievements: firebaseAchievements }) => {
@@ -152,7 +152,7 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
     try {
       console.log(`Claiming badge ${badgeIndex}...`);
       
-      const result = await claimSpecificBadge({
+      const result = await claimSpecificBadgeWithSOLManagement({
         publicKey,
         wallet,
         signMessage,

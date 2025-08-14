@@ -1,7 +1,7 @@
 import createEdgeClient from '@honeycomb-protocol/edge-client';
 import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/walletHelpers';
 import bs58 from 'bs58';
-import { Connection, LAMPORTS_PER_SOL, PublicKey, Keypair, Transaction, SystemProgram } from '@solana/web3.js';
+import { Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, Keypair } from '@solana/web3.js';
 
 // Real Honeycomb Protocol Configuration for "Whot Go!" Project
 // Project was created on Honeynet (Solana test network)
@@ -13,13 +13,6 @@ const API_URLS = [
 
 const PROJECT_ADDRESS = 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c';
 const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
-
-// App wallet configuration for funding users
-const APP_WALLET_CONFIG = {
-  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY,
-  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY,
-  isConfigured: !!(import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY && import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY)
-};
 
 // Network configuration
 const NETWORK_CONFIG = {
@@ -149,8 +142,14 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       throw new Error('Wallet not properly connected or missing signAllTransactions method');
     }
 
-    // Note: SOL funding will be handled automatically by executeTransactionWithAutoFunding
-    console.log('💰 SOL funding will be handled automatically if needed during transaction...');
+    // Ensure wallet has SOL for transaction fees
+    console.log('💰 Ensuring wallet has SOL for transaction fees...');
+    const airdropPerformed = await ensureWalletHasSOL(publicKey, 0.01);
+    
+    if (airdropPerformed) {
+      console.log('💰 Waiting 2 seconds for airdrop to settle...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
 
     const walletAddress = publicKey.toBase58();
     const displayName = username || `Player${Math.floor(Math.random() * 10000)}`;
@@ -177,40 +176,67 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     let accessToken = null;
     
     // Create new user with profile using Honeycomb Protocol
-    // Following the official documentation pattern exactly
+    // Following the official documentation pattern
     console.log('📝 Creating profile transaction...');
+    console.log('📋 Transaction parameters configured');
     
     const transactionParams = {
       project: PROJECT_ADDRESS,
       wallet: walletAddress,
       payer: walletAddress,
-      profileIdentity: "main",
+      profileIdentity: "main", // Main profile identity
       userInfo: {
         name: displayName,
         bio: "Whot Go! Player - Join the ultimate card game experience!",
-        pfp: "https://whotgo.com/default-avatar.png"
+        pfp: "https://whotgo.com/default-avatar.png" // Default avatar
+      },
+      customData: {
+        add: {
+          xp: ["0"],
+          level: ["1"],
+          gamesPlayed: ["0"],
+          gamesWon: ["0"],
+          createdAt: [Date.now().toString()],
+          lastActive: [Date.now().toString()],
+          totalCardsPlayed: ["0"],
+          perfectWins: ["0"],
+          currentWinStreak: ["0"],
+          bestWinStreak: ["0"]
+        }
       }
     };
     
     console.log('📝 Calling createNewUserWithProfileTransaction...');
-    console.log('📝 Transaction params:', transactionParams);
     
     let apiResponse;
     try {
+      console.log('📝 About to call createNewUserWithProfileTransaction...');
       apiResponse = await client.createNewUserWithProfileTransaction(transactionParams);
-      console.log('📝 API response received:', apiResponse);
+          console.log('📝 API response received');
+    console.log('📝 API response type:', typeof apiResponse);
+    console.log('📝 API response keys:', apiResponse ? Object.keys(apiResponse) : 'null/undefined');
     } catch (apiError) {
       console.error('❌ API call failed:', apiError);
+      console.error('❌ API error details:', {
+        message: apiError.message,
+        name: apiError.name,
+        graphqlErrors: apiError.graphQLErrors,
+        networkError: apiError.networkError
+      });
       throw apiError;
     }
+    
+    console.log('📝 Checking API response structure...');
+    console.log('📝 apiResponse exists:', !!apiResponse);
+    console.log('📝 Transaction data exists:', !!(apiResponse && apiResponse.createNewUserWithProfileTransaction));
     
     if (!apiResponse || !apiResponse.createNewUserWithProfileTransaction) {
       console.error('❌ Invalid API response structure:', apiResponse);
       throw new Error('Invalid response from Honeycomb API: missing createNewUserWithProfileTransaction');
     }
     
-    // Get the transaction response as per docs
-    const { createNewUserWithProfileTransaction: txResponse } = apiResponse;
+    // The API returns the transaction data directly, not nested under 'tx'
+    const txResponse = apiResponse.createNewUserWithProfileTransaction;
     
     console.log('📝 Transaction response exists:', !!txResponse);
     console.log('📝 Transaction response type:', typeof txResponse);
@@ -223,32 +249,82 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     
     console.log('✅ Profile transaction created, requesting wallet signature...');
     
-    // Sign and send the transaction as per docs
+    // Sign and send the transaction - this will prompt the user to approve
     const walletAdapter = getWalletAdapter(wallet);
-    
-    // Send the transaction using the client's helper with auto-funding
-    const response = await executeTransactionWithAutoFunding(publicKey, async () => {
-      return await sendClientTransactions(client, walletAdapter, txResponse);
+    console.log('🔐 Using wallet adapter for transaction');
+    console.log('🔐 Adapter name:', walletAdapter.name);
+    console.log('🔐 Connected:', walletAdapter.connected);
+    console.log('🔐 Has required methods:', {
+      signAllTransactions: !!walletAdapter.signAllTransactions,
+      signTransaction: !!walletAdapter.signTransaction,
+      signMessage: !!walletAdapter.signMessage
     });
     
+    console.log('🔐 Transaction data ready for signing');
+    console.log('🔐 Transaction type:', typeof txResponse);
+    console.log('🔐 Transaction keys:', txResponse ? Object.keys(txResponse) : null);
+    
+    // Wrap transaction in object format expected by sendClientTransactions
+    const transactionObject = {
+      transaction: txResponse.transaction,
+      blockhash: txResponse.blockhash,
+      lastValidBlockHeight: txResponse.lastValidBlockHeight
+    };
+    
+    console.log('🔐 Transaction object prepared for profile creation:', {
+      hasTransaction: !!transactionObject.transaction,
+      hasBlockhash: !!transactionObject.blockhash,
+      hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
+    });
+    
+    const response = await sendClientTransactions(client, walletAdapter, transactionObject);
     console.log('✅ Honeycomb user profile created successfully');
-    console.log('📋 Transaction response:', response);
+    console.log('📋 Transaction response type:', typeof response);
+    console.log('📋 Transaction response keys:', response ? Object.keys(response) : null);
     
-    // Extract transaction signature and profile address from response
-    const transactionSignature = response?.signature || null;
-    const profileAddress = response?.profileAddress || null;
+    // Handle bundle response format
+    let transactionSignature = null;
+    let profileAddress = null;
     
+    if (Array.isArray(response) && response.length > 0) {
+      // Bundle response format
+      console.log('📦 Bundle response detected');
+      const bundleResponse = response[0];
+      
+      if (bundleResponse && bundleResponse.responses && Array.isArray(bundleResponse.responses)) {
+        console.log('📦 Bundle responses count:', bundleResponse.responses.length);
+        
+        // Look for the actual transaction response
+        for (const resp of bundleResponse.responses) {
+          if (resp && resp.signature) {
+            transactionSignature = resp.signature;
+            console.log('✅ Found transaction signature in bundle');
+          }
+          if (resp && resp.profileAddress) {
+            profileAddress = resp.profileAddress;
+            console.log('✅ Found profile address in bundle');
+          }
+        }
+      }
+    } else if (response && response.signature) {
+      // Direct response format
+      transactionSignature = response.signature;
+      profileAddress = response.profileAddress;
+      console.log('✅ Direct transaction signature found');
+      console.log('✅ Direct profile address found');
+    }
+    
+    // Verify the transaction was successful
     if (transactionSignature) {
-      console.log('✅ Transaction signature:', transactionSignature);
+      console.log('✅ Transaction signature confirmed');
+      console.log('✅ Profile address confirmed');
+    } else {
+      console.error('❌ Transaction response missing signature');
+      console.error('❌ Response structure available for debugging');
     }
     
-    if (profileAddress) {
-      console.log('✅ Profile address:', profileAddress);
-    }
-    
-    // Create user data for Firebase
-    const userData = {
-      id: walletAddress,
+    return {
+      success: true,
       username: displayName,
       xp: 0,
       level: 1,
@@ -256,19 +332,6 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       gamesWon: 0,
       createdAt: Date.now(),
       lastActive: Date.now(),
-      totalCardsPlayed: 0,
-      perfectWins: 0,
-      currentWinStreak: 0,
-      bestWinStreak: 0,
-      profilePicture: "https://whotgo.com/default-avatar.png", // Default profile picture
-      honeycombProfileExists: true,
-      profileAddress: profileAddress || null,
-      transactionSignature: transactionSignature || null
-    };
-
-    return {
-      success: true,
-      userData,
       profileAddress: profileAddress || null,
       transactionSignature: transactionSignature || null
     };
@@ -647,111 +710,145 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
   }
 };
 
-// Check wallet SOL balance and fund if needed using the method you specified
+// App wallet configuration for SOL transfers
+const APP_WALLET_CONFIG = {
+  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY,
+  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY
+};
+
+// Enhanced SOL management with automatic airdrops and app wallet fallback
 export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
   try {
-    console.log('💰 Checking wallet SOL balance...');
+    console.log('💰 Enhanced SOL management: Checking wallet balance...');
     
-    // Connect to Honeycomb testnet
+    // Connect to Honeynet RPC
     const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+    
+    // Get current balance
     const balance = await connection.getBalance(publicKey);
     const solBalance = balance / LAMPORTS_PER_SOL;
     
     console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
+    console.log('💰 Minimum required:', minSOL, 'SOL');
     
-    if (solBalance < minSOL) {
-      console.log('💰 Balance too low, attempting to fund wallet...');
-      
-      const walletAddress = publicKey.toBase58();
-      const fundingAmount = 0.005; // 0.005 SOL as specified
-      
-      // Step 1: Try web3.js airdrop first
-      console.log('💰 Step 1: Trying web3.js airdrop (0.005 SOL)...');
-      try {
-        const airdropSignature = await connection.requestAirdrop(publicKey, fundingAmount * LAMPORTS_PER_SOL);
-        console.log('💰 Web3.js airdrop requested, signature:', airdropSignature);
-        
-        // Wait for confirmation
-        console.log('💰 Waiting for web3.js airdrop confirmation...');
-        const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
-        
-        if (confirmation.value && confirmation.value.err) {
-          throw new Error(`Web3.js airdrop failed: ${JSON.stringify(confirmation.value.err)}`);
-        }
-        
-        console.log('✅ Web3.js airdrop successful!');
-        return true;
-        
-      } catch (web3Error) {
-        console.warn('⚠️ Web3.js airdrop failed:', web3Error.message);
-        console.log('💰 Step 2: Using app wallet to send 0.005 SOL...');
-        
-        // Step 2: Use app wallet to send SOL
-        try {
-          // Check app wallet balance
-          const appWalletInfo = await checkAppWalletBalance(connection);
-          
-          if (appWalletInfo.balance < fundingAmount + 0.001) { // +0.001 for transaction fee
-            throw new Error(`App wallet has insufficient balance: ${appWalletInfo.balance.toFixed(4)} SOL (need ${(fundingAmount + 0.001).toFixed(4)} SOL)`);
-          }
-          
-          // Create transfer transaction
-          const transferTransaction = new Transaction().add(
-            SystemProgram.transfer({
-              fromPubkey: appWalletInfo.keypair.publicKey,
-              toPubkey: publicKey,
-              lamports: fundingAmount * LAMPORTS_PER_SOL
-            })
-          );
-          
-          // Get recent blockhash
-          const { blockhash } = await connection.getLatestBlockhash();
-          transferTransaction.recentBlockhash = blockhash;
-          transferTransaction.feePayer = appWalletInfo.keypair.publicKey;
-          
-          // Sign and send transaction
-          transferTransaction.sign(appWalletInfo.keypair);
-          const signature = await connection.sendRawTransaction(transferTransaction.serialize());
-          
-          console.log('💰 App wallet transfer sent, signature:', signature);
-          
-          // Wait for confirmation
-          console.log('💰 Waiting for app wallet transfer confirmation...');
-          const transferConfirmation = await connection.confirmTransaction(signature, 'confirmed');
-          
-          if (transferConfirmation.value && transferConfirmation.value.err) {
-            throw new Error(`App wallet transfer failed: ${JSON.stringify(transferConfirmation.value.err)}`);
-          }
-          
-          console.log('✅ App wallet transfer successful!');
-          return true;
-          
-        } catch (appWalletError) {
-          console.error('❌ App wallet transfer failed:', appWalletError.message);
-          throw new Error(`Both funding methods failed. Web3.js: ${web3Error.message}, App wallet: ${appWalletError.message}`);
-        }
-      }
-    } else {
+    if (solBalance >= minSOL) {
       console.log('✅ Wallet has sufficient SOL balance');
-      return false; // No funding needed
+      return { success: true, method: 'none', balance: solBalance };
     }
+    
+    console.log('💰 Balance too low, attempting airdrop...');
+    
+    // Step 1: Try web3.js airdrop
+    try {
+      console.log('🪂 Attempting web3.js airdrop...');
+      const airdropAmount = 0.005 * LAMPORTS_PER_SOL; // 0.005 SOL
+      const airdropSignature = await connection.requestAirdrop(publicKey, airdropAmount);
+      
+      // Wait for confirmation
+      const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
+      
+      if (confirmation.value && confirmation.value.err) {
+        throw new Error(`Airdrop failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+      
+      // Verify balance increased
+      const newBalance = await connection.getBalance(publicKey);
+      const newSolBalance = newBalance / LAMPORTS_PER_SOL;
+      
+      if (newSolBalance > solBalance) {
+        console.log('✅ Web3.js airdrop successful!');
+        console.log('💰 Balance increased from', solBalance.toFixed(4), 'to', newSolBalance.toFixed(4), 'SOL');
+        return { success: true, method: 'airdrop', balance: newSolBalance, signature: airdropSignature };
+      }
+      
+    } catch (airdropError) {
+      console.warn('⚠️ Web3.js airdrop failed:', airdropError.message);
+    }
+    
+    // Step 2: Use app wallet to send SOL
+    try {
+      console.log('🏦 Attempting app wallet transfer...');
+      
+      if (!APP_WALLET_CONFIG.publicKey || !APP_WALLET_CONFIG.privateKey) {
+        throw new Error('App wallet configuration missing');
+      }
+      
+      const appWalletPublicKey = new PublicKey(APP_WALLET_CONFIG.publicKey);
+      const appWalletPrivateKey = bs58.decode(APP_WALLET_CONFIG.privateKey);
+      const appWalletKeypair = Keypair.fromSecretKey(appWalletPrivateKey);
+      
+      // Check app wallet balance
+      const appWalletBalance = await connection.getBalance(appWalletPublicKey);
+      const appWalletSolBalance = appWalletBalance / LAMPORTS_PER_SOL;
+      
+      console.log('🏦 App wallet balance:', appWalletSolBalance.toFixed(4), 'SOL');
+      
+      if (appWalletSolBalance < 0.01) {
+        throw new Error('App wallet has insufficient balance for transfer');
+      }
+      
+      // Create transfer transaction
+      const transferAmount = 0.005 * LAMPORTS_PER_SOL; // 0.005 SOL
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: appWalletPublicKey,
+          toPubkey: publicKey,
+          lamports: transferAmount,
+        })
+      );
+      
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = appWalletPublicKey;
+      
+      // Sign and send transaction
+      transaction.sign(appWalletKeypair);
+      const transferSignature = await connection.sendRawTransaction(transaction.serialize());
+      
+      // Wait for confirmation
+      const transferConfirmation = await connection.confirmTransaction(transferSignature, 'confirmed');
+      
+      if (transferConfirmation.value && transferConfirmation.value.err) {
+        throw new Error(`App wallet transfer failed: ${JSON.stringify(transferConfirmation.value.err)}`);
+      }
+      
+      // Verify balance increased
+      const finalBalance = await connection.getBalance(publicKey);
+      const finalSolBalance = finalBalance / LAMPORTS_PER_SOL;
+      
+      console.log('✅ App wallet transfer successful!');
+      console.log('💰 Balance increased from', solBalance.toFixed(4), 'to', finalSolBalance.toFixed(4), 'SOL');
+      
+      return { 
+        success: true, 
+        method: 'app_wallet', 
+        balance: finalSolBalance, 
+        signature: transferSignature 
+      };
+      
+    } catch (appWalletError) {
+      console.error('❌ App wallet transfer failed:', appWalletError.message);
+      throw new Error(`All SOL funding methods failed: ${appWalletError.message}`);
+    }
+    
   } catch (error) {
-    console.error('❌ Wallet funding failed:', error);
-    throw new Error(`Unable to fund wallet: ${error.message}`);
+    console.error('❌ Enhanced SOL management failed:', error);
+    throw error;
   }
 };
 
-// Execute transaction with automatic SOL funding and retry
-export const executeTransactionWithAutoFunding = async (publicKey, transactionFunction, maxRetries = 2) => {
+// Automatic transaction retry with SOL management
+export const executeTransactionWithSOLRetry = async (transactionFunction, publicKey, maxRetries = 3) => {
   let lastError = null;
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Transaction attempt ${attempt}/${maxRetries}...`);
+      console.log(`🔄 Transaction attempt ${attempt}/${maxRetries}`);
       
       // Execute the transaction
       const result = await transactionFunction();
-      console.log('✅ Transaction successful!');
+      console.log('✅ Transaction successful on attempt', attempt);
       return result;
       
     } catch (error) {
@@ -763,36 +860,80 @@ export const executeTransactionWithAutoFunding = async (publicKey, transactionFu
         error.message.includes('insufficient') ||
         error.message.includes('Insufficient') ||
         error.message.includes('0x1') || // Solana insufficient funds error code
-        error.message.includes('insufficient lamports') ||
-        error.message.includes('insufficient balance')
+        error.message.includes('lamports')
       );
       
       if (isInsufficientSOL && attempt < maxRetries) {
-        console.log('💰 Insufficient SOL detected, funding wallet automatically...');
+        console.log('💰 Insufficient SOL detected, attempting automatic airdrop...');
         
         try {
-          // Fund the wallet
-          await ensureWalletHasSOL(publicKey, 0.005);
-          console.log('✅ Wallet funded, retrying transaction...');
+          // Ensure wallet has SOL
+          const solResult = await ensureWalletHasSOL(publicKey, 0.005);
           
-          // Wait a moment for the funding to settle
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          continue; // Retry the transaction
-          
-        } catch (fundingError) {
-          console.error('❌ Auto-funding failed:', fundingError.message);
-          throw new Error(`Transaction failed and auto-funding failed: ${fundingError.message}`);
+          if (solResult.success) {
+            console.log('✅ SOL funding successful, retrying transaction...');
+            // Wait a moment for the transaction to be processed
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue; // Retry the transaction
+          }
+        } catch (solError) {
+          console.error('❌ SOL funding failed:', solError.message);
         }
-      } else {
-        // Not an insufficient SOL error or max retries reached
-        throw error;
+      }
+      
+      // If not insufficient SOL or SOL funding failed, don't retry
+      if (attempt < maxRetries) {
+        console.log(`⏳ Waiting 3 seconds before retry...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
   }
   
-  // If we get here, all retries failed
+  console.error(`❌ Transaction failed after ${maxRetries} attempts`);
   throw lastError;
+};
+
+// Enhanced profile creation with automatic SOL management
+export const createUserProfileWithSOLManagement = async (publicKey, wallet, signMessage, displayName) => {
+  console.log('🚀 Enhanced profile creation with SOL management...');
+  
+  // First, ensure wallet has SOL
+  try {
+    const solResult = await ensureWalletHasSOL(publicKey, 0.005);
+    console.log('💰 SOL management result:', solResult);
+  } catch (solError) {
+    console.error('❌ SOL management failed:', solError.message);
+    throw new Error(`Failed to ensure sufficient SOL balance: ${solError.message}`);
+  }
+  
+  // Execute profile creation with automatic retry
+  return await executeTransactionWithSOLRetry(
+    () => createUserProfile(publicKey, wallet, signMessage, displayName),
+    publicKey,
+    3
+  );
+};
+
+// Enhanced profile update with automatic SOL management
+export const updateUserProfileWithSOLManagement = async (publicKey, wallet, signMessage, updates) => {
+  console.log('🚀 Enhanced profile update with SOL management...');
+  
+  return await executeTransactionWithSOLRetry(
+    () => updateUserProfile(publicKey, wallet, signMessage, updates),
+    publicKey,
+    3
+  );
+};
+
+// Enhanced badge claiming with automatic SOL management
+export const claimBadgeWithSOLManagement = async (publicKey, wallet, signMessage, badgeIndex) => {
+  console.log('🚀 Enhanced badge claiming with SOL management...');
+  
+  return await executeTransactionWithSOLRetry(
+    () => claimBadge(publicKey, wallet, signMessage, badgeIndex),
+    publicKey,
+    3
+  );
 };
 
 // Test Honeycomb API connection and configuration
@@ -844,57 +985,6 @@ export const testRPCConnection = async () => {
   } catch (error) {
     console.error('❌ RPC connection test failed:', error);
     return false;
-  }
-};
-
-// Get manual airdrop command for users
-export const getManualAirdropCommand = (walletAddress, amount = 0.1) => {
-  // Use Honeycomb testnet for consistency
-  const command = `solana airdrop ${amount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`;
-  console.log('💰 Manual airdrop command:', command);
-  return command;
-};
-
-// Get app wallet keypair for sending SOL
-const getAppWalletKeypair = () => {
-  if (!APP_WALLET_CONFIG.isConfigured) {
-    throw new Error('App wallet not configured. Please set VITE_FEE_PAYER_PUBLIC_KEY and VITE_FEE_PAYER_PRIVATE_KEY environment variables.');
-  }
-  
-  try {
-    const privateKeyBytes = bs58.decode(APP_WALLET_CONFIG.privateKey);
-    
-    // Validate private key length (should be 64 bytes for Solana)
-    if (privateKeyBytes.length !== 64) {
-      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes (expected 64)`);
-    }
-    
-    const keypair = Keypair.fromSecretKey(privateKeyBytes);
-    
-    // Verify the keypair matches the configured public key
-    if (keypair.publicKey.toBase58() !== APP_WALLET_CONFIG.publicKey) {
-      throw new Error('Private key does not match the configured public key');
-    }
-    
-    return keypair;
-  } catch (error) {
-    console.error('❌ App wallet keypair validation failed:', error);
-    throw new Error(`Invalid app wallet private key: ${error.message}`);
-  }
-};
-
-// Check app wallet balance
-const checkAppWalletBalance = async (connection) => {
-  try {
-    const appKeypair = getAppWalletKeypair();
-    const balance = await connection.getBalance(appKeypair.publicKey);
-    const solBalance = balance / LAMPORTS_PER_SOL;
-    
-    console.log('💰 App wallet balance:', solBalance.toFixed(4), 'SOL');
-    return { balance: solBalance, keypair: appKeypair };
-  } catch (error) {
-    console.error('❌ Error checking app wallet balance:', error);
-    throw error;
   }
 };
 
@@ -1060,10 +1150,7 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
       hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
     });
     
-    const response = await executeTransactionWithAutoFunding(publicKey, async () => {
-      return await sendClientTransactions(client, walletAdapter, transactionObject);
-    });
-    
+    const response = await sendClientTransactions(client, walletAdapter, transactionObject);
     console.log('✅ Honeycomb profile updated successfully:', response);
     
     return { success: true, response };
@@ -1372,10 +1459,7 @@ export const claimBadge = async ({ publicKey, wallet, signMessage, badgeIndex })
       hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
     });
     
-    const response = await executeTransactionWithAutoFunding(publicKey, async () => {
-      return await sendClientTransactions(client, walletAdapter, transactionObject);
-    });
-    
+    const response = await sendClientTransactions(client, walletAdapter, transactionObject);
     console.log('Honeycomb badge claimed successfully');
     
     return { success: true, badgeIndex, response };
