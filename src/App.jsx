@@ -392,7 +392,7 @@ const App = () => {
     if (isMusicPlaying) return;
     
     try {
-      console.log('🎵 Starting background music via sound effects system...');
+      // console.log('🎵 Starting background music via sound effects system...');
       setIsMusicPlaying(true);
       
       // Use the sound effects system to play background music
@@ -405,7 +405,7 @@ const App = () => {
         backgroundAudio.volume = musicVolume / 100;
         
         backgroundAudio.play().then(() => {
-          console.log('🎵 Background music started');
+          // console.log('🎵 Background music started');
         }).catch(error => {
           console.warn('Failed to start background music:', error);
           setIsMusicPlaying(false);
@@ -424,7 +424,7 @@ const App = () => {
     if (!isMusicPlaying) return;
     
     try {
-      console.log('🎵 Stopping background music...');
+      // console.log('🎵 Stopping background music...');
       
       const backgroundAudio = soundEffects.sounds.background;
       if (backgroundAudio) {
@@ -440,7 +440,7 @@ const App = () => {
             backgroundAudio.pause();
             backgroundAudio.currentTime = 0;
             setIsMusicPlaying(false);
-            console.log('🎵 Background music stopped');
+            // console.log('🎵 Background music stopped');
           }
         }, 50);
       } else {
@@ -984,7 +984,7 @@ const App = () => {
   // Stop game music when game ends
   useEffect(() => {
     if (gameData?.gamePhase === 'gameEnd') {
-      console.log('🎵 Game ended, stopping game music...');
+      // console.log('🎵 Game ended, stopping game music...');
       soundEffects.stopGameMusic();
     }
   }, [gameData?.gamePhase]);
@@ -3246,6 +3246,7 @@ const App = () => {
       }
     });
   };
+  };
 
   const handleMultiplayerRoundEnd = async (gameData) => {
     try {
@@ -3320,7 +3321,7 @@ const App = () => {
   };
 
   // Function to handle continuing to next round in multiplayer (called when button is clicked)
-  const handleContinueToNextRoundMultiplayer = () => {
+  const handleContinueToNextRound = () => {
     if (!roundEndData || !currentRoom) return;
     
     const eliminatedPlayer = roundEndData.eliminatedPlayer;
@@ -4360,14 +4361,14 @@ const App = () => {
                     console.log('🎮 Button state debug:', { connected, currentUser: !!currentUser, honeycombProfileExists });
                     if (connected && honeycombProfileExists) {
                       // Profile exists, initialize sounds and start music
-                      console.log('🎵 Initializing sounds and starting background music...');
+                      // console.log('🎵 Initializing sounds and starting background music...');
                       try {
                         await soundEffects.initializeAfterUserInteraction();
-                        console.log('🎵 Sounds initialized, starting background music...');
+                                                  // console.log('🎵 Sounds initialized, starting background music...');
                         startBackgroundMusic();
                         setGameState('menu');
                       } catch (error) {
-                        console.warn('🎵 Failed to initialize sounds:', error);
+                        // console.warn('🎵 Failed to initialize sounds:', error);
                         // Still proceed to menu even if sounds fail
                         startBackgroundMusic();
                       setGameState('menu');
@@ -4393,7 +4394,7 @@ const App = () => {
                               startBackgroundMusic();
                               setGameState('menu');
                             } catch (error) {
-                              console.warn('🎵 Failed to initialize sounds:', error);
+                              // console.warn('🎵 Failed to initialize sounds:', error);
                               startBackgroundMusic();
                               setGameState('menu');
                             }
@@ -5292,7 +5293,7 @@ const App = () => {
       {showGameLog && gameData && <GameLogPopup gameData={gameData} selectedLogRound={selectedLogRound} setSelectedLogRound={setSelectedLogRound} closePopup={() => setShowGameLog(false)} />}
       {showRoundEndPopup && roundEndData && <RoundEndPopup 
         roundEndData={roundEndData} 
-        onContinue={currentRoom ? handleContinueToNextRoundMultiplayer : handleContinueToNextRound}
+        onContinue={currentRoom ? () => {} : handleContinueToNextRound}
         isMultiplayer={!!currentRoom}
 
         currentUser={currentUser}

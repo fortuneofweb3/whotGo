@@ -27,19 +27,19 @@ class SoundEffectsManager {
       end: '/assets/sounds/effects/End.mp3'
     };
 
-    console.log('🎵 Sound file paths:', soundFiles);
+    // console.log('🎵 Sound file paths:', soundFiles);
 
-    console.log('🎵 Loading sound files...');
+    // console.log('🎵 Loading sound files...');
     
     // Test if files are accessible
     for (const [name, path] of Object.entries(soundFiles)) {
       fetch(path, { method: 'HEAD' })
         .then(response => {
-          console.log(`🎵 File ${name} accessible: ${response.ok} (${response.status})`);
+          // console.log(`🎵 File ${name} accessible: ${response.ok} (${response.status})`);
         })
-        .catch(error => {
-          console.error(`🎵 File ${name} not accessible:`, error);
-        });
+                  .catch(error => {
+            // console.error(`🎵 File ${name} not accessible:`, error);
+          });
     }
     
     const loadPromises = [];
@@ -54,7 +54,7 @@ class SoundEffectsManager {
           // Handle successful load
           audio.addEventListener('canplaythrough', () => {
             this.sounds[name] = audio;
-            console.log(`🎵 Loaded sound: ${name}`);
+            // console.log(`🎵 Loaded sound: ${name}`);
             resolve();
           }, { once: true });
           
@@ -80,7 +80,7 @@ class SoundEffectsManager {
     
     // Wait for all sounds to load (or fail gracefully)
     await Promise.all(loadPromises);
-    console.log('🎵 Sound loading complete. Loaded sounds:', Object.keys(this.sounds));
+    // console.log('🎵 Sound loading complete. Loaded sounds:', Object.keys(this.sounds));
   }
 
   async loadSoundOnDemand(soundName) {
@@ -109,7 +109,7 @@ class SoundEffectsManager {
         
         audio.addEventListener('canplaythrough', () => {
           this.sounds[soundName] = audio;
-          console.log(`🎵 Loaded sound on demand: ${soundName}`);
+          // console.log(`🎵 Loaded sound on demand: ${soundName}`);
           resolve();
         }, { once: true });
         
@@ -126,7 +126,7 @@ class SoundEffectsManager {
   }
 
   play(soundName, options = {}) {
-    console.log(`🎵 Attempting to play sound: ${soundName}, enabled: ${this.isEnabled}, loaded: ${!!this.sounds[soundName]}, initialized: ${this.isInitialized}`);
+    // console.log(`🎵 Attempting to play sound: ${soundName}, enabled: ${this.isEnabled}, loaded: ${!!this.sounds[soundName]}, initialized: ${this.isInitialized}`);
     if (!this.isEnabled) {
       console.log(`Sound ${soundName} not enabled`);
       return;
@@ -365,7 +365,7 @@ class SoundEffectsManager {
     gameAudio.loop = true;
     
     gameAudio.play().then(() => {
-      console.log('🎵 Game music started, beginning fade in...');
+      // console.log('🎵 Game music started, beginning fade in...');
       
       // Fade in the music over 2 seconds
       let volume = 0;
@@ -384,7 +384,7 @@ class SoundEffectsManager {
         if (volume >= targetVolume) {
           clearInterval(this.fadeInterval);
           this.fadeInterval = null;
-          console.log('🎵 Game music fade in complete');
+          // console.log('🎵 Game music fade in complete');
         }
       }, stepInterval);
     }).catch(error => {
@@ -423,7 +423,7 @@ class SoundEffectsManager {
         gameAudio.currentTime = 0;
         clearInterval(this.fadeInterval);
         this.fadeInterval = null;
-        console.log('🎵 Game music stopped');
+        // console.log('🎵 Game music stopped');
       }
     }, stepInterval);
   }
