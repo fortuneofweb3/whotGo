@@ -3246,7 +3246,6 @@ const App = () => {
       }
     });
   };
-  };
 
   const handleMultiplayerRoundEnd = async (gameData) => {
     try {
@@ -3321,7 +3320,7 @@ const App = () => {
   };
 
   // Function to handle continuing to next round in multiplayer (called when button is clicked)
-  const handleContinueToNextRound = () => {
+  const handleContinueToNextRoundMultiplayer = () => {
     if (!roundEndData || !currentRoom) return;
     
     const eliminatedPlayer = roundEndData.eliminatedPlayer;
@@ -5293,7 +5292,7 @@ const App = () => {
       {showGameLog && gameData && <GameLogPopup gameData={gameData} selectedLogRound={selectedLogRound} setSelectedLogRound={setSelectedLogRound} closePopup={() => setShowGameLog(false)} />}
       {showRoundEndPopup && roundEndData && <RoundEndPopup 
         roundEndData={roundEndData} 
-        onContinue={currentRoom ? () => {} : handleContinueToNextRound}
+        onContinue={currentRoom ? handleContinueToNextRoundMultiplayer : handleContinueToNextRound}
         isMultiplayer={!!currentRoom}
 
         currentUser={currentUser}
