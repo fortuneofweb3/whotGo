@@ -163,12 +163,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     if (feePayerInfo.useUserAsFeePayer) {
       // Use user's wallet as fee payer (original approach)
       console.log('💰 Using user wallet as fee payer...');
-      try {
-        await ensureWalletHasSOL(publicKey, 0.01);
-      } catch (airdropError) {
-        console.error('❌ Airdrop failed on Honeycomb testnet:', airdropError);
-        throw new Error('Insufficient balance on Honeycomb testnet. Please request airdrop manually.');
-      }
+      // Note: User wallet should have sufficient SOL for fees
     } else {
       // Use dedicated fee payer wallet
       console.log('💰 Using dedicated fee payer wallet...');
@@ -715,94 +710,7 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
 };
 
 // Check wallet SOL balance and airdrop if needed
-export const ensureWalletHasSOL = async (publicKey, minSOL = 0.01) => {
-  try {
-    console.log('💰 Checking wallet SOL balance...');
-    
-    // Use Honeycomb testnet RPC endpoints for consistency
-    const rpcEndpoints = [
-      'https://rpc.test.honeycombprotocol.com', // Primary Honeycomb testnet
-      'https://api.devnet.solana.com', // Fallback Solana devnet
-      'https://solana-devnet.rpc.extrnode.com' // Alternative devnet
-    ];
-    
-    let connection;
-    let balance;
-    let solBalance;
-    
-    // Try each RPC endpoint until one works
-    for (const rpcUrl of rpcEndpoints) {
-      try {
-        console.log(`💰 Trying RPC endpoint: ${rpcUrl}`);
-        connection = new Connection(rpcUrl, 'confirmed');
-        balance = await connection.getBalance(publicKey);
-        solBalance = balance / LAMPORTS_PER_SOL;
-        console.log(`✅ RPC endpoint ${rpcUrl} working, balance: ${solBalance.toFixed(4)} SOL`);
-        break;
-      } catch (rpcError) {
-        console.warn(`⚠️ RPC endpoint ${rpcUrl} failed:`, rpcError.message);
-        continue;
-      }
-    }
-    
-    if (!connection || balance === undefined) {
-      throw new Error('All RPC endpoints failed');
-    }
-    
-    console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
-    
-    if (solBalance < minSOL) {
-      console.log('💰 Balance too low, requesting airdrop...');
-      
-      const walletAddress = publicKey.toBase58();
-      const airdropAmount = 0.1;
-      
-      console.log(`💰 Requesting airdrop: solana airdrop ${airdropAmount} ${walletAddress} -u ${connection._rpcEndpoint}`);
-      
-      // Request airdrop with retry logic for Honeycomb testnet
-      let airdropSignature;
-      let confirmation;
-      let retries = 0;
-      const maxRetries = 3;
-      
-      while (retries < maxRetries) {
-        try {
-          console.log(`💰 Airdrop attempt ${retries + 1}/${maxRetries} on Honeycomb testnet...`);
-          airdropSignature = await connection.requestAirdrop(publicKey, airdropAmount * LAMPORTS_PER_SOL);
-          console.log('💰 Airdrop requested, signature:', airdropSignature);
-          
-          // Wait for confirmation with longer timeout for testnet
-          console.log('💰 Waiting for confirmation on Honeycomb testnet...');
-          confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
-          
-          if (confirmation.value && confirmation.value.err) {
-            throw new Error(`Airdrop failed: ${JSON.stringify(confirmation.value.err)}`);
-          }
-          
-          console.log('✅ Airdrop confirmed successfully on Honeycomb testnet');
-          return true;
-          
-        } catch (airdropError) {
-          retries++;
-          console.warn(`⚠️ Airdrop attempt ${retries} failed:`, airdropError.message);
-          
-          if (retries < maxRetries) {
-            console.log(`⏳ Waiting 3 seconds before retry...`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          } else {
-            throw new Error(`Airdrop failed after ${maxRetries} attempts on Honeycomb testnet: ${airdropError.message}`);
-          }
-        }
-      }
-    } else {
-      console.log('✅ Wallet has sufficient SOL balance');
-      return false; // No airdrop needed
-    }
-  } catch (error) {
-    console.error('❌ Airdrop failed on Honeycomb testnet:', error);
-    throw new Error('Insufficient balance on Honeycomb testnet. Please request airdrop manually.');
-  }
-};
+// Note: Airdrop logic removed - fee payer wallet handles all transaction costs
 
 // Test Honeycomb API connection and configuration
 export const testHoneycombConnection = async () => {
@@ -856,13 +764,7 @@ export const testRPCConnection = async () => {
   }
 };
 
-// Get manual airdrop command for users
-export const getManualAirdropCommand = (walletAddress, amount = 0.1) => {
-  // Use Honeycomb testnet for consistency
-  const command = `solana airdrop ${amount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`;
-  console.log('💰 Manual airdrop command:', command);
-  return command;
-};
+// Note: Manual airdrop command removed - fee payer wallet handles all transaction costs
 
 // Create a fee payer wallet for transaction fees
 export const createFeePayerWallet = async () => {
