@@ -736,10 +736,44 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
+  // Initialize leaderboard with real-time updates
   useEffect(() => {
     if (currentUser) {
       initializeAchievements(currentUser);
-      fetchLeaderboard();
+      
+      // Set up real-time leaderboard listener
+      const lbRef = ref(db, 'leaderboard/users');
+      const unsubscribe = onValue(lbRef, snapshot => {
+        console.log('📊 Leaderboard real-time update received');
+        if (snapshot.exists()) {
+          const snapshotData = snapshot.val();
+          if (snapshotData) {
+            const data = Object.values(snapshotData);
+            console.log('📊 Leaderboard users:', data.length, 'users found');
+            
+            const sorted = data
+              .sort((a, b) => (b.xp || 0) - (a.xp || 0)) // Sort by XP (highest first)
+              .map((u, index) => ({
+                rank: index + 1,
+                name: (currentUser && u.id === currentUser.id) ? 'You' : (u.username || u.id),
+                wins: u.gamesWon || 0,
+                games: u.gamesPlayed || 0,
+                winRate: u.gamesPlayed > 0 ? ((u.gamesWon || 0) / u.gamesPlayed * 100).toFixed(1) : '0.0',
+                level: u.level || calculateLevel(u.xp || 0).level,
+                xp: u.xp || 0
+              }));
+            
+            console.log('📊 Real-time leaderboard updated:', sorted.length, 'players');
+            setLeaderboardData(sorted);
+          } else {
+            setLeaderboardData([]);
+          }
+        } else {
+          setLeaderboardData([]);
+        }
+      });
+      
+      return () => unsubscribe();
     } else {
       setAchievements([]);
       setLeaderboardData([]);
@@ -1459,50 +1493,7 @@ const App = () => {
     }
   };
 
-  // Manually update current user's leaderboard entry
-  const updateCurrentUserLeaderboard = async () => {
-    if (!currentUser) {
-      console.log('❌ No current user to update leaderboard');
-      return;
-    }
-    
-    try {
-      console.log('🔄 Manually updating leaderboard for user:', currentUser.id);
-      
-      const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
-      const leaderboardData = {
-        id: currentUser.id,
-        username: currentUser.username || 'Unknown Player',
-        xp: currentUser.xp || 0,
-        level: currentUser.level || 1,
-        gamesPlayed: currentUser.gamesPlayed || 0,
-        gamesWon: currentUser.gamesWon || 0,
-        winRate: (currentUser.gamesPlayed || 0) > 0 ? ((currentUser.gamesWon || 0) / (currentUser.gamesPlayed || 0) * 100) : 0,
-        totalCardsPlayed: currentUser.totalCardsPlayed || 0,
-        perfectWins: currentUser.perfectWins || 0,
-        currentWinStreak: currentUser.currentWinStreak || 0,
-        bestWinStreak: currentUser.bestWinStreak || 0,
-        lastActive: serverTimestamp()
-      };
-      
-      console.log('📊 Current user data being saved to leaderboard:', {
-        id: currentUser.id,
-        xp: currentUser.xp,
-        level: currentUser.level,
-        gamesPlayed: currentUser.gamesPlayed,
-        gamesWon: currentUser.gamesWon
-      });
-      
-      await set(leaderboardRef, leaderboardData);
-      console.log('✅ Leaderboard updated manually for user:', currentUser.id);
-      
-      // Refresh leaderboard data
-      fetchLeaderboard();
-      
-    } catch (error) {
-      console.error('❌ Error manually updating leaderboard:', error);
-    }
-  };
+
 
   // Update leaderboard entry
   const updateLeaderboardEntry = async (userData) => {
@@ -1529,44 +1520,7 @@ const App = () => {
     }
   };
 
-  const fetchLeaderboard = () => {
-    const lbRef = ref(db, 'leaderboard/users');
-    const unsubscribe = onValue(lbRef, snapshot => {
-      console.log('📊 Leaderboard snapshot:', snapshot.exists() ? 'exists' : 'does not exist');
-      if (snapshot.exists()) {
-        const snapshotData = snapshot.val();
-        console.log('📊 Leaderboard data:', snapshotData);
-        if (snapshotData) {
-          const data = Object.values(snapshotData);
-          console.log('📊 Leaderboard users:', data.length, 'users found');
-          console.log('📊 Current user ID:', currentUser?.id);
-          
-          const sorted = data
-            .sort((a, b) => (b.xp || 0) - (a.xp || 0)) // Sort by XP (highest first)
-            .map((u, index) => ({
-              rank: index + 1,
-              name: (currentUser && u.id === currentUser.id) ? 'You' : (u.username || u.id),
-              wins: u.gamesWon || 0,
-              games: u.gamesPlayed || 0,
-              winRate: u.gamesPlayed > 0 ? ((u.gamesWon || 0) / u.gamesPlayed * 100).toFixed(1) : '0.0',
-              level: u.level || calculateLevel(u.xp || 0).level,
-              xp: u.xp || 0
-            }));
-          
-          console.log('📊 Sorted leaderboard:', sorted);
-          console.log('📊 Your XP:', sorted.find(p => p.name === 'You')?.xp || 'Not found');
-          setLeaderboardData(sorted);
-        } else {
-          console.log('📊 No leaderboard data found');
-          setLeaderboardData([]);
-        }
-      } else {
-        console.log('📊 Leaderboard does not exist');
-        setLeaderboardData([]);
-      }
-    });
-    return () => unsubscribe();
-  };
+
 
   const updateUsername = async (newUsernameValue, newBioValue = null) => {
     if (!currentUser || !newUsernameValue.trim()) return;
@@ -1946,8 +1900,7 @@ const App = () => {
     // Update local state
     setCurrentUser(updatedUserData);
 
-    // Update leaderboard data
-    await fetchLeaderboard();
+
 
     console.log('📊 Game statistics update complete with bidirectional sync');
     return updatedUserData;
@@ -4843,7 +4796,7 @@ const App = () => {
                     playSoundEffect.back();
                     setActivePopup('profile');
                   }}
-                  onDebugUpdate={updateCurrentUserLeaderboard}
+  
 
                 />}
                 {activePopup === 'config' && <SettingsPopup 

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebugUpdate }) => {
+const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 fade-in" onClick={closePopup}>
       <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto scale-in" onClick={e => e.stopPropagation()}>
@@ -76,17 +76,6 @@ const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebu
               <p className="text-gray-200 italic">
                 Compete with other players to climb the rankings and earn your place at the top.
               </p>
-              {onDebugUpdate && (
-                <div className="mt-4 space-y-2">
-                  <button
-                    onClick={onDebugUpdate}
-                    className="px-4 py-2 bg-[#80142C] text-white hover:bg-[#a01d39] text-sm"
-                  >
-                    🔧 Debug: Update My Leaderboard Entry
-                  </button>
-
-                </div>
-              )}
             </div>
           </div>
         </div>
