@@ -1288,12 +1288,19 @@ const App = () => {
         return;
       }
       
+      const privateKey = prompt('Enter the private key (base58 encoded) for the fee payer wallet:');
+      
+      if (!privateKey) {
+        alert('No private key provided.');
+        return;
+      }
+      
       console.log('💰 Configuring fee payer with address:', walletAddress);
       
-      const result = await configureFeePayerWithAddress(walletAddress);
+      const result = await configureFeePayerWithAddress(walletAddress, privateKey);
       
       if (result.success) {
-        alert(`Fee payer configured successfully!\nAddress: ${result.address}\nBalance: ${result.balance.toFixed(4)} SOL\n\nThis wallet will now pay for transaction fees.`);
+        alert(`Fee payer configured successfully!\nAddress: ${result.address}\nBalance: ${result.balance.toFixed(4)} SOL\n\nThis wallet will now automatically pay for all transaction fees.`);
       } else {
         alert(`Fee payer configuration failed: ${result.error}`);
       }

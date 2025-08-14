@@ -17,11 +17,10 @@ const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 // Fee payer wallet configuration (for paying transaction fees)
 const FEE_PAYER_WALLET = {
   // This is a dedicated wallet with SOL for paying transaction fees
-  // You can replace this with your own funded wallet address
-  publicKey: '4sEvUGHzR6xPKCtdezRDpmxPhPRVCVjxk7H29Ekw7d6b', // Your funded wallet address
+  publicKey: null, // Will be set when configured
+  privateKey: null, // Will be set when configured (base58 encoded)
   useUserAsFeePayer: false, // Set to false to use dedicated fee payer wallet
-  // In production, you'd want to store this securely and manage it properly
-  isConfigured: true // Set to true if you have a funded wallet ready
+  isConfigured: false // Set to true when wallet is properly configured
 };
 
 // Network configuration
@@ -273,7 +272,29 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     console.log('✅ Profile transaction created, requesting wallet signature...');
     
     // Sign and send the transaction as per docs
-    const walletAdapter = getWalletAdapter(wallet);
+    let walletAdapter;
+    
+    if (feePayerInfo.useUserAsFeePayer) {
+      // Use user's wallet adapter
+      walletAdapter = getWalletAdapter(wallet);
+    } else {
+      // Use fee payer keypair for signing
+      console.log('📝 Using fee payer keypair for transaction signing...');
+      const feePayerKeypair = getFeePayerKeypair();
+      
+      // Create a custom wallet adapter that uses the fee payer keypair
+      walletAdapter = {
+        publicKey: feePayerKeypair.publicKey,
+        signTransaction: async (transaction) => {
+          transaction.partialSign(feePayerKeypair);
+          return transaction;
+        },
+        signAllTransactions: async (transactions) => {
+          transactions.forEach(tx => tx.partialSign(feePayerKeypair));
+          return transactions;
+        }
+      };
+    }
     
     // Send the transaction using the client's helper
     const response = await sendClientTransactions(client, walletAdapter, txResponse);
@@ -886,9 +907,24 @@ export const createFeePayerWallet = async () => {
 export const getFeePayerInfo = () => {
   return {
     address: FEE_PAYER_WALLET.publicKey,
+    privateKey: FEE_PAYER_WALLET.privateKey,
     useUserAsFeePayer: FEE_PAYER_WALLET.useUserAsFeePayer,
     isConfigured: FEE_PAYER_WALLET.isConfigured
   };
+};
+
+// Get fee payer keypair for signing transactions
+export const getFeePayerKeypair = () => {
+  if (!FEE_PAYER_WALLET.isConfigured || !FEE_PAYER_WALLET.privateKey) {
+    throw new Error('Fee payer wallet not configured or private key missing');
+  }
+  
+  try {
+    const privateKeyBytes = bs58.decode(FEE_PAYER_WALLET.privateKey);
+    return Keypair.fromSecretKey(privateKeyBytes);
+  } catch (error) {
+    throw new Error('Invalid fee payer private key');
+  }
 };
 
 // Set up fee payer wallet manually
@@ -901,6 +937,7 @@ export const setupFeePayerWallet = async () => {
     
     // Update the configuration to use the new fee payer
     FEE_PAYER_WALLET.publicKey = feePayerWallet.address;
+    FEE_PAYER_WALLET.privateKey = bs58.encode(feePayerWallet.keypair.secretKey);
     FEE_PAYER_WALLET.useUserAsFeePayer = false;
     FEE_PAYER_WALLET.isConfigured = true;
     
@@ -921,13 +958,31 @@ export const setupFeePayerWallet = async () => {
   }
 };
 
-// Configure fee payer with existing wallet address
-export const configureFeePayerWithAddress = async (walletAddress) => {
+// Configure fee payer with existing wallet address and private key
+export const configureFeePayerWithAddress = async (walletAddress, privateKeyBase58) => {
   try {
     console.log('💰 Configuring fee payer with address:', walletAddress);
     
     // Validate the wallet address
     const publicKey = new PublicKey(walletAddress);
+    
+    // Validate the private key
+    if (!privateKeyBase58) {
+      throw new Error('Private key is required for fee payer wallet.');
+    }
+    
+    let keypair;
+    try {
+      const privateKeyBytes = bs58.decode(privateKeyBase58);
+      keypair = Keypair.fromSecretKey(privateKeyBytes);
+      
+      // Verify the keypair matches the public key
+      if (keypair.publicKey.toBase58() !== walletAddress) {
+        throw new Error('Private key does not match the provided wallet address.');
+      }
+    } catch (keyError) {
+      throw new Error('Invalid private key format. Please provide a valid base58-encoded private key.');
+    }
     
     // Check if the wallet has sufficient balance
     const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
@@ -942,6 +997,7 @@ export const configureFeePayerWithAddress = async (walletAddress) => {
     
     // Update the configuration
     FEE_PAYER_WALLET.publicKey = walletAddress;
+    FEE_PAYER_WALLET.privateKey = privateKeyBase58;
     FEE_PAYER_WALLET.useUserAsFeePayer = false;
     FEE_PAYER_WALLET.isConfigured = true;
     
@@ -1308,7 +1364,29 @@ export const updateProfileInfo = async ({ publicKey, wallet, signMessage, userna
     }
     
     // Sign and send the transaction
-    const walletAdapter = getWalletAdapter(wallet);
+    let walletAdapter;
+    
+    if (feePayerInfo.useUserAsFeePayer) {
+      // Use user's wallet adapter
+      walletAdapter = getWalletAdapter(wallet);
+    } else {
+      // Use fee payer keypair for signing
+      console.log('📝 Using fee payer keypair for transaction signing...');
+      const feePayerKeypair = getFeePayerKeypair();
+      
+      // Create a custom wallet adapter that uses the fee payer keypair
+      walletAdapter = {
+        publicKey: feePayerKeypair.publicKey,
+        signTransaction: async (transaction) => {
+          transaction.partialSign(feePayerKeypair);
+          return transaction;
+        },
+        signAllTransactions: async (transactions) => {
+          transactions.forEach(tx => tx.partialSign(feePayerKeypair));
+          return transactions;
+        }
+      };
+    }
     
     // Wrap transaction in object format expected by sendClientTransactions
     const transactionObject = {

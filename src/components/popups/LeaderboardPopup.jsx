@@ -127,7 +127,7 @@ const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebu
                       onClick={onConfigureFeePayer}
                       className="px-4 py-2 bg-[#80142C] text-white hover:bg-[#a01d39] text-sm block w-full mt-2"
                     >
-                      ⚙️ Configure Fee Payer Address
+                      ⚙️ Configure Fee Payer (Address + Private Key)
                     </button>
                   )}
                 </div>
