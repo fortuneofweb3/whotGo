@@ -4052,7 +4052,7 @@ const App = () => {
                           } catch (airdropError) {
                             console.error('❌ Airdrop failed:', airdropError);
                             const manualCommand = getManualAirdropCommand(publicKey.toBase58());
-                            alert(`Insufficient balance! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
+                            alert(`Insufficient balance on Honeycomb testnet! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
                             setIsCreatingProfile(false);
                             return;
                           }
