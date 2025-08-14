@@ -1,7 +1,7 @@
 import createEdgeClient from '@honeycomb-protocol/edge-client';
 import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/walletHelpers';
 import bs58 from 'bs58';
-import { Connection, LAMPORTS_PER_SOL, PublicKey, Keypair } from '@solana/web3.js';
+import { Connection, LAMPORTS_PER_SOL, PublicKey, Keypair, Transaction, SystemProgram } from '@solana/web3.js';
 
 // Real Honeycomb Protocol Configuration for "Whot Go!" Project
 // Project was created on Honeynet (Solana test network)
@@ -17,8 +17,8 @@ const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 // Fee payer wallet configuration (for paying transaction fees)
 const FEE_PAYER_WALLET = {
   // This is a dedicated wallet with SOL for paying transaction fees
-  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY , // Your funded wallet address
-  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY , // Your private key (base58 encoded)
+  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY || 'HhEQWQdVL9wagu3tHj6vSBAR4YB9UtkuQkiHZ3cLMU1y', // Your funded wallet address
+  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY || 'Dr2kjAFqGTBANf2nn4EauNQrdeFdL4sN5ib5VjQp729A2RbLw2ogJud4ApMXsgWRAoCSMewbJVEajVFdwWyNByu', // Your private key (base58 encoded)
   useUserAsFeePayer: false, // Set to false to use dedicated fee payer wallet
   isConfigured: true // Set to true when wallet is properly configured
 };
@@ -160,16 +160,19 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       throw new Error('Fee payer wallet not configured. Please set up a funded wallet for transaction fees.');
     }
     
-    if (feePayerInfo.useUserAsFeePayer) {
-      // Use user's wallet as fee payer (original approach)
-      console.log('💰 Using user wallet as fee payer...');
-      // Note: User wallet should have sufficient SOL for fees
-    } else {
-      // Use dedicated fee payer wallet
-      console.log('💰 Using dedicated fee payer wallet...');
-      console.log('💰 Fee payer address:', feePayerInfo.address);
-      
-      // Verify fee payer wallet has sufficient balance
+    // Always ensure user has SOL for profile creation (using fee payer if needed)
+    console.log('💰 Ensuring user has SOL for profile creation...');
+    try {
+      await ensureWalletHasSOL(publicKey, 0.005);
+      console.log('✅ User has sufficient SOL for profile creation');
+    } catch (airdropError) {
+      console.error('❌ Failed to ensure user has SOL:', airdropError);
+      throw new Error(`Unable to provide SOL for profile creation: ${airdropError.message}`);
+    }
+    
+    // Check fee payer wallet has sufficient balance for transaction fees
+    if (!feePayerInfo.useUserAsFeePayer) {
+      console.log('💰 Checking fee payer wallet balance for transaction fees...');
       try {
         const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
         const feePayerPublicKey = new PublicKey(feePayerInfo.address);
@@ -179,8 +182,8 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
         console.log('💰 Fee payer balance:', solBalance.toFixed(4), 'SOL');
         
         if (solBalance < 0.01) {
-          console.error('❌ Fee payer wallet has insufficient balance');
-          throw new Error('Fee payer wallet has insufficient balance. Please fund the fee payer wallet.');
+          console.error('❌ Fee payer wallet has insufficient balance for transaction fees');
+          throw new Error('Fee payer wallet has insufficient balance for transaction fees. Please fund the fee payer wallet.');
         }
       } catch (balanceError) {
         console.error('❌ Error checking fee payer balance:', balanceError);
@@ -267,21 +270,24 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     console.log('✅ Profile transaction created, requesting wallet signature...');
     
     // Sign and send the transaction as per docs
-    let walletAdapter;
+    // Use user's wallet for signing (they now have SOL) but fee payer for transaction fees
+    console.log('📝 Using user wallet for signing and fee payer for transaction fees...');
+    const userWalletAdapter = getWalletAdapter(wallet);
     
-    if (feePayerInfo.useUserAsFeePayer) {
-      // Use user's wallet adapter
-      walletAdapter = getWalletAdapter(wallet);
-    } else {
-      // Use fee payer keypair for signing
-      console.log('📝 Using fee payer keypair for transaction signing...');
-      walletAdapter = createFeePayerWalletAdapter();
-    }
+    // Create a custom wallet adapter that uses user's wallet for signing but fee payer for fees
+    const walletAdapter = {
+      publicKey: userWalletAdapter.publicKey,
+      signTransaction: async (transaction) => {
+        // User signs the transaction
+        return await userWalletAdapter.signTransaction(transaction);
+      },
+      signAllTransactions: async (transactions) => {
+        // User signs all transactions
+        return await userWalletAdapter.signAllTransactions(transactions);
+      }
+    };
     
     // Send the transaction using the client's helper
-    console.log('📝 Sending transaction with wallet adapter...');
-    console.log('📝 Wallet adapter public key:', walletAdapter.publicKey?.toBase58());
-    console.log('📝 Wallet adapter connected:', walletAdapter.connected);
     const response = await sendClientTransactions(client, walletAdapter, txResponse);
     console.log('✅ Honeycomb user profile created successfully');
     console.log('📋 Transaction response:', response);
@@ -699,8 +705,90 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
   }
 };
 
-// Check wallet SOL balance and airdrop if needed
-// Note: Airdrop logic removed - fee payer wallet handles all transaction costs
+// Check wallet SOL balance and airdrop if needed using fee payer wallet
+export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
+  try {
+    console.log('💰 Checking wallet SOL balance...');
+    
+    // Use Honeycomb testnet RPC endpoint
+    const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+    const balance = await connection.getBalance(publicKey);
+    const solBalance = balance / LAMPORTS_PER_SOL;
+    
+    console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
+    
+    if (solBalance < minSOL) {
+      console.log('💰 Balance too low, attempting airdrop...');
+      
+      // First, try web3.js airdrop (original method)
+      try {
+        console.log('💰 Attempting web3.js airdrop...');
+        const airdropAmount = 0.005; // Reduced amount
+        const airdropSignature = await connection.requestAirdrop(publicKey, airdropAmount * LAMPORTS_PER_SOL);
+        console.log('💰 Web3.js airdrop requested, signature:', airdropSignature);
+        
+        // Wait for confirmation
+        const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
+        
+        if (confirmation.value && confirmation.value.err) {
+          throw new Error(`Web3.js airdrop failed: ${JSON.stringify(confirmation.value.err)}`);
+        }
+        
+        console.log('✅ Web3.js airdrop successful');
+        return true;
+        
+      } catch (web3AirdropError) {
+        console.warn('⚠️ Web3.js airdrop failed, trying fee payer wallet airdrop...');
+        
+        // If web3.js airdrop fails, use fee payer wallet to send SOL
+        try {
+          console.log('💰 Using fee payer wallet to send SOL...');
+          const feePayerKeypair = getFeePayerKeypair();
+          const airdropAmount = 0.005; // 0.005 SOL
+          
+          // Create transfer transaction
+          const transferTransaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: feePayerKeypair.publicKey,
+              toPubkey: publicKey,
+              lamports: airdropAmount * LAMPORTS_PER_SOL
+            })
+          );
+          
+          // Get recent blockhash
+          const { blockhash } = await connection.getLatestBlockhash();
+          transferTransaction.recentBlockhash = blockhash;
+          transferTransaction.feePayer = feePayerKeypair.publicKey;
+          
+          // Sign and send transaction
+          transferTransaction.sign(feePayerKeypair);
+          const signature = await connection.sendRawTransaction(transferTransaction.serialize());
+          
+          // Wait for confirmation
+          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+          
+          if (confirmation.value && confirmation.value.err) {
+            throw new Error(`Fee payer airdrop failed: ${JSON.stringify(confirmation.value.err)}`);
+          }
+          
+          console.log('✅ Fee payer wallet airdrop successful');
+          console.log('💰 Transaction signature:', signature);
+          return true;
+          
+        } catch (feePayerError) {
+          console.error('❌ Fee payer wallet airdrop failed:', feePayerError);
+          throw new Error(`Both airdrop methods failed. Web3.js: ${web3AirdropError.message}, Fee payer: ${feePayerError.message}`);
+        }
+      }
+    } else {
+      console.log('✅ Wallet has sufficient SOL balance');
+      return false; // No airdrop needed
+    }
+  } catch (error) {
+    console.error('❌ Airdrop process failed:', error);
+    throw new Error(`Airdrop failed: ${error.message}`);
+  }
+};
 
 // Test Honeycomb API connection and configuration
 export const testHoneycombConnection = async () => {
@@ -754,7 +842,13 @@ export const testRPCConnection = async () => {
   }
 };
 
-// Note: Manual airdrop command removed - fee payer wallet handles all transaction costs
+// Get manual airdrop command for users
+export const getManualAirdropCommand = (walletAddress, amount = 0.1) => {
+  // Use Honeycomb testnet for consistency
+  const command = `solana airdrop ${amount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`;
+  console.log('💰 Manual airdrop command:', command);
+  return command;
+};
 
 // Create a fee payer wallet for transaction fees
 export const createFeePayerWallet = async () => {
@@ -831,33 +925,6 @@ export const getFeePayerKeypair = () => {
     console.error('❌ Fee payer keypair validation failed:', error);
     throw new Error(`Invalid fee payer private key: ${error.message}`);
   }
-};
-
-// Create a fee payer wallet adapter for transaction signing
-export const createFeePayerWalletAdapter = () => {
-  const feePayerKeypair = getFeePayerKeypair();
-  
-  return {
-    publicKey: feePayerKeypair.publicKey,
-    connected: true,
-    connecting: false,
-    disconnect: async () => {},
-    signTransaction: async (transaction) => {
-      console.log('📝 Signing transaction with fee payer keypair...');
-      transaction.partialSign(feePayerKeypair);
-      return transaction;
-    },
-    signAllTransactions: async (transactions) => {
-      console.log('📝 Signing multiple transactions with fee payer keypair...');
-      transactions.forEach(tx => tx.partialSign(feePayerKeypair));
-      return transactions;
-    },
-    signMessage: async (message) => {
-      console.log('📝 Signing message with fee payer keypair...');
-      const signature = bs58.encode(feePayerKeypair.sign(message));
-      return signature;
-    }
-  };
 };
 
 // Set up fee payer wallet manually
@@ -1297,16 +1364,22 @@ export const updateProfileInfo = async ({ publicKey, wallet, signMessage, userna
     }
     
     // Sign and send the transaction
-    let walletAdapter;
+    // Use user's wallet for signing (they should have SOL now) but fee payer for transaction fees
+    console.log('📝 Using user wallet for signing and fee payer for transaction fees...');
+    const userWalletAdapter = getWalletAdapter(wallet);
     
-    if (feePayerInfo.useUserAsFeePayer) {
-      // Use user's wallet adapter
-      walletAdapter = getWalletAdapter(wallet);
-    } else {
-      // Use fee payer keypair for signing
-      console.log('📝 Using fee payer keypair for transaction signing...');
-      walletAdapter = createFeePayerWalletAdapter();
-    }
+    // Create a custom wallet adapter that uses user's wallet for signing but fee payer for fees
+    const walletAdapter = {
+      publicKey: userWalletAdapter.publicKey,
+      signTransaction: async (transaction) => {
+        // User signs the transaction
+        return await userWalletAdapter.signTransaction(transaction);
+      },
+      signAllTransactions: async (transactions) => {
+        // User signs all transactions
+        return await userWalletAdapter.signAllTransactions(transactions);
+      }
+    };
     
     // Wrap transaction in object format expected by sendClientTransactions
     const transactionObject = {

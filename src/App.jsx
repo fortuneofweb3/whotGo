@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, setupFeePayerWallet, getFeePayerInfo, configureFeePayerWithAddress, createFeePayerWalletAdapter } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand, setupFeePayerWallet, getFeePayerInfo, configureFeePayerWithAddress } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
@@ -1234,7 +1234,31 @@ const App = () => {
     }
   };
 
-  // Note: Airdrop functionality removed - fee payer wallet handles all transaction costs
+  // Test airdrop functionality
+  const testAirdrop = async () => {
+    if (!publicKey) {
+      console.log('❌ No wallet connected');
+      return;
+    }
+    
+    console.log('🧪 Testing airdrop functionality...');
+    try {
+      // Test RPC connection first
+      console.log('🔧 Testing RPC connection...');
+      const rpcTest = await testRPCConnection();
+      console.log('🔧 RPC test result:', rpcTest);
+      
+      // Test airdrop
+      console.log('💰 Testing airdrop...');
+      const airdropResult = await ensureWalletHasSOL(publicKey, 0.01);
+      console.log('💰 Airdrop test result:', airdropResult);
+      
+      alert(`Airdrop test completed!\nRPC Test: ${rpcTest ? '✅ Passed' : '❌ Failed'}\nAirdrop: ${airdropResult ? '✅ Performed' : '✅ Not needed'}`);
+    } catch (error) {
+      console.error('❌ Airdrop test failed:', error);
+      alert(`Airdrop test failed: ${error.message}`);
+    }
+  };
 
   // Setup fee payer wallet
   const setupFeePayer = async () => {
@@ -4071,8 +4095,17 @@ const App = () => {
                       if (publicKey && wallet && signMessage) {
                         setIsCreatingProfile(true);
                         try {
-                          // Note: No airdrop needed - fee payer wallet handles all transaction costs
-                          console.log('💰 Fee payer wallet will handle transaction costs...');
+                          // Ensure wallet has SOL
+                          console.log('💰 Ensuring wallet has SOL...');
+                          try {
+                            await ensureWalletHasSOL(publicKey, 0.01);
+                          } catch (airdropError) {
+                            console.error('❌ Airdrop failed:', airdropError);
+                            const manualCommand = getManualAirdropCommand(publicKey.toBase58());
+                            alert(`Insufficient balance on Honeycomb testnet! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
+                            setIsCreatingProfile(false);
+                            return;
+                          }
                           
                           const result = await createUserProfile({ 
                             publicKey, 
@@ -4602,7 +4635,7 @@ const App = () => {
                     setActivePopup('profile');
                   }}
                   onDebugUpdate={updateCurrentUserLeaderboard}
-
+                onTestAirdrop={testAirdrop}
                 onSetupFeePayer={setupFeePayer}
                 onConfigureFeePayer={configureFeePayer}
                 />}
