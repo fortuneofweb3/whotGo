@@ -663,24 +663,56 @@ const App = () => {
       publicKey: publicKey?.toBase58(), 
       connected: connected,
       hasWallet: !!wallet,
-      hasSignMessage: !!signMessage
+      hasSignMessage: !!signMessage,
+      currentUserId: currentUser?.id
     });
     
     if (publicKey && connected && wallet && signMessage) {
+      const walletAddress = publicKey.toBase58();
+      
+      // Check if currentUser from localStorage matches the connected wallet
+      if (currentUser && currentUser.id !== walletAddress) {
+        console.log('👤 Wallet changed, clearing old user data and reinitializing...');
+        setCurrentUser(null);
+        setAchievements([]);
+        setLeaderboardData([]);
+        setHoneycombProfileExists(false);
+        // Clear localStorage for the old user
+        localStorage.removeItem('whotgo_currentUser');
+      }
+      
       console.log('👤 Wallet connected, initializing user...');
-      initializeUser(publicKey.toBase58());
+      initializeUser(walletAddress);
     } else if (!publicKey) {
       console.log('👤 No public key, clearing user data');
       setCurrentUser(null);
       setAchievements([]);
       setLeaderboardData([]);
       setHoneycombProfileExists(false);
+      // Clear localStorage when wallet disconnects
+      localStorage.removeItem('whotgo_currentUser');
     }
-  }, [publicKey, connected, wallet, signMessage]);
+  }, [publicKey, connected, wallet, signMessage, currentUser?.id]);
 
   // Fallback Firebase user data loading (for when Honeycomb fails)
   useEffect(() => {
-    console.log('👤 Firebase fallback user data loading effect:', { publicKey: publicKey?.toBase58() });
+    console.log('👤 Firebase fallback user data loading effect:', { 
+      publicKey: publicKey?.toBase58(),
+      currentUser: currentUser?.id,
+      connected: connected
+    });
+    
+    // If there's localStorage data but no wallet connection, clear it
+    if (currentUser && (!publicKey || !connected)) {
+      console.log('👤 User data exists but wallet not connected, clearing data...');
+      setCurrentUser(null);
+      setAchievements([]);
+      setLeaderboardData([]);
+      setHoneycombProfileExists(false);
+      localStorage.removeItem('whotgo_currentUser');
+      return;
+    }
+    
     if (publicKey && !currentUser) {
       const userRef = ref(db, `users/${publicKey.toBase58()}`);
       const unsubscribe = onValue(userRef, snapshot => {
@@ -703,7 +735,7 @@ const App = () => {
       });
       return () => unsubscribe();
     }
-  }, [publicKey, currentUser]);
+  }, [publicKey, currentUser, connected]);
 
   useEffect(() => {
     const roomsRef = ref(db, 'rooms');
