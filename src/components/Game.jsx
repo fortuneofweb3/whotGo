@@ -534,7 +534,8 @@ const Game = ({
           });
           nextRoundGameData.playPile = [];
           nextRoundGameData.drawPile = shuffledNewDeck;
-          const firstPlayerIndex = (nextRoundGameData.players || []).findIndex(p => !p.eliminated);
+          const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
+          const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
           nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
           nextRoundGameData.pendingPickCount = 0;
           nextRoundGameData.generalMarketActive = false;
@@ -559,7 +560,8 @@ const Game = ({
       const drawnCard = gameDataToUse.drawPile[gameDataToUse.drawPile.length - 1];
       gameDataToUse.drawPile = gameDataToUse.drawPile.slice(0, -1);
       player.cards = [...player.cards, drawnCard];
-      const playerActualIndex = (gameDataToUse.players || []).findIndex(p => p.id === player.id);
+      const players = ensurePlayersArray(gameDataToUse.players);
+      const playerActualIndex = players.findIndex(p => p.id === player.id);
       let visualPlayerIndex = playerActualIndex;
       if (currentRoom) {
         const mapping = getVisualPlayerMapping();
@@ -588,7 +590,7 @@ const Game = ({
       });
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-          const currentUserActualIndex = currentRoom ? (gameDataToUse.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+          const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
     if (player.id === currentUserActualIndex || !currentRoom && player.id === 0) {
       const newTotal = (player.cards || []).length;
       if (newTotal > maxVisiblePlayerCards) setPlayerScrollIndex(newTotal - maxVisiblePlayerCards);
@@ -770,8 +772,9 @@ const Game = ({
 
   const scrollPlayerCards = direction => {
     if (!gameData) return;
-    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
-    const playerCards = (gameData.players[currentUserActualIndex]?.cards || gameData.players[0]?.cards || []);
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
+    const playerCards = (players[currentUserActualIndex]?.cards || players[0]?.cards || []);
     const maxScroll = Math.max(0, playerCards.length - maxVisiblePlayerCards);
     if (direction === 'left') {
       setPlayerScrollIndex(Math.max(0, playerScrollIndex - 1));
@@ -826,7 +829,8 @@ const Game = ({
     };
     newGameData.playPile[(newGameData.playPile || []).length - 1] = whotCard;
     if (currentRoom) {
-      const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+      const players = ensurePlayersArray(gameData.players);
+      const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
       const currentPlayer = newGameData.players?.[currentUserActualIndex];
       newGameData.lastAction = `${currentPlayer.name} - WHOT → ${shape}`;
       newGameData.gameLog = {
@@ -1024,10 +1028,11 @@ const Game = ({
 
   const handlePlayMultiplayerCard = async (cardIndex, clickPosition) => {
     if (!gameData || gameData.gamePhase !== 'playing' || !currentRoom || !currentUser || isPlayerActionInProgress) return;
-    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) return;
-    const currentPlayerData = gameData.players?.[currentUserActualIndex];
+    const currentPlayerData = players[currentUserActualIndex];
     if (!currentPlayerData) return;
     const actualCardIndex = cardIndex + playerScrollIndex;
     const card = currentPlayerData.cards[actualCardIndex];
@@ -1158,7 +1163,8 @@ const Game = ({
 
   const handleDrawMultiplayerCard = async () => {
     if (!gameData || gameData.gamePhase !== 'playing' || !currentRoom || !currentUser || isPlayerActionInProgress) return;
-    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) return;
     try {
@@ -1319,10 +1325,11 @@ const Game = ({
       </div>
       <div className="absolute top-1/2 left-1/2 transform -translate-y-1/2 z-20" style={{ transform: `translate(calc(-50% + ${window.innerWidth < 768 ? '54px' : window.innerWidth < 1024 ? '72px' : '90px'}), -50%)` }}>
         <div className={`relative ${window.innerWidth < 768 ? 'w-[72px] h-[100px]' : window.innerWidth < 1024 ? 'w-[100px] h-36' : 'w-[130px] h-[172px]'} ${(() => {
-          const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+          const players = ensurePlayersArray(gameData.players);
+          const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
           const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
-          const shouldGlow = !isAnyAnimationInProgress && isCurrentUserTurn && (gameData.pendingPickCount > 0 || gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId || gameData.pendingPickCount === 0 && !gameData.generalMarketActive && (() => {
-            const currentUserPlayer = gameData.players[currentUserActualIndex];
+                      const shouldGlow = !isAnyAnimationInProgress && isCurrentUserTurn && (gameData.pendingPickCount > 0 || gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId || gameData.pendingPickCount === 0 && !gameData.generalMarketActive && (() => {
+            const currentUserPlayer = players[currentUserActualIndex];
             if (!currentUserPlayer) return false;
             const topCard = (gameData.playPile || []).length > 0 ? gameData.playPile[gameData.playPile.length - 1] : null;
             if (!topCard) return false;
@@ -1335,10 +1342,10 @@ const Game = ({
           return shouldGlow ? 'animate-pulse' : '';
         })()}`} style={{
           filter: (() => {
-            const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+            const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
             const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
             const shouldGlow = isCurrentUserTurn && (gameData.pendingPickCount > 0 || gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId || gameData.pendingPickCount === 0 && !gameData.generalMarketActive && (() => {
-              const currentUserPlayer = gameData.players[currentUserActualIndex];
+              const currentUserPlayer = players[currentUserActualIndex];
               if (!currentUserPlayer) return false;
               const topCard = (gameData.playPile || []).length > 0 ? gameData.playPile[gameData.playPile.length - 1] : null;
               if (!topCard) return false;
@@ -1444,8 +1451,9 @@ const Game = ({
         const pos = animationPositions?.playerDecks?.[visualPlayerIndex] || { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
         const maxVisibleCards = visualPlayerIndex === 0 ? maxVisiblePlayerCards : MAX_VISIBLE_AI_CARDS;
         const cardSpacing = 6;
-        const isCurrentUserPlayer = currentRoom ? playerIndex === (gameData.players || []).findIndex(p => p.id === currentUser?.id) : playerIndex === 0;
-        const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+        const players = ensurePlayersArray(gameData.players);
+        const isCurrentUserPlayer = currentRoom ? playerIndex === players.findIndex(p => p.id === currentUser?.id) : playerIndex === 0;
+        const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
         const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
          // During dealing, progressively reveal cards: own cards face-up, opponent cards as backs
          let baseVisible = isCurrentUserPlayer ? (player.cards || []).slice(playerScrollIndex, playerScrollIndex + maxVisibleCards) : (player.cards || []).slice(0, maxVisibleCards);

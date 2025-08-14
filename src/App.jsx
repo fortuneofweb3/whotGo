@@ -2509,12 +2509,13 @@ const App = () => {
       left: false,
       right: false
     };
-    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
     if (gameData.currentPlayer !== currentUserActualIndex) return {
       left: false,
       right: false
     };
-    const player = gameData.players[currentUserActualIndex];
+    const player = players[currentUserActualIndex];
     const topCard = gameData.playPile[gameData.playPile.length - 1];
     const leftCards = (player.cards || []).slice(0, playerScrollIndex);
     const hasPlayableLeft = leftCards.some(card => isCardPlayable(card, topCard));
@@ -2528,8 +2529,9 @@ const App = () => {
 
   const scrollPlayerCards = direction => {
     if (!gameData) return;
-    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
-    const playerCards = gameData.players[currentUserActualIndex]?.cards || gameData.players[0].cards;
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
+    const playerCards = players[currentUserActualIndex]?.cards || players[0].cards;
     const maxScroll = Math.max(0, playerCards.length - maxVisiblePlayerCards);
     if (direction === 'left') {
       setPlayerScrollIndex(Math.max(0, playerScrollIndex - 1));
