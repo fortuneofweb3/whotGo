@@ -71,7 +71,7 @@ const App = () => {
   const [currentCard, setCurrentCard] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [gameState, setGameState] = useState('landing'); // Always start at landing, no localStorage
-  const [currentUser, setCurrentUser] = useState(() => getInitialState('currentUser', null));
+  const [currentUser, setCurrentUser] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [currentRoom, setCurrentRoom] = useState(null); // Always start with no room, no localStorage
   const [gameCountdown, setGameCountdown] = useState(null); // Always start with no countdown, no localStorage
@@ -120,10 +120,7 @@ const App = () => {
     }
   };
 
-  // Save only user state to localStorage, not game states
-  useEffect(() => {
-    saveToLocalStorage('currentUser', currentUser);
-  }, [currentUser]);
+  // No longer saving user state to localStorage - all data comes from Firebase/Honeycomb
 
   // Don't save game-related states to localStorage to prevent restoration
 
@@ -657,85 +654,54 @@ const App = () => {
     console.log('👤 honeycombProfileExists changed to:', honeycombProfileExists);
   }, [honeycombProfileExists]);
 
-  // Initialize user when wallet connects (handles both Honeycomb and Firebase)
+  // Initialize user when wallet connects (always fetch from both Firebase and Honeycomb)
   useEffect(() => {
     console.log('👤 Wallet connection effect:', { 
       publicKey: publicKey?.toBase58(), 
       connected: connected,
       hasWallet: !!wallet,
-      hasSignMessage: !!signMessage,
-      currentUserId: currentUser?.id
+      hasSignMessage: !!signMessage
     });
     
     if (publicKey && connected && wallet && signMessage) {
       const walletAddress = publicKey.toBase58();
-      
-      // Check if currentUser from localStorage matches the connected wallet
-      if (currentUser && currentUser.id !== walletAddress) {
-        console.log('👤 Wallet changed, clearing old user data and reinitializing...');
-        setCurrentUser(null);
-        setAchievements([]);
-        setLeaderboardData([]);
-        setHoneycombProfileExists(false);
-        // Clear localStorage for the old user
-        localStorage.removeItem('whotgo_currentUser');
-      }
-      
-      console.log('👤 Wallet connected, initializing user...');
-      initializeUser(walletAddress);
+      console.log('👤 Wallet connected, initializing user from both sources...');
+      initializeUserFromBothSources(walletAddress);
     } else if (!publicKey) {
       console.log('👤 No public key, clearing user data');
       setCurrentUser(null);
       setAchievements([]);
       setLeaderboardData([]);
       setHoneycombProfileExists(false);
-      // Clear localStorage when wallet disconnects
-      localStorage.removeItem('whotgo_currentUser');
     }
-  }, [publicKey, connected, wallet, signMessage, currentUser?.id]);
+  }, [publicKey, connected, wallet, signMessage]);
 
-  // Fallback Firebase user data loading (for when Honeycomb fails)
+  // Firebase real-time user data sync (always active when user exists)
   useEffect(() => {
-    console.log('👤 Firebase fallback user data loading effect:', { 
-      publicKey: publicKey?.toBase58(),
-      currentUser: currentUser?.id,
-      connected: connected
-    });
-    
-    // If there's localStorage data but no wallet connection, clear it
-    if (currentUser && (!publicKey || !connected)) {
-      console.log('👤 User data exists but wallet not connected, clearing data...');
-      setCurrentUser(null);
-      setAchievements([]);
-      setLeaderboardData([]);
-      setHoneycombProfileExists(false);
-      localStorage.removeItem('whotgo_currentUser');
-      return;
-    }
-    
-    if (publicKey && !currentUser) {
-      const userRef = ref(db, `users/${publicKey.toBase58()}`);
+    if (currentUser?.id) {
+      const userRef = ref(db, `users/${currentUser.id}`);
       const unsubscribe = onValue(userRef, snapshot => {
-        console.log('👤 Firebase user data snapshot:', { exists: snapshot.exists(), data: snapshot.val() });
         if (snapshot.exists()) {
-          const userData = { id: publicKey.toBase58(), ...snapshot.val() };
-          console.log('👤 Setting current user from Firebase:', userData);
-          setCurrentUser(userData);
+          const firebaseData = snapshot.val();
+          console.log('👤 Firebase real-time update received:', firebaseData);
           
-          // Only update lastActive if it's been more than 30 seconds
-          const lastActive = userData.lastActive;
-          const now = Date.now();
-          if (!lastActive || now - lastActive > 30000) {
-            update(userRef, { lastActive: serverTimestamp() });
-            onDisconnect(userRef).update({ lastActive: serverTimestamp() });
+          // Merge Firebase data with current user data
+          const updatedUserData = {
+            ...currentUser,
+            ...firebaseData,
+            id: currentUser.id // Ensure ID doesn't change
+          };
+          
+          // Only update if data actually changed
+          if (JSON.stringify(updatedUserData) !== JSON.stringify(currentUser)) {
+            console.log('👤 Updating user data from Firebase sync');
+            setCurrentUser(updatedUserData);
           }
-        } else {
-          console.log('👤 No Firebase user data found for public key');
         }
       });
       return () => unsubscribe();
     }
-  }, [publicKey, currentUser, connected]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const roomsRef = ref(db, 'rooms');
@@ -891,6 +857,265 @@ const App = () => {
   }, [gameData?.gamePhase]);
 
 
+
+  // Initialize user from both Firebase and Honeycomb sources
+  const initializeUserFromBothSources = async walletAddress => {
+    try {
+      console.log('🔄 Initializing user from both Firebase and Honeycomb sources...');
+      
+      // First, try to get data from both sources simultaneously
+      const [firebaseData, honeycombData] = await Promise.allSettled([
+        getFirebaseUserData(walletAddress),
+        getHoneycombUserData(walletAddress)
+      ]);
+      
+      console.log('📊 Data fetch results:', {
+        firebase: firebaseData.status === 'fulfilled' ? 'success' : 'failed',
+        honeycomb: honeycombData.status === 'fulfilled' ? 'success' : 'failed'
+      });
+      
+      let userData = null;
+      let dataSource = 'none';
+      
+      // Determine which data to use and merge if both exist
+      if (firebaseData.status === 'fulfilled' && firebaseData.value) {
+        userData = firebaseData.value;
+        dataSource = 'firebase';
+        console.log('✅ Using Firebase data as primary source');
+      }
+      
+      if (honeycombData.status === 'fulfilled' && honeycombData.value) {
+        if (userData) {
+          // Merge Honeycomb data with Firebase data
+          userData = {
+            ...userData,
+            ...honeycombData.value,
+            honeycombProfile: honeycombData.value.honeycombProfile || userData.honeycombProfile
+          };
+          dataSource = 'both';
+          console.log('✅ Merged Honeycomb data with Firebase data');
+        } else {
+          userData = honeycombData.value;
+          dataSource = 'honeycomb';
+          console.log('✅ Using Honeycomb data as primary source');
+        }
+      }
+      
+      if (userData) {
+        // Ensure user data has all required fields
+        const levelData = calculateLevel(userData.xp || 0);
+        const completeUserData = {
+          id: walletAddress,
+          username: userData.username || `Player${Math.floor(Math.random() * 10000)}`,
+          xp: userData.xp || 0,
+          level: levelData.level,
+          currentLevelXP: levelData.currentLevelXP,
+          xpNeededForNext: levelData.xpNeededForNext,
+          gamesPlayed: userData.gamesPlayed || 0,
+          gamesWon: userData.gamesWon || 0,
+          currentWinStreak: userData.currentWinStreak || 0,
+          bestWinStreak: userData.bestWinStreak || 0,
+          totalCardsPlayed: userData.totalCardsPlayed || 0,
+          perfectWins: userData.perfectWins || 0,
+          achievementsUnlocked: userData.achievementsUnlocked || [],
+          claimedAchievements: userData.claimedAchievements || [],
+          honeycombProfile: userData.honeycombProfile,
+          createdAt: userData.createdAt || Date.now(),
+          lastActive: Date.now()
+        };
+        
+        console.log('👤 Setting user data from', dataSource, ':', completeUserData);
+        setCurrentUser(completeUserData);
+        setHoneycombProfileExists(!!userData.honeycombProfile);
+        initializeAchievements(completeUserData);
+        
+        // Sync data to both sources if needed
+        await syncUserDataToBothSources(completeUserData, dataSource);
+        
+        return completeUserData;
+      } else {
+        // No existing data found, create new user
+        console.log('🆕 No existing user data found, creating new user...');
+        return await createNewUser(walletAddress);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error initializing user from both sources:', error);
+      throw error;
+    }
+  };
+
+  // Get user data from Firebase
+  const getFirebaseUserData = async (walletAddress) => {
+    try {
+      const userRef = ref(db, `users/${walletAddress}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        return { id: walletAddress, ...snapshot.val() };
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Error fetching Firebase user data:', error);
+      return null;
+    }
+  };
+
+  // Get user data from Honeycomb
+  const getHoneycombUserData = async (walletAddress) => {
+    try {
+      if (!publicKey || !wallet || !signMessage) {
+        return null;
+      }
+      
+      const loginResult = await loginUserProfile(publicKey);
+      if (loginResult.exists && loginResult.profile) {
+        const levelData = calculateLevel(loginResult.profile.xp || 0);
+        return {
+          id: walletAddress,
+          username: loginResult.profile.username,
+          xp: loginResult.profile.xp,
+          level: levelData.level,
+          currentLevelXP: levelData.currentLevelXP,
+          xpNeededForNext: levelData.xpNeededForNext,
+          gamesPlayed: loginResult.profile.gamesPlayed,
+          gamesWon: loginResult.profile.gamesWon,
+          currentWinStreak: loginResult.profile.currentWinStreak,
+          bestWinStreak: loginResult.profile.bestWinStreak,
+          totalCardsPlayed: loginResult.profile.totalCardsPlayed,
+          perfectWins: loginResult.profile.perfectWins,
+          achievementsUnlocked: loginResult.profile.badges?.map(b => b.badgeCriteria) || [],
+          claimedAchievements: loginResult.profile.badges?.map(b => b.badgeCriteria) || [],
+          honeycombProfile: loginResult.profile,
+          createdAt: loginResult.profile.createdAt,
+          lastActive: loginResult.profile.lastActive
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Error fetching Honeycomb user data:', error);
+      return null;
+    }
+  };
+
+  // Sync user data to both Firebase and Honeycomb
+  const syncUserDataToBothSources = async (userData, currentSource) => {
+    try {
+      console.log('🔄 Syncing user data to both sources...');
+      
+      // Always sync to Firebase
+      const userRef = ref(db, `users/${userData.id}`);
+      await set(userRef, {
+        ...userData,
+        lastActive: serverTimestamp()
+      });
+      console.log('✅ User data synced to Firebase');
+      
+      // Sync to Honeycomb if not already from Honeycomb
+      if (currentSource !== 'honeycomb' && publicKey && wallet && signMessage) {
+        try {
+          await updateUserProfileWithSOLManagement(
+            publicKey,
+            wallet,
+            signMessage,
+            {
+              username: userData.username,
+              xp: userData.xp,
+              gamesPlayed: userData.gamesPlayed,
+              gamesWon: userData.gamesWon,
+              totalCardsPlayed: userData.totalCardsPlayed,
+              perfectWins: userData.perfectWins,
+              currentWinStreak: userData.currentWinStreak,
+              bestWinStreak: userData.bestWinStreak
+            }
+          );
+          console.log('✅ User data synced to Honeycomb');
+        } catch (honeycombError) {
+          console.warn('⚠️ Failed to sync to Honeycomb:', honeycombError.message);
+        }
+      }
+      
+      // Update leaderboard
+      const leaderboardRef = ref(db, `leaderboard/users/${userData.id}`);
+      const leaderboardData = {
+        id: userData.id,
+        username: userData.username,
+        xp: userData.xp,
+        level: userData.level,
+        gamesPlayed: userData.gamesPlayed,
+        gamesWon: userData.gamesWon,
+        winRate: userData.gamesPlayed > 0 ? (userData.gamesWon / userData.gamesPlayed * 100) : 0,
+        totalCardsPlayed: userData.totalCardsPlayed,
+        perfectWins: userData.perfectWins,
+        currentWinStreak: userData.currentWinStreak,
+        bestWinStreak: userData.bestWinStreak,
+        lastActive: serverTimestamp()
+      };
+      await set(leaderboardRef, leaderboardData);
+      console.log('✅ Leaderboard updated');
+      
+    } catch (error) {
+      console.error('❌ Error syncing user data:', error);
+    }
+  };
+
+  // Create new user in both Firebase and Honeycomb
+  const createNewUser = async (walletAddress) => {
+    try {
+      console.log('🆕 Creating new user in both Firebase and Honeycomb...');
+      
+      // Try to create Honeycomb profile first
+      let honeycombProfile = null;
+      if (publicKey && wallet && signMessage) {
+        try {
+          honeycombProfile = await createUserProfileWithSOLManagement(
+            publicKey,
+            wallet,
+            signMessage,
+            `Player${Math.floor(Math.random() * 10000)}`
+          );
+          console.log('✅ Honeycomb profile created');
+        } catch (honeycombError) {
+          console.warn('⚠️ Failed to create Honeycomb profile:', honeycombError.message);
+        }
+      }
+      
+      // Create Firebase user data
+      const levelData = calculateLevel(0);
+      const newUserData = {
+        id: walletAddress,
+        username: honeycombProfile?.username || `Player${Math.floor(Math.random() * 10000)}`,
+        xp: 0,
+        level: levelData.level,
+        currentLevelXP: levelData.currentLevelXP,
+        xpNeededForNext: levelData.xpNeededForNext,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        currentWinStreak: 0,
+        bestWinStreak: 0,
+        totalCardsPlayed: 0,
+        perfectWins: 0,
+        achievementsUnlocked: [],
+        claimedAchievements: [],
+        honeycombProfile: honeycombProfile,
+        createdAt: Date.now(),
+        lastActive: Date.now()
+      };
+      
+      // Sync to both sources
+      await syncUserDataToBothSources(newUserData, 'new');
+      
+      console.log('👤 New user created:', newUserData);
+      setCurrentUser(newUserData);
+      setHoneycombProfileExists(!!honeycombProfile);
+      initializeAchievements(newUserData);
+      
+      return newUserData;
+      
+    } catch (error) {
+      console.error('❌ Error creating new user:', error);
+      throw error;
+    }
+  };
 
   const initializeUser = async walletAddress => {
     try {
