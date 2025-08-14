@@ -36,7 +36,7 @@ export const getVisualPlayerMapping = (currentRoom, currentUser) => {
   if (!currentRoom) return { actualToVisual: {}, visualToActual: {} };
   
   const roomPlayers = currentRoom.players || [];
-  const currentUserIndex = roomPlayers.findIndex(p => p.id === currentUser?.id);
+  const currentUserIndex = (roomPlayers || []).findIndex(p => p.id === currentUser?.id);
   
   if (currentUserIndex === -1) return { actualToVisual: {}, visualToActual: {} };
   

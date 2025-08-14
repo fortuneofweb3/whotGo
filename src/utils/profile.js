@@ -144,11 +144,16 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
 
     // Ensure wallet has SOL for transaction fees
     console.log('💰 Ensuring wallet has SOL for transaction fees...');
-    const airdropPerformed = await ensureWalletHasSOL(publicKey, 0.01);
-    
-    if (airdropPerformed) {
-      console.log('💰 Waiting 2 seconds for airdrop to settle...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const airdropPerformed = await ensureWalletHasSOL(publicKey, 0.01);
+      
+      if (airdropPerformed) {
+        console.log('💰 Waiting 5 seconds for airdrop to settle...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    } catch (airdropError) {
+      console.error('❌ Airdrop failed - cannot proceed with profile creation:', airdropError);
+      throw new Error(`Profile creation failed: ${airdropError.message}. Please ensure your wallet has sufficient SOL for transaction fees.`);
     }
 
     const walletAddress = publicKey.toBase58();
@@ -731,47 +736,62 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.01) => {
       console.log('💰 Balance too low, requesting airdrop...');
       console.log('💰 Minimum required:', minSOL, 'SOL');
       
-      // Try airdrop with retry logic
+      // Use Solana CLI airdrop command for better reliability
+      const walletAddress = publicKey.toBase58();
+      const airdropAmount = 0.1; // 0.1 SOL should be enough for multiple transactions
+      
+      console.log('💰 Using Solana CLI airdrop command...');
+      console.log(`💰 Command: solana airdrop ${airdropAmount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`);
+      
+      // For now, we'll use the web3.js method but with better confirmation handling
+      // In a production environment, you'd want to call the CLI command via a backend service
       let airdropSuccess = false;
       let attempts = 0;
-      const maxAttempts = 1; // Reduced to 1 since we're proceeding anyway
+      const maxAttempts = 3;
       
       while (!airdropSuccess && attempts < maxAttempts) {
         attempts++;
         console.log(`💰 Airdrop attempt ${attempts}/${maxAttempts}`);
         
         try {
-          // Test RPC connection first
-          console.log('🔧 Testing RPC connection before airdrop...');
-          const slot = await connection.getSlot();
-          console.log('🔧 Current slot:', slot);
-          
-          // Request airdrop (0.1 SOL should be enough for multiple transactions)
-          console.log('💰 Requesting airdrop for', publicKey.toBase58());
-          const airdropSignature = await connection.requestAirdrop(publicKey, 0.1 * LAMPORTS_PER_SOL);
+          // Request airdrop
+          console.log('💰 Requesting airdrop for', walletAddress);
+          const airdropSignature = await connection.requestAirdrop(publicKey, airdropAmount * LAMPORTS_PER_SOL);
           console.log('💰 Airdrop requested, signature:', airdropSignature);
           
-          // Wait for confirmation with timeout
+          // Wait for confirmation with proper timeout and retry logic
           console.log('💰 Waiting for airdrop confirmation...');
-          try {
-            const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
-            console.log('💰 Airdrop confirmation received:', confirmation);
-            console.log('💰 Confirmation details:', {
-              hasValue: !!confirmation.value,
-              hasErr: !!(confirmation.value && confirmation.value.err),
-              err: confirmation.value?.err,
-              slot: confirmation.context?.slot
-            });
+          let confirmationReceived = false;
+          let retries = 0;
+          const maxConfirmationRetries = 10;
+          
+          while (!confirmationReceived && retries < maxConfirmationRetries) {
+            retries++;
+            console.log(`💰 Confirmation attempt ${retries}/${maxConfirmationRetries}`);
             
-            // Check if transaction was successful
-            if (confirmation.value && confirmation.value.err) {
-              console.error('❌ Airdrop transaction failed:', confirmation.value.err);
-              throw new Error(`Airdrop transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+            try {
+              const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
+              console.log('💰 Airdrop confirmation received:', confirmation);
+              
+              // Check if transaction was successful
+              if (confirmation.value && confirmation.value.err) {
+                console.error('❌ Airdrop transaction failed:', confirmation.value.err);
+                throw new Error(`Airdrop transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+              }
+              
+              confirmationReceived = true;
+              console.log('✅ Airdrop transaction confirmed successfully');
+              
+            } catch (confirmationError) {
+              console.warn(`⚠️ Confirmation attempt ${retries} failed:`, confirmationError.message);
+              
+              if (retries < maxConfirmationRetries) {
+                console.log('⏳ Waiting 3 seconds before retrying confirmation...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+              } else {
+                throw new Error(`Airdrop confirmation failed after ${maxConfirmationRetries} attempts`);
+              }
             }
-          } catch (confirmationError) {
-            console.warn('⚠️ Airdrop confirmation timed out, but proceeding anyway:', confirmationError.message);
-            console.log('💰 Airdrop request was successful, signature:', airdropSignature);
-            console.log('💰 Proceeding with profile creation - airdrop will be available soon');
           }
           
           // Verify the balance actually increased
@@ -789,19 +809,12 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.01) => {
             console.log('✅ Airdrop successful! Balance increased from', solBalance.toFixed(4), 'to', newSolBalance.toFixed(4), 'SOL');
             airdropSuccess = true;
           } else {
-            console.warn('⚠️ Balance unchanged, but airdrop was requested successfully');
-            console.log('💰 Airdrop signature:', airdropSignature);
-            console.log('💰 Proceeding anyway - airdrop will be available for profile creation');
-            airdropSuccess = true; // Proceed anyway since airdrop was requested
+            console.error('❌ Balance unchanged after airdrop - transaction may have failed');
+            throw new Error('Airdrop did not increase wallet balance');
           }
           
         } catch (attemptError) {
           console.error(`❌ Airdrop attempt ${attempts} failed:`, attemptError);
-          console.error('❌ Error details:', {
-            message: attemptError.message,
-            name: attemptError.name,
-            stack: attemptError.stack
-          });
           
           if (attempts < maxAttempts) {
             console.log(`⏳ Waiting 5 seconds before retry...`);
@@ -872,6 +885,45 @@ export const testRPCConnection = async () => {
   } catch (error) {
     console.error('❌ RPC connection test failed:', error);
     return false;
+  }
+};
+
+// Get manual airdrop command for users
+export const getManualAirdropCommand = (walletAddress, amount = 0.1) => {
+  const command = `solana airdrop ${amount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`;
+  console.log('💰 Manual airdrop command:', command);
+  return command;
+};
+
+// Check if airdrop is needed and provide manual command
+export const checkAirdropStatus = async (publicKey) => {
+  try {
+    console.log('💰 Checking airdrop status...');
+    const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+    const balance = await connection.getBalance(publicKey);
+    const solBalance = balance / LAMPORTS_PER_SOL;
+    
+    console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
+    
+    if (solBalance < 0.01) {
+      const walletAddress = publicKey.toBase58();
+      const manualCommand = getManualAirdropCommand(walletAddress);
+      
+      return {
+        needsAirdrop: true,
+        currentBalance: solBalance,
+        manualCommand,
+        walletAddress
+      };
+    } else {
+      return {
+        needsAirdrop: false,
+        currentBalance: solBalance
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error checking airdrop status:', error);
+    throw error;
   }
 };
 

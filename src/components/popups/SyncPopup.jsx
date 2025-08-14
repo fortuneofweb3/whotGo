@@ -5,15 +5,11 @@ const SyncPopup = ({ firebaseData, honeycombProfile, onSync, onClose }) => {
   if (!firebaseData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 fade-in" onClick={() => { playSoundEffect.back(); onClose(); }}>
-      <div className="relative w-full max-w-2xl scale-in" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 fade-in">
+      <div className="relative w-full max-w-2xl scale-in">
         <div className="bg-gray-900">
           <div className="p-8 bg-[#80142C]">
             <div className="text-center mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <div></div>
-                <span onClick={() => { playSoundEffect.back(); onClose(); }} className="text-white text-2xl cursor-pointer">×</span>
-              </div>
               <h1 className="text-3xl font-bold mb-2 text-white">
                 🔄 Data Sync Required
               </h1>
@@ -56,18 +52,12 @@ const SyncPopup = ({ firebaseData, honeycombProfile, onSync, onClose }) => {
               <p className="text-gray-200 text-sm">
                 This will update your on-chain profile with your latest Firebase data.
               </p>
-              <div className="flex justify-center space-x-4">
+              <div className="flex justify-center">
                 <button
                   onClick={() => { playSoundEffect.click(); onSync(); }}
                   className="px-6 py-3 bg-[#80142C] text-white hover:bg-[#a01d39] font-bold"
                 >
                   🔄 Sync to Honeycomb
-                </button>
-                <button
-                  onClick={() => { playSoundEffect.back(); onClose(); }}
-                  className="px-6 py-3 bg-gray-600 text-white hover:bg-gray-700"
-                >
-                  Cancel
                 </button>
               </div>
             </div>

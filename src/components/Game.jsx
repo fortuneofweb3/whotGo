@@ -481,7 +481,7 @@ const Game = ({
     let maxTotal = Math.max(...playersWithTotals.map(p => p.cardTotal));
     const playersWithMaxTotal = playersWithTotals.filter(p => p.cardTotal === maxTotal);
     const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
-    const roundWinner = playersWithTotals.find(p => p.cardTotal === Math.min(...playersWithTotals.map(p => p.cardTotal)));
+          const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
     const roundEndInfo = {
       winner: roundWinner,
       players: playersWithTotals.map(p => ({
@@ -503,7 +503,7 @@ const Game = ({
     setTimeout(() => {
       setGameData(prevData => {
         const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
-        const eliminatedPlayerInNewData = nextRoundGameData.players.find(p => p.id === eliminatedPlayer.id);
+        const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
         if (eliminatedPlayerInNewData) {
           eliminatedPlayerInNewData.eliminated = true;
         }
@@ -531,7 +531,7 @@ const Game = ({
           });
           nextRoundGameData.playPile = [];
           nextRoundGameData.drawPile = shuffledNewDeck;
-          const firstPlayerIndex = nextRoundGameData.players.findIndex(p => !p.eliminated);
+          const firstPlayerIndex = (nextRoundGameData.players || []).findIndex(p => !p.eliminated);
           nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
           nextRoundGameData.pendingPickCount = 0;
           nextRoundGameData.generalMarketActive = false;
@@ -556,7 +556,7 @@ const Game = ({
       const drawnCard = gameDataToUse.drawPile[gameDataToUse.drawPile.length - 1];
       gameDataToUse.drawPile = gameDataToUse.drawPile.slice(0, -1);
       player.cards = [...player.cards, drawnCard];
-      const playerActualIndex = gameDataToUse.players.findIndex(p => p.id === player.id);
+      const playerActualIndex = (gameDataToUse.players || []).findIndex(p => p.id === player.id);
       let visualPlayerIndex = playerActualIndex;
       if (currentRoom) {
         const mapping = getVisualPlayerMapping();
@@ -585,7 +585,7 @@ const Game = ({
       });
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    const currentUserActualIndex = currentRoom ? gameDataToUse.players.findIndex(p => p.id === currentUser?.id) : 0;
+          const currentUserActualIndex = currentRoom ? (gameDataToUse.players || []).findIndex(p => p.id === currentUser?.id) : 0;
     if (player.id === currentUserActualIndex || !currentRoom && player.id === 0) {
       const newTotal = (player.cards || []).length;
       if (newTotal > maxVisiblePlayerCards) setPlayerScrollIndex(newTotal - maxVisiblePlayerCards);
@@ -767,7 +767,7 @@ const Game = ({
 
   const scrollPlayerCards = direction => {
     if (!gameData) return;
-    const currentUserActualIndex = currentRoom ? gameData.players.findIndex(p => p.id === currentUser?.id) : 0;
+    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
     const playerCards = (gameData.players[currentUserActualIndex]?.cards || gameData.players[0]?.cards || []);
     const maxScroll = Math.max(0, playerCards.length - maxVisiblePlayerCards);
     if (direction === 'left') {
@@ -1310,7 +1310,7 @@ const Game = ({
       </div>
       <div className="absolute top-1/2 left-1/2 transform -translate-y-1/2 z-20" style={{ transform: `translate(calc(-50% + ${window.innerWidth < 768 ? '54px' : window.innerWidth < 1024 ? '72px' : '90px'}), -50%)` }}>
         <div className={`relative ${window.innerWidth < 768 ? 'w-[72px] h-[100px]' : window.innerWidth < 1024 ? 'w-[100px] h-36' : 'w-[130px] h-[172px]'} ${(() => {
-          const currentUserActualIndex = currentRoom ? gameData.players.findIndex(p => p.id === currentUser?.id) : 0;
+          const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
           const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
           const shouldGlow = !isAnyAnimationInProgress && isCurrentUserTurn && (gameData.pendingPickCount > 0 || gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId || gameData.pendingPickCount === 0 && !gameData.generalMarketActive && (() => {
             const currentUserPlayer = gameData.players[currentUserActualIndex];
@@ -1326,7 +1326,7 @@ const Game = ({
           return shouldGlow ? 'animate-pulse' : '';
         })()}`} style={{
           filter: (() => {
-            const currentUserActualIndex = currentRoom ? gameData.players.findIndex(p => p.id === currentUser?.id) : 0;
+            const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
             const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
             const shouldGlow = isCurrentUserTurn && (gameData.pendingPickCount > 0 || gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId || gameData.pendingPickCount === 0 && !gameData.generalMarketActive && (() => {
               const currentUserPlayer = gameData.players[currentUserActualIndex];

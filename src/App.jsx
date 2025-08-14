@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand, checkAirdropStatus } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
@@ -1797,8 +1797,8 @@ const App = () => {
       const lastCard = newGameData.playPile[newGameData.playPile.length - 1];
       
       // Determine who played by card count difference
-      let playerWhoPlayed = prevGameData.players.findIndex(p => 
-        (p.cards || []).length > ((newGameData.players.find(np => np.id === p.id))?.cards || []).length
+      let playerWhoPlayed = (prevGameData.players || []).findIndex(p => 
+        (p.cards || []).length > (((newGameData.players || []).find(np => np.id === p.id))?.cards || []).length
       );
       
       // Fallback to currentPlayer if no difference found
@@ -1806,7 +1806,7 @@ const App = () => {
         playerWhoPlayed = newGameData.currentPlayer;
       }
       
-      const currentUserIndex = newGameData.players.findIndex(p => p.id === currentUser?.id);
+      const currentUserIndex = (newGameData.players || []).findIndex(p => p.id === currentUser?.id);
       
       if (playerWhoPlayed !== -1 && playerWhoPlayed !== currentUserIndex) {
         moves.cardPlay = {
@@ -1819,9 +1819,9 @@ const App = () => {
 
     // Detect card draws
     if (prevGameData?.players && newGameData?.players) {
-      newGameData.players.forEach((newPlayer, playerIndex) => {
-        const oldPlayer = prevGameData.players.find(p => p.id === newPlayer.id);
-        if (oldPlayer && newPlayer.cards.length > oldPlayer.cards.length && playerIndex !== newGameData.players.findIndex(p => p.id === currentUser?.id)) {
+      (newGameData.players || []).forEach((newPlayer, playerIndex) => {
+        const oldPlayer = (prevGameData.players || []).find(p => p.id === newPlayer.id);
+        if (oldPlayer && newPlayer.cards.length > oldPlayer.cards.length && playerIndex !== (newGameData.players || []).findIndex(p => p.id === currentUser?.id)) {
           const cardsDifference = newPlayer.cards.length - oldPlayer.cards.length;
           moves.cardDraw.push({
             playerIndex,
@@ -1963,7 +1963,7 @@ const App = () => {
           
           const newData = { ...prevData };
           const updatedPlayers = newData.players.map(p => ({ ...p, cards: [...p.cards] }));
-          const actualPlayerIndex = updatedPlayers.findIndex(p => p.id === currentPlayer.id);
+          const actualPlayerIndex = (updatedPlayers || []).findIndex(p => p.id === currentPlayer.id);
           if (actualPlayerIndex !== -1 && !updatedPlayers[actualPlayerIndex].eliminated) {
             updatedPlayers[actualPlayerIndex].cards.push(cardToDeal);
           }
@@ -2061,7 +2061,7 @@ const App = () => {
       const drawnCard = gameDataToUse.drawPile[gameDataToUse.drawPile.length - 1];
       gameDataToUse.drawPile = gameDataToUse.drawPile.slice(0, -1);
       player.cards = [...player.cards, drawnCard];
-      const playerActualIndex = gameDataToUse.players.findIndex(p => p.id === player.id);
+      const playerActualIndex = (gameDataToUse.players || []).findIndex(p => p.id === player.id);
       let visualPlayerIndex = playerActualIndex;
       if (currentRoom) {
         const mapping = getVisualPlayerMapping();
@@ -2088,7 +2088,7 @@ const App = () => {
       });
       await new Promise(resolve => setTimeout(resolve, 150)); // Increased pause between draw animations
     }
-    const currentUserActualIndex = currentRoom ? gameDataToUse.players.findIndex(p => p.id === currentUser?.id) : 0;
+          const currentUserActualIndex = currentRoom ? (gameDataToUse.players || []).findIndex(p => p.id === currentUser?.id) : 0;
     if (player.id === currentUserActualIndex || !currentRoom && player.id === 0) {
       const newTotal = player.cards.length;
       if (newTotal > maxVisiblePlayerCards) setPlayerScrollIndex(newTotal - maxVisiblePlayerCards);
@@ -2167,7 +2167,7 @@ const App = () => {
       left: false,
       right: false
     };
-    const currentUserActualIndex = currentRoom ? gameData.players.findIndex(p => p.id === currentUser?.id) : 0;
+    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
     if (gameData.currentPlayer !== currentUserActualIndex) return {
       left: false,
       right: false
@@ -2186,7 +2186,7 @@ const App = () => {
 
   const scrollPlayerCards = direction => {
     if (!gameData) return;
-    const currentUserActualIndex = currentRoom ? gameData.players.findIndex(p => p.id === currentUser?.id) : 0;
+    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
     const playerCards = gameData.players[currentUserActualIndex]?.cards || gameData.players[0].cards;
     const maxScroll = Math.max(0, playerCards.length - maxVisiblePlayerCards);
     if (direction === 'left') {
@@ -2218,7 +2218,7 @@ const App = () => {
     if (!currentRoom) return { actualToVisual: {}, visualToActual: {} };
     
     const roomPlayers = currentRoom.players || [];
-    const currentUserIndex = roomPlayers.findIndex(p => p.id === currentUser?.id);
+    const currentUserIndex = (roomPlayers || []).findIndex(p => p.id === currentUser?.id);
     
     if (currentUserIndex === -1) return { actualToVisual: {}, visualToActual: {} };
     
@@ -2349,7 +2349,7 @@ const App = () => {
     let maxTotal = Math.max(...playersWithTotals.map(p => p.cardTotal));
     const playersWithMaxTotal = playersWithTotals.filter(p => p.cardTotal === maxTotal);
     const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
-    const roundWinner = playersWithTotals.find(p => p.cardTotal === Math.min(...playersWithTotals.map(p => p.cardTotal)));
+    const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
     const roundEndInfo = {
       winner: roundWinner,
       players: playersWithTotals.map(p => ({
@@ -2367,7 +2367,7 @@ const App = () => {
       roundEndData: roundEndInfo,
       gamePhase: 'roundEnd'
     };
-    const eliminatedPlayerInNewData = newGameData.players.find(p => p.id === eliminatedPlayer.id);
+    const eliminatedPlayerInNewData = (newGameData.players || []).find(p => p.id === eliminatedPlayer.id);
     if (eliminatedPlayerInNewData) {
       eliminatedPlayerInNewData.eliminated = true;
     }
@@ -2596,7 +2596,7 @@ const App = () => {
       const playableCards = currentPlayer.cards.filter(card => canPlayCard(card, topCard));
       if (playableCards.length > 0) {
         const cardToPlay = playableCards[Math.floor(Math.random() * playableCards.length)];
-        const cardIndex = currentPlayer.cards.findIndex(c => c.id === cardToPlay.id);
+        const cardIndex = (currentPlayer.cards || []).findIndex(c => c.id === cardToPlay.id);
         const mapping = getVisualPlayerMapping();
         const visualPlayerIndex = mapping.actualToVisual[gameData.currentPlayer] !== undefined ? mapping.actualToVisual[gameData.currentPlayer] : gameData.currentPlayer;
         // Use the new animation system for AI card play
@@ -2727,7 +2727,7 @@ const App = () => {
     let maxTotal = Math.max(...playersWithTotals.map(p => p.cardTotal));
     const playersWithMaxTotal = playersWithTotals.filter(p => p.cardTotal === maxTotal);
     const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
-    const roundWinner = playersWithTotals.find(p => p.cardTotal === Math.min(...playersWithTotals.map(p => p.cardTotal)));
+    const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
     
     // Check if this round ends the game (only one player left)
     const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
@@ -2770,7 +2770,7 @@ const App = () => {
     setGameData(prevData => {
       if (!prevData) return prevData;
       const nextRoundGameData = { ...prevData };
-      const eliminatedPlayerInNewData = nextRoundGameData.players.find(p => p.id === eliminatedPlayer.id);
+      const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
       if (eliminatedPlayerInNewData) {
         eliminatedPlayerInNewData.eliminated = true;
       }
@@ -2850,7 +2850,7 @@ const App = () => {
         });
         nextRoundGameData.playPile = [];
         nextRoundGameData.drawPile = shuffledNewDeck;
-        const firstPlayerIndex = nextRoundGameData.players.findIndex(p => !p.eliminated);
+        const firstPlayerIndex = (nextRoundGameData.players || []).findIndex(p => !p.eliminated);
         nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
         nextRoundGameData.pendingPickCount = 0;
         nextRoundGameData.generalMarketActive = false;
@@ -2902,7 +2902,7 @@ const App = () => {
       let maxTotal = Math.max(...playersWithTotals.map(p => p.cardTotal));
       const playersWithMaxTotal = playersWithTotals.filter(p => p.cardTotal === maxTotal);
       const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
-      const roundWinner = playersWithTotals.find(p => p.cardTotal === Math.min(...playersWithTotals.map(p => p.cardTotal)));
+      const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
       
       // Check if this round ends the game (only one player left)
       const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
@@ -2935,7 +2935,7 @@ const App = () => {
         gamePhase: 'roundEnd'
       };
       
-      const eliminatedPlayerInNewData = newGameData.players.find(p => p.id === eliminatedPlayer.id);
+      const eliminatedPlayerInNewData = (newGameData.players || []).find(p => p.id === eliminatedPlayer.id);
       if (eliminatedPlayerInNewData) {
         eliminatedPlayerInNewData.eliminated = true;
       }
@@ -2969,7 +2969,7 @@ const App = () => {
       if (!prevData) return prevData;
       
       const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
-      const eliminatedPlayerInNewData = nextRoundGameData.players.find(p => p.id === eliminatedPlayer.id);
+      const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
       if (eliminatedPlayerInNewData) {
         eliminatedPlayerInNewData.eliminated = true;
       }
@@ -3036,7 +3036,7 @@ const App = () => {
         ];
         
         // Set current player to first non-eliminated player
-        const firstPlayerIndex = nextRoundGameData.players.findIndex(p => !p.eliminated);
+        const firstPlayerIndex = (nextRoundGameData.players || []).findIndex(p => !p.eliminated);
         nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
         
         // Update Firebase with next round data
@@ -3075,7 +3075,7 @@ const App = () => {
 
   const handleAutoPlay = async () => {
     if (!gameData || !currentRoom || !currentUser) return;
-    const currentUserActualIndex = gameData.players.findIndex(p => p.id === (currentUser?.id));
+    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) return;
     const currentPlayerData = gameData.players[currentUserActualIndex];
@@ -3084,7 +3084,7 @@ const App = () => {
       const playableCards = currentPlayerData.cards.filter(card => canPlayCard(card, topCard));
       if (playableCards.length > 0) {
         const cardToPlay = playableCards[0];
-        const cardIndex = currentPlayerData.cards.findIndex(c => c.id === cardToPlay.id);
+        const cardIndex = (currentPlayerData.cards || []).findIndex(c => c.id === cardToPlay.id);
         await playMultiplayerCard(cardIndex);
       } else {
         await drawMultiplayerCard();
@@ -3101,7 +3101,7 @@ const App = () => {
     const whotCard = { ...pendingWhotCard, chosenShape: shape };
     newGameData.playPile[newGameData.playPile.length - 1] = whotCard;
     if (currentRoom) {
-      const currentUserActualIndex = gameData.players.findIndex(p => p.id === (currentUser?.id));
+      const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
       const currentPlayer = newGameData.players[currentUserActualIndex];
       newGameData.lastAction = `${currentPlayer.name} - WHOT → ${shape}`;
       newGameData.gameLog = {
@@ -3487,7 +3487,7 @@ const App = () => {
   const playMultiplayerCard = async (cardIndex) => {
     if (!gameData || !currentRoom || !currentUser || isPlayerActionInProgress) return;
     
-    const currentUserActualIndex = gameData.players.findIndex(p => p.id === currentUser.id);
+    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === currentUser.id);
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) {
       console.log('🎴 Not your turn! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
@@ -3643,7 +3643,7 @@ const App = () => {
     if (!gameData || !currentRoom || isPlayerActionInProgress || isAnyAnimationInProgress || animatingCards.length > 0) return;
     updateGameActivity(); // Track activity for timeout
     
-    const currentUserActualIndex = gameData.players.findIndex(p => p.id === (currentUser?.id));
+    const currentUserActualIndex = (gameData.players || []).findIndex(p => p.id === (currentUser?.id));
     if (gameData.currentPlayer !== currentUserActualIndex) {
       console.log('🎴 Not your turn to draw! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
       return;
@@ -4039,6 +4039,30 @@ const App = () => {
                       if (publicKey && wallet && signMessage) {
                         setIsCreatingProfile(true);
                         try {
+                          // Check if airdrop is needed first
+                          console.log('💰 Checking airdrop status...');
+                          const airdropStatus = await checkAirdropStatus(publicKey);
+                          
+                          if (airdropStatus.needsAirdrop) {
+                            console.log('💰 Airdrop needed. Current balance:', airdropStatus.currentBalance, 'SOL');
+                            const manualCommand = getManualAirdropCommand(publicKey.toBase58());
+                            alert(`Airdrop needed! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
+                            setIsCreatingProfile(false);
+                            return;
+                          }
+                          
+                          // Ensure wallet has SOL
+                          console.log('💰 Ensuring wallet has SOL...');
+                          try {
+                            await ensureWalletHasSOL(publicKey, 0.01);
+                          } catch (airdropError) {
+                            console.error('❌ Airdrop failed:', airdropError);
+                            const manualCommand = getManualAirdropCommand(publicKey.toBase58());
+                            alert(`Airdrop failed! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
+                            setIsCreatingProfile(false);
+                            return;
+                          }
+                          
                           const result = await createUserProfile({ 
                             publicKey, 
                             wallet, 
