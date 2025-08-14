@@ -528,17 +528,13 @@ const checkProfileDataConsistency = async (honeycombProfile, firebaseUserData) =
       username: honeycombData.username
     });
     
-    // Check key fields that should be synced
+    // Check key fields that should be synced - only check for significant mismatches
     const fieldsToCheck = [
       'username',
       'xp',
       'level',
       'gamesPlayed',
-      'gamesWon',
-      'totalCardsPlayed',
-      'perfectWins',
-      'currentWinStreak',
-      'bestWinStreak'
+      'gamesWon'
     ];
     
     let needsUpdate = false;
@@ -552,12 +548,34 @@ const checkProfileDataConsistency = async (honeycombProfile, firebaseUserData) =
       const firebaseString = firebaseValue?.toString();
       const honeycombString = honeycombValue?.toString();
       
-      // Check if Firebase has data that Honeycomb doesn't have
+      // Only flag as mismatch if there's a significant difference
       if (firebaseValue !== undefined && firebaseValue !== null && 
-          (honeycombValue === undefined || honeycombValue === null || firebaseString !== honeycombString)) {
+          (honeycombValue === undefined || honeycombValue === null)) {
+        // Missing field in Honeycomb - this is a real mismatch
         needsUpdate = true;
         missingFields.push(field);
-        console.log(`⚠️ Field '${field}' mismatch: Firebase=${firebaseValue} (${typeof firebaseValue}), Honeycomb=${honeycombValue} (${typeof honeycombValue})`);
+        console.log(`⚠️ Field '${field}' missing in Honeycomb: Firebase=${firebaseValue}`);
+      } else if (firebaseValue !== undefined && honeycombValue !== undefined) {
+        // Both have values, check for significant differences
+        const firebaseNum = parseFloat(firebaseString) || 0;
+        const honeycombNum = parseFloat(honeycombString) || 0;
+        
+        // For numeric fields, only flag if difference is significant (>5% or >10 points)
+        if (field === 'xp' || field === 'gamesPlayed' || field === 'gamesWon') {
+          const difference = Math.abs(firebaseNum - honeycombNum);
+          const percentDifference = firebaseNum > 0 ? (difference / firebaseNum) * 100 : 0;
+          
+          if (difference > 10 || percentDifference > 5) {
+            needsUpdate = true;
+            missingFields.push(field);
+            console.log(`⚠️ Significant difference in '${field}': Firebase=${firebaseValue}, Honeycomb=${honeycombValue} (diff: ${difference}, ${percentDifference.toFixed(1)}%)`);
+          }
+        } else if (firebaseString !== honeycombString) {
+          // For non-numeric fields, any difference is significant
+          needsUpdate = true;
+          missingFields.push(field);
+          console.log(`⚠️ Field '${field}' mismatch: Firebase=${firebaseValue}, Honeycomb=${honeycombValue}`);
+        }
       }
     }
     

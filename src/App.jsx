@@ -630,14 +630,26 @@ const App = () => {
           // We'll handle profile creation when user clicks "Start Playing"
         }
         
-        // Check if data sync is needed
+        // Check if data sync is needed - only show if there's a significant mismatch
         if (result.exists && result.needsSync && currentUser) {
-          console.log('🔄 Data sync needed, showing sync popup...');
-          setSyncPopupData({
-            firebaseData: currentUser,
-            honeycombProfile: result.profile
-          });
-          setShowSyncPopup(true);
+          console.log('🔄 Significant data sync needed, showing sync popup...');
+          
+          // Check if we've already shown the sync popup recently for this user
+          const lastSyncTime = localStorage.getItem(`sync_popup_${currentUser.id}`);
+          const now = Date.now();
+          const timeSinceLastSync = lastSyncTime ? now - parseInt(lastSyncTime) : Infinity;
+          
+          // Only show sync popup if it's been more than 1 hour since last shown
+          if (timeSinceLastSync > 3600000) { // 1 hour in milliseconds
+            setSyncPopupData({
+              firebaseData: currentUser,
+              honeycombProfile: result.profile
+            });
+            setShowSyncPopup(true);
+            localStorage.setItem(`sync_popup_${currentUser.id}`, now.toString());
+          } else {
+            console.log('🔄 Sync popup shown recently, skipping...');
+          }
         }
       }).catch(error => {
         console.log('👤 Profile check failed, assuming it doesn\'t exist:', error);
