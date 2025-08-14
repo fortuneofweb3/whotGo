@@ -176,67 +176,40 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     let accessToken = null;
     
     // Create new user with profile using Honeycomb Protocol
-    // Following the official documentation pattern
+    // Following the official documentation pattern exactly
     console.log('📝 Creating profile transaction...');
-    console.log('📋 Transaction parameters configured');
     
     const transactionParams = {
       project: PROJECT_ADDRESS,
       wallet: walletAddress,
       payer: walletAddress,
-      profileIdentity: "main", // Main profile identity
+      profileIdentity: "main",
       userInfo: {
         name: displayName,
         bio: "Whot Go! Player - Join the ultimate card game experience!",
-        pfp: "https://whotgo.com/default-avatar.png" // Default avatar
-      },
-      customData: {
-        add: {
-          xp: ["0"],
-          level: ["1"],
-          gamesPlayed: ["0"],
-          gamesWon: ["0"],
-          createdAt: [Date.now().toString()],
-          lastActive: [Date.now().toString()],
-          totalCardsPlayed: ["0"],
-          perfectWins: ["0"],
-          currentWinStreak: ["0"],
-          bestWinStreak: ["0"]
-        }
+        pfp: "https://whotgo.com/default-avatar.png"
       }
     };
     
     console.log('📝 Calling createNewUserWithProfileTransaction...');
+    console.log('📝 Transaction params:', transactionParams);
     
     let apiResponse;
     try {
-      console.log('📝 About to call createNewUserWithProfileTransaction...');
       apiResponse = await client.createNewUserWithProfileTransaction(transactionParams);
-          console.log('📝 API response received');
-    console.log('📝 API response type:', typeof apiResponse);
-    console.log('📝 API response keys:', apiResponse ? Object.keys(apiResponse) : 'null/undefined');
+      console.log('📝 API response received:', apiResponse);
     } catch (apiError) {
       console.error('❌ API call failed:', apiError);
-      console.error('❌ API error details:', {
-        message: apiError.message,
-        name: apiError.name,
-        graphqlErrors: apiError.graphQLErrors,
-        networkError: apiError.networkError
-      });
       throw apiError;
     }
-    
-    console.log('📝 Checking API response structure...');
-    console.log('📝 apiResponse exists:', !!apiResponse);
-    console.log('📝 Transaction data exists:', !!(apiResponse && apiResponse.createNewUserWithProfileTransaction));
     
     if (!apiResponse || !apiResponse.createNewUserWithProfileTransaction) {
       console.error('❌ Invalid API response structure:', apiResponse);
       throw new Error('Invalid response from Honeycomb API: missing createNewUserWithProfileTransaction');
     }
     
-    // The API returns the transaction data directly, not nested under 'tx'
-    const txResponse = apiResponse.createNewUserWithProfileTransaction;
+    // Get the transaction response as per docs
+    const { createNewUserWithProfileTransaction: txResponse } = apiResponse;
     
     console.log('📝 Transaction response exists:', !!txResponse);
     console.log('📝 Transaction response type:', typeof txResponse);
@@ -249,82 +222,29 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     
     console.log('✅ Profile transaction created, requesting wallet signature...');
     
-    // Sign and send the transaction - this will prompt the user to approve
+    // Sign and send the transaction as per docs
     const walletAdapter = getWalletAdapter(wallet);
-    console.log('🔐 Using wallet adapter for transaction');
-    console.log('🔐 Adapter name:', walletAdapter.name);
-    console.log('🔐 Connected:', walletAdapter.connected);
-    console.log('🔐 Has required methods:', {
-      signAllTransactions: !!walletAdapter.signAllTransactions,
-      signTransaction: !!walletAdapter.signTransaction,
-      signMessage: !!walletAdapter.signMessage
-    });
     
-    console.log('🔐 Transaction data ready for signing');
-    console.log('🔐 Transaction type:', typeof txResponse);
-    console.log('🔐 Transaction keys:', txResponse ? Object.keys(txResponse) : null);
-    
-    // Wrap transaction in object format expected by sendClientTransactions
-    const transactionObject = {
-      transaction: txResponse.transaction,
-      blockhash: txResponse.blockhash,
-      lastValidBlockHeight: txResponse.lastValidBlockHeight
-    };
-    
-    console.log('🔐 Transaction object prepared for profile creation:', {
-      hasTransaction: !!transactionObject.transaction,
-      hasBlockhash: !!transactionObject.blockhash,
-      hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
-    });
-    
-    const response = await sendClientTransactions(client, walletAdapter, transactionObject);
+    // Send the transaction using the client's helper
+    const response = await sendClientTransactions(client, walletAdapter, txResponse);
     console.log('✅ Honeycomb user profile created successfully');
-    console.log('📋 Transaction response type:', typeof response);
-    console.log('📋 Transaction response keys:', response ? Object.keys(response) : null);
+    console.log('📋 Transaction response:', response);
     
-    // Handle bundle response format
-    let transactionSignature = null;
-    let profileAddress = null;
+    // Extract transaction signature and profile address from response
+    const transactionSignature = response?.signature || null;
+    const profileAddress = response?.profileAddress || null;
     
-    if (Array.isArray(response) && response.length > 0) {
-      // Bundle response format
-      console.log('📦 Bundle response detected');
-      const bundleResponse = response[0];
-      
-      if (bundleResponse && bundleResponse.responses && Array.isArray(bundleResponse.responses)) {
-        console.log('📦 Bundle responses count:', bundleResponse.responses.length);
-        
-        // Look for the actual transaction response
-        for (const resp of bundleResponse.responses) {
-          if (resp && resp.signature) {
-            transactionSignature = resp.signature;
-            console.log('✅ Found transaction signature in bundle');
-          }
-          if (resp && resp.profileAddress) {
-            profileAddress = resp.profileAddress;
-            console.log('✅ Found profile address in bundle');
-          }
-        }
-      }
-    } else if (response && response.signature) {
-      // Direct response format
-      transactionSignature = response.signature;
-      profileAddress = response.profileAddress;
-      console.log('✅ Direct transaction signature found');
-      console.log('✅ Direct profile address found');
-    }
-    
-    // Verify the transaction was successful
     if (transactionSignature) {
-      console.log('✅ Transaction signature confirmed');
-      console.log('✅ Profile address confirmed');
-    } else {
-      console.error('❌ Transaction response missing signature');
-      console.error('❌ Response structure available for debugging');
+      console.log('✅ Transaction signature:', transactionSignature);
     }
     
-    return {
-      success: true,
+    if (profileAddress) {
+      console.log('✅ Profile address:', profileAddress);
+    }
+    
+    // Create user data for Firebase
+    const userData = {
+      id: walletAddress,
       username: displayName,
       xp: 0,
       level: 1,
@@ -332,6 +252,18 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       gamesWon: 0,
       createdAt: Date.now(),
       lastActive: Date.now(),
+      totalCardsPlayed: 0,
+      perfectWins: 0,
+      currentWinStreak: 0,
+      bestWinStreak: 0,
+      honeycombProfileExists: true,
+      profileAddress: profileAddress || null,
+      transactionSignature: transactionSignature || null
+    };
+
+    return {
+      success: true,
+      userData,
       profileAddress: profileAddress || null,
       transactionSignature: transactionSignature || null
     };
