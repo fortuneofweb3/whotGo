@@ -647,7 +647,7 @@ const App = () => {
             });
             setShowSyncPopup(true);
             localStorage.setItem(`sync_popup_${currentUser.id}`, now.toString());
-          } else {
+    } else {
             console.log('🔄 Sync popup shown recently, skipping...');
           }
         }
@@ -779,7 +779,7 @@ const App = () => {
         
         await Promise.all(deletePromises);
         console.log(`🧹 Successfully deleted ${roomsToDelete.length} inactive rooms`);
-      } else {
+    } else {
         console.log('🧹 No inactive rooms found');
       }
       
@@ -807,11 +807,11 @@ const App = () => {
       if (snapshot.exists()) {
         const roomsData = snapshot.val();
         if (roomsData) {
-          const roomsList = Object.keys(roomsData).map(roomId => ({
-            id: roomId,
-            ...roomsData[roomId]
-          })).filter(room => room.status === 'waiting' || room.status === 'countdown');
-          setRooms(roomsList);
+        const roomsList = Object.keys(roomsData).map(roomId => ({
+          id: roomId,
+          ...roomsData[roomId]
+        })).filter(room => room.status === 'waiting' || room.status === 'countdown');
+        setRooms(roomsList);
         } else {
           setRooms([]);
         }
@@ -1137,8 +1137,9 @@ const App = () => {
       
       // Always sync to Firebase (especially important for honeycomb_only case)
       const userRef = ref(db, `users/${userData.id}`);
+      const sanitizedUserData = removeUndefinedValues(userData);
       await set(userRef, {
-        ...userData,
+        ...sanitizedUserData,
         lastActive: serverTimestamp()
       });
       console.log('✅ User data synced to Firebase');
@@ -1733,29 +1734,29 @@ const App = () => {
           console.error(`❌ Error claiming achievement in Honeycomb: ${achievementId}`, error);
           
           // Fallback to Firebase function if Honeycomb fails
-          const claimFn = httpsCallable(fbFunctions, 'claimAchievement');
-          await claimFn({ userId: currentUser.id, achievementId });
+      const claimFn = httpsCallable(fbFunctions, 'claimAchievement');
+      await claimFn({ userId: currentUser.id, achievementId });
           
-          // Refresh user profile snapshot and update level data
-          const userRef = ref(db, `users/${currentUser.id}`);
-          const snapshot = await get(userRef);
-          if (snapshot.exists()) {
-            const firebaseData = snapshot.val();
-            const levelData = calculateLevel(firebaseData.xp || 0);
-            const updatedUserData = {
-              id: currentUser.id,
-              ...firebaseData,
-              level: levelData.level,
-              currentLevelXP: levelData.currentLevelXP,
-              xpNeededForNext: levelData.xpNeededForNext
-            };
-            setCurrentUser(updatedUserData);
-            // Update Firebase with new level data
-            await update(userRef, {
-              level: levelData.level,
-              currentLevelXP: levelData.currentLevelXP,
-              xpNeededForNext: levelData.xpNeededForNext
-            });
+      // Refresh user profile snapshot and update level data
+      const userRef = ref(db, `users/${currentUser.id}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const firebaseData = snapshot.val();
+        const levelData = calculateLevel(firebaseData.xp || 0);
+        const updatedUserData = {
+          id: currentUser.id,
+          ...firebaseData,
+          level: levelData.level,
+          currentLevelXP: levelData.currentLevelXP,
+          xpNeededForNext: levelData.xpNeededForNext
+        };
+        setCurrentUser(updatedUserData);
+        // Update Firebase with new level data
+        await update(userRef, {
+          level: levelData.level,
+          currentLevelXP: levelData.currentLevelXP,
+          xpNeededForNext: levelData.xpNeededForNext
+        });
             
             // Update leaderboard with new level data
             const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
@@ -1764,8 +1765,8 @@ const App = () => {
             });
             
             console.log(`✅ User profile and leaderboard updated after claiming achievement (Firebase fallback)`);
-          }
-          setAchievements(prev => prev.map(a => a.id === achievementId ? { ...a, claimed: true } : a));
+      }
+      setAchievements(prev => prev.map(a => a.id === achievementId ? { ...a, claimed: true } : a));
         }
       } else {
         // Fallback to Firebase function if no wallet
@@ -3259,7 +3260,7 @@ const App = () => {
       newGameData.gameLog[newGameData.roundNumber] = [...currentRoundLog, `Round ${newGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${maxTotal} total card points`];
       
       // Update Firebase with round end data
-      await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
+        await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
       
       // Show round end popup for display purposes
       setRoundEndData(roundEndInfo);
@@ -3469,11 +3470,12 @@ const App = () => {
     
     const roomRef = ref(db, 'rooms');
     const newRoomRef = push(roomRef);
+    const sanitizedCurrentUser = removeUndefinedValues(currentUser);
     const roomData = {
       id: newRoomRef.key,
       ownerId: currentUser.id,
       ownerUsername: currentUser?.username || 'Unknown Player',
-      players: { [currentUser.id]: { ...currentUser, ready: true } },
+      players: { [currentUser.id]: { ...sanitizedCurrentUser, ready: true } },
       maxPlayers: 4,
       status: 'waiting',
       createdAt: serverTimestamp(),
@@ -3495,8 +3497,9 @@ const App = () => {
     const roomData = roomSnapshot.val();
     if (Object.keys(roomData.players || {}).length >= roomData.maxPlayers) return;
     
+    const sanitizedCurrentUser = removeUndefinedValues(currentUser);
     await update(roomRef, {
-      [`players/${currentUser.id}`]: { ...currentUser, ready: false },
+      [`players/${currentUser.id}`]: { ...sanitizedCurrentUser, ready: false },
       lastActive: Date.now()
     });
     
@@ -3543,6 +3546,23 @@ const App = () => {
         });
       }
     }, 1000);
+  };
+
+  // Remove undefined values from objects (Firebase doesn't allow undefined)
+  const removeUndefinedValues = (obj) => {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+      return obj.map(item => removeUndefinedValues(item)).filter(item => item !== null);
+    }
+    
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+    return cleaned;
   };
 
   // Ensure gameData has valid array structure before using or writing to Firebase
@@ -3634,7 +3654,7 @@ const App = () => {
       };
       
       // Only add room metadata if it exists to avoid undefined values
-      if (currentRoom.players) updateData.players = currentRoom.players;
+      if (currentRoom.players) updateData.players = removeUndefinedValues(currentRoom.players);
       if (currentRoom.name) updateData.name = currentRoom.name;
       if (currentRoom.maxPlayers) updateData.maxPlayers = currentRoom.maxPlayers;
       if (currentRoom.ownerId) updateData.ownerId = currentRoom.ownerId;
@@ -3642,7 +3662,7 @@ const App = () => {
       
       console.log('🔥 Sending Firebase update with gameData:', updateData);
       // Ensure we don't send undefined arrays/fields
-      const safeUpdate = JSON.parse(JSON.stringify(updateData));
+      const safeUpdate = removeUndefinedValues(updateData);
       await update(ref(db, `rooms/${currentRoom.id}`), safeUpdate);
       console.log('✅ Firebase update completed successfully');
       
@@ -3665,9 +3685,9 @@ const App = () => {
             
             // Start game music with fade in
             soundEffects.startGameMusic();
-            
-            // Move to game state; listener will animate locally from Firebase snapshot
-            setGameState('game');
+
+      // Move to game state; listener will animate locally from Firebase snapshot
+      setGameState('game');
 
       console.log(`Multiplayer game started with ${players.length} players, ${cardsPerPlayer} cards each`);
 
@@ -4108,12 +4128,12 @@ const App = () => {
     try {
       console.log('🔄 Returning to menu...');
       
-      // Clear game timeout
-      if (gameTimeoutRef.current) {
-        clearTimeout(gameTimeoutRef.current);
-        gameTimeoutRef.current = null;
-      }
-      
+    // Clear game timeout
+    if (gameTimeoutRef.current) {
+      clearTimeout(gameTimeoutRef.current);
+      gameTimeoutRef.current = null;
+    }
+    
       // Stop game music when returning to menu
       soundEffects.stopGameMusic();
       
@@ -4121,39 +4141,39 @@ const App = () => {
       startBackgroundMusic();
       
       // Clear all game state first to prevent any map operations on undefined data
-      setGameData(null);
+    setGameData(null);
       setAnimatingCards([]);
       setIsAnyAnimationInProgress(false);
       setIsPlayerActionInProgress(false);
       setIsAITurnInProgress(false);
       
       // Clear other game-related state
-      setShowWhotChoice(false);
-      setPendingWhotCard(null);
-      setPlayerScrollIndex(0);
-      setShowDeckView(false);
-      setShowEliminatedPopup(false);
-      setShowRoundEndPopup(false);
-      setRoundEndData(null);
-      setShowGameLog(false);
-      setSelectedLogRound(1);
-      setActivePopup(null);
-      setLastGameActivity(null);
-      setAdminCardsRevealed(false);
-      setAdminMarketRevealed(false);
-      setShowAdminDeckOverview(false);
-      setConfettiActive(false);
-      setPlayPileCardPositions({});
-      marketCardPositionsRef.current = [];
-      playPilePositionsRef.current = [];
-      setMarketCardPositions([]);
-      setNeedNewMarketPositions(false);
+    setShowWhotChoice(false);
+    setPendingWhotCard(null);
+    setPlayerScrollIndex(0);
+    setShowDeckView(false);
+    setShowEliminatedPopup(false);
+    setShowRoundEndPopup(false);
+    setRoundEndData(null);
+    setShowGameLog(false);
+    setSelectedLogRound(1);
+    setActivePopup(null);
+    setLastGameActivity(null);
+    setAdminCardsRevealed(false);
+    setAdminMarketRevealed(false);
+    setShowAdminDeckOverview(false);
+    setConfettiActive(false);
+    setPlayPileCardPositions({});
+    marketCardPositionsRef.current = [];
+    playPilePositionsRef.current = [];
+    setMarketCardPositions([]);
+    setNeedNewMarketPositions(false);
       
       // Clear confetti canvas
-      if (confettiCanvasRef.current) {
-        const ctx = confettiCanvasRef.current.getContext('2d');
-        ctx?.clearRect(0, 0, confettiCanvasRef.current.width, confettiCanvasRef.current.height);
-      }
+    if (confettiCanvasRef.current) {
+      const ctx = confettiCanvasRef.current.getContext('2d');
+      ctx?.clearRect(0, 0, confettiCanvasRef.current.width, confettiCanvasRef.current.height);
+    }
       
       // Handle room-specific cleanup
       if (currentRoom) {
@@ -4162,8 +4182,8 @@ const App = () => {
         setGameState('menu');
       }
       
-      // Clear localStorage when explicitly returning to menu
-      clearGameState();
+    // Clear localStorage when explicitly returning to menu
+    clearGameState();
       
       console.log('✅ Successfully returned to menu');
     } catch (error) {
@@ -4247,7 +4267,7 @@ const App = () => {
                   textShadow: '2px 2px 0 #000000'
                 }}>
                   ◆ THE CLASSIC 4-PLAYER CARD GAME ◆
-                </div>
+              </div>
               </div>
               <div className="mb-6 max-w-2xl mx-auto">
                 <p className="text-xl md:text-2xl mb-2 leading-relaxed text-gray-200">
@@ -4299,7 +4319,7 @@ const App = () => {
                         console.warn('🎵 Failed to initialize sounds:', error);
                         // Still proceed to menu even if sounds fail
                         startBackgroundMusic();
-                        setGameState('menu');
+                      setGameState('menu');
                       }
                     } else if (connected && !honeycombProfileExists) {
                       // Profile doesn't exist, create it
@@ -4367,12 +4387,12 @@ const App = () => {
                            honeycombProfileExists ? 'Start Playing' : 'Setup Profile'}
                         </span>
                         {!isCreatingProfile && (
-                          <ChevronRight className="ml-3 group-hover:translate-x-1 transition-transform duration-200" size={24} />
+                        <ChevronRight className="ml-3 group-hover:translate-x-1 transition-transform duration-200" size={24} />
                         )}
                       </>
                     ) : 'Connect Wallet to Play'}
                   </span>
-
+                  
                   {connected && honeycombProfileExists && (
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   )}
@@ -4824,7 +4844,7 @@ const App = () => {
                   setShowSyncPopup(false);
                   setSyncPopupData(null);
                 }}
-              />}
+        />}
                 {activePopup === 'leaderboards' && <LeaderboardPopup 
                   leaderboardData={leaderboardData} 
                   closePopup={() => {
