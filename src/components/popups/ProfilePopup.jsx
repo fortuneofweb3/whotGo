@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { updateProfileInfo } from '../../utils/profile';
 
-const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboard }) => {
+const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboard, onManualSync }) => {
   // Safety check for null userProfile
   if (!userProfile) {
     return (
@@ -312,6 +312,31 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                   </div>
                 </div>
               </button>
+
+              {/* Sync from Honeycomb Button */}
+              {onManualSync && (
+                <button 
+                  onClick={() => {
+                    if (onManualSync) {
+                      onManualSync();
+                    }
+                  }} 
+                  className="group w-full p-6 bg-black transition-all duration-200 hover:bg-gray-800 rounded-xl"
+                >
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-blue-600 flex items-center justify-center rounded-lg">
+                      <span className="text-white text-xl">🔄</span>
+                    </div>
+                    <div className="ml-6 text-left">
+                      <h2 className="text-xl font-bold text-white mb-1">Sync from Honeycomb</h2>
+                      <p className="text-gray-200">Update Firebase with latest Honeycomb data</p>
+                    </div>
+                    <div className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200">
+                      →
+                    </div>
+                  </div>
+                </button>
+              )}
             </div>
             <div className="mt-8 text-center">
               <p className="text-gray-200 italic">
