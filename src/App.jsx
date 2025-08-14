@@ -4210,16 +4210,16 @@ const App = () => {
                   ◆ THE CLASSIC 4-PLAYER CARD GAME ◆
                 </div>
               </div>
-              <div className="mb-8 max-w-2xl mx-auto">
-                <p className="text-xl md:text-2xl mb-3 leading-relaxed text-gray-200">
+              <div className="mb-6 max-w-2xl mx-auto">
+                <p className="text-xl md:text-2xl mb-2 leading-relaxed text-gray-200">
                   Experience the <span className="text-[#80142C] font-bold">beloved classic</span> card game for everyone
                 </p>
                 <p className="text-base text-gray-300 leading-relaxed">
                   Strategic thinking meets fun gameplay in exciting 4-player matches with friends or AI opponents.
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-6">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-1">
                   <div className="h-12 flex items-center border-3 border-black" style={{
                     boxShadow: '4px 4px 0 rgba(0,0,0,0.8)'
                   }}>
@@ -4338,7 +4338,7 @@ const App = () => {
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   )}
                 </button>
-                <p className="text-sm text-gray-400 italic max-w-md text-center">
+                <p className="text-sm text-gray-400 italic max-w-md text-center mt-2">
                   Connect your wallet and start playing the classic African card game that brings families together.
                 </p>
               </div>
