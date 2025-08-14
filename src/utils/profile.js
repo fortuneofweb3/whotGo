@@ -14,6 +14,16 @@ const API_URLS = [
 const PROJECT_ADDRESS = 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c';
 const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 
+// Fee payer wallet configuration (for paying transaction fees)
+const FEE_PAYER_WALLET = {
+  // This is a dedicated wallet with SOL for paying transaction fees
+  // You can replace this with your own funded wallet address
+  publicKey: '4sEvUGHzR6xPKCtdezRDpmxPhPRVCVjxk7H29Ekw7d6b', // Your funded wallet address
+  useUserAsFeePayer: false, // Set to false to use dedicated fee payer wallet
+  // In production, you'd want to store this securely and manage it properly
+  isConfigured: true // Set to true if you have a funded wallet ready
+};
+
 // Network configuration
 const NETWORK_CONFIG = {
   rpcUrl: "https://rpc.test.honeycombprotocol.com", // Honeynet RPC endpoint
@@ -142,13 +152,46 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       throw new Error('Wallet not properly connected or missing signAllTransactions method');
     }
 
-    // Ensure wallet has SOL for transaction fees
-    console.log('💰 Ensuring wallet has SOL for transaction fees...');
-    try {
-      await ensureWalletHasSOL(publicKey, 0.01);
-    } catch (airdropError) {
-      console.error('❌ Airdrop failed on Honeycomb testnet:', airdropError);
-      throw new Error('Insufficient balance on Honeycomb testnet. Please request airdrop manually.');
+    // Check fee payer configuration
+    console.log('💰 Checking fee payer configuration...');
+    const feePayerInfo = getFeePayerInfo();
+    
+    if (!feePayerInfo.isConfigured) {
+      console.error('❌ Fee payer wallet not configured');
+      throw new Error('Fee payer wallet not configured. Please set up a funded wallet for transaction fees.');
+    }
+    
+    if (feePayerInfo.useUserAsFeePayer) {
+      // Use user's wallet as fee payer (original approach)
+      console.log('💰 Using user wallet as fee payer...');
+      try {
+        await ensureWalletHasSOL(publicKey, 0.01);
+      } catch (airdropError) {
+        console.error('❌ Airdrop failed on Honeycomb testnet:', airdropError);
+        throw new Error('Insufficient balance on Honeycomb testnet. Please request airdrop manually.');
+      }
+    } else {
+      // Use dedicated fee payer wallet
+      console.log('💰 Using dedicated fee payer wallet...');
+      console.log('💰 Fee payer address:', feePayerInfo.address);
+      
+      // Verify fee payer wallet has sufficient balance
+      try {
+        const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+        const feePayerPublicKey = new PublicKey(feePayerInfo.address);
+        const balance = await connection.getBalance(feePayerPublicKey);
+        const solBalance = balance / LAMPORTS_PER_SOL;
+        
+        console.log('💰 Fee payer balance:', solBalance.toFixed(4), 'SOL');
+        
+        if (solBalance < 0.01) {
+          console.error('❌ Fee payer wallet has insufficient balance');
+          throw new Error('Fee payer wallet has insufficient balance. Please fund the fee payer wallet.');
+        }
+      } catch (balanceError) {
+        console.error('❌ Error checking fee payer balance:', balanceError);
+        throw new Error('Unable to verify fee payer wallet balance.');
+      }
     }
 
     const walletAddress = publicKey.toBase58();
@@ -182,7 +225,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     const transactionParams = {
       project: PROJECT_ADDRESS,
       wallet: walletAddress,
-      payer: walletAddress,
+      payer: feePayerInfo.useUserAsFeePayer ? walletAddress : feePayerInfo.address, // Use fee payer for transaction fees
       profileIdentity: "main",
       userInfo: {
         name: displayName,
@@ -190,6 +233,13 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
         pfp: "https://whotgo.com/default-avatar.png"
       }
     };
+    
+    console.log('📝 Transaction params:', {
+      project: transactionParams.project,
+      wallet: transactionParams.wallet,
+      payer: transactionParams.payer, // This will be the fee payer address
+      profileIdentity: transactionParams.profileIdentity
+    });
     
     console.log('📝 Calling createNewUserWithProfileTransaction...');
     console.log('📝 Transaction params:', transactionParams);
@@ -793,6 +843,125 @@ export const getManualAirdropCommand = (walletAddress, amount = 0.1) => {
   return command;
 };
 
+// Create a fee payer wallet for transaction fees
+export const createFeePayerWallet = async () => {
+  try {
+    console.log('💰 Creating fee payer wallet...');
+    
+    // Import Keypair for creating a new wallet
+    const { Keypair } = await import('@solana/web3.js');
+    
+    // Generate a new keypair for fee payer
+    const feePayerKeypair = Keypair.generate();
+    const feePayerAddress = feePayerKeypair.publicKey.toBase58();
+    
+    console.log('💰 Fee payer wallet created:', feePayerAddress);
+    
+    // Connect to Honeycomb testnet
+    const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+    
+    // Request airdrop for fee payer wallet
+    console.log('💰 Requesting airdrop for fee payer wallet...');
+    const airdropSignature = await connection.requestAirdrop(feePayerKeypair.publicKey, 1 * LAMPORTS_PER_SOL);
+    const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
+    
+    if (confirmation.value && confirmation.value.err) {
+      throw new Error('Failed to fund fee payer wallet');
+    }
+    
+    console.log('✅ Fee payer wallet funded successfully');
+    
+    return {
+      keypair: feePayerKeypair,
+      address: feePayerAddress,
+      connection
+    };
+  } catch (error) {
+    console.error('❌ Error creating fee payer wallet:', error);
+    throw error;
+  }
+};
+
+// Get fee payer wallet info
+export const getFeePayerInfo = () => {
+  return {
+    address: FEE_PAYER_WALLET.publicKey,
+    useUserAsFeePayer: FEE_PAYER_WALLET.useUserAsFeePayer,
+    isConfigured: FEE_PAYER_WALLET.isConfigured
+  };
+};
+
+// Set up fee payer wallet manually
+export const setupFeePayerWallet = async () => {
+  try {
+    console.log('💰 Setting up fee payer wallet...');
+    
+    // Create and fund a fee payer wallet
+    const feePayerWallet = await createFeePayerWallet();
+    
+    // Update the configuration to use the new fee payer
+    FEE_PAYER_WALLET.publicKey = feePayerWallet.address;
+    FEE_PAYER_WALLET.useUserAsFeePayer = false;
+    FEE_PAYER_WALLET.isConfigured = true;
+    
+    console.log('✅ Fee payer wallet setup complete');
+    console.log('💰 Fee payer address:', feePayerWallet.address);
+    
+    return {
+      success: true,
+      address: feePayerWallet.address,
+      message: 'Fee payer wallet created and funded successfully'
+    };
+  } catch (error) {
+    console.error('❌ Error setting up fee payer wallet:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Configure fee payer with existing wallet address
+export const configureFeePayerWithAddress = async (walletAddress) => {
+  try {
+    console.log('💰 Configuring fee payer with address:', walletAddress);
+    
+    // Validate the wallet address
+    const publicKey = new PublicKey(walletAddress);
+    
+    // Check if the wallet has sufficient balance
+    const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+    const balance = await connection.getBalance(publicKey);
+    const solBalance = balance / LAMPORTS_PER_SOL;
+    
+    console.log('💰 Fee payer balance:', solBalance.toFixed(4), 'SOL');
+    
+    if (solBalance < 0.01) {
+      throw new Error('Insufficient balance in fee payer wallet. Please fund it with at least 0.01 SOL.');
+    }
+    
+    // Update the configuration
+    FEE_PAYER_WALLET.publicKey = walletAddress;
+    FEE_PAYER_WALLET.useUserAsFeePayer = false;
+    FEE_PAYER_WALLET.isConfigured = true;
+    
+    console.log('✅ Fee payer configured successfully');
+    
+    return {
+      success: true,
+      address: walletAddress,
+      balance: solBalance,
+      message: 'Fee payer wallet configured successfully'
+    };
+  } catch (error) {
+    console.error('❌ Error configuring fee payer:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 // Enhanced profile check with retry mechanism for newly created profiles
 export const checkUserProfileExistsWithRetry = async (publicKey, firebaseUserData = null, maxRetries = 5, delayMs = 3000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1096,11 +1265,14 @@ export const updateProfileInfo = async ({ publicKey, wallet, signMessage, userna
     
     const profile = profiles.profile[0];
     
+    // Get fee payer configuration
+    const feePayerInfo = getFeePayerInfo();
+    
     // Update profile info
     console.log('📝 Creating update profile transaction...');
     const apiResponse = await client.createUpdateProfileTransaction({
       profile: profile.address,
-      payer: walletAddress,
+      payer: feePayerInfo.useUserAsFeePayer ? walletAddress : feePayerInfo.address, // Use fee payer for transaction fees
       info: {
         name: username || profile.info?.name,
         bio: bio || profile.info?.bio,

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebugUpdate, onTestAirdrop }) => {
+const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebugUpdate, onTestAirdrop, onSetupFeePayer, onConfigureFeePayer }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 fade-in" onClick={closePopup}>
       <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto scale-in" onClick={e => e.stopPropagation()}>
@@ -112,6 +112,22 @@ const LeaderboardPopup = ({ leaderboardData, closePopup, onBackToProfile, onDebu
                       className="px-4 py-2 bg-[#80142C] text-white hover:bg-[#a01d39] text-sm block w-full"
                     >
                       🧪 Test Airdrop Functionality
+                    </button>
+                  )}
+                  {onSetupFeePayer && (
+                    <button
+                      onClick={onSetupFeePayer}
+                      className="px-4 py-2 bg-[#80142C] text-white hover:bg-[#a01d39] text-sm block w-full mt-2"
+                    >
+                      💰 Setup Fee Payer Wallet
+                    </button>
+                  )}
+                  {onConfigureFeePayer && (
+                    <button
+                      onClick={onConfigureFeePayer}
+                      className="px-4 py-2 bg-[#80142C] text-white hover:bg-[#a01d39] text-sm block w-full mt-2"
+                    >
+                      ⚙️ Configure Fee Payer Address
                     </button>
                   )}
                 </div>

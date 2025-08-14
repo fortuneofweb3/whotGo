@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand, setupFeePayerWallet, getFeePayerInfo, configureFeePayerWithAddress } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
@@ -1257,6 +1257,49 @@ const App = () => {
     } catch (error) {
       console.error('❌ Airdrop test failed:', error);
       alert(`Airdrop test failed: ${error.message}`);
+    }
+  };
+
+  // Setup fee payer wallet
+  const setupFeePayer = async () => {
+    try {
+      console.log('💰 Setting up fee payer wallet...');
+      
+      const result = await setupFeePayerWallet();
+      
+      if (result.success) {
+        alert(`Fee payer wallet setup successful!\nAddress: ${result.address}\n\nThis wallet will now pay for transaction fees.`);
+      } else {
+        alert(`Fee payer setup failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Fee payer setup failed:', error);
+      alert(`Fee payer setup failed: ${error.message}`);
+    }
+  };
+
+  // Configure fee payer with specific address
+  const configureFeePayer = async () => {
+    try {
+      const walletAddress = prompt('Enter the wallet address to use as fee payer:');
+      
+      if (!walletAddress) {
+        alert('No wallet address provided.');
+        return;
+      }
+      
+      console.log('💰 Configuring fee payer with address:', walletAddress);
+      
+      const result = await configureFeePayerWithAddress(walletAddress);
+      
+      if (result.success) {
+        alert(`Fee payer configured successfully!\nAddress: ${result.address}\nBalance: ${result.balance.toFixed(4)} SOL\n\nThis wallet will now pay for transaction fees.`);
+      } else {
+        alert(`Fee payer configuration failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Fee payer configuration failed:', error);
+      alert(`Fee payer configuration failed: ${error.message}`);
     }
   };
 
@@ -4586,6 +4629,8 @@ const App = () => {
                   }}
                   onDebugUpdate={updateCurrentUserLeaderboard}
                 onTestAirdrop={testAirdrop}
+                onSetupFeePayer={setupFeePayer}
+                onConfigureFeePayer={configureFeePayer}
                 />}
                 {activePopup === 'config' && <SettingsPopup 
                   musicVolume={musicVolume}
