@@ -1,7 +1,7 @@
 import createEdgeClient from '@honeycomb-protocol/edge-client';
 import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/walletHelpers';
 import bs58 from 'bs58';
-import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { Connection, LAMPORTS_PER_SOL, PublicKey, Keypair } from '@solana/web3.js';
 
 // Real Honeycomb Protocol Configuration for "Whot Go!" Project
 // Project was created on Honeynet (Solana test network)
@@ -18,7 +18,7 @@ const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 const FEE_PAYER_WALLET = {
   // This is a dedicated wallet with SOL for paying transaction fees
   publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY || 'HhEQWQdVL9wagu3tHj6vSBAR4YB9UtkuQkiHZ3cLMU1y', // Your funded wallet address
-  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY || 'Dr2kjAFqGTBANf2nn4EauNQrdeFdL4sN5ib5VjQp729A2RbLw2ogJud4ApMXsgWRAoCSMewbJVEajVFdwWyNByu', // Your private key (base58 encoded)
+  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY , // Your private key (base58 encoded)
   useUserAsFeePayer: false, // Set to false to use dedicated fee payer wallet
   isConfigured: true // Set to true when wallet is properly configured
 };
@@ -822,23 +822,35 @@ export const getFeePayerKeypair = () => {
   }
   
   try {
+    console.log('🔐 Decoding private key...');
     const privateKeyBytes = bs58.decode(FEE_PAYER_WALLET.privateKey);
+    console.log('🔐 Private key decoded, length:', privateKeyBytes.length, 'bytes');
     
     // Validate private key length (should be 64 bytes for Solana)
     if (privateKeyBytes.length !== 64) {
-      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes (expected 64)`);
+      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes (expected 64). Please ensure the private key is in base58 format.`);
     }
     
+    console.log('🔐 Creating keypair from private key...');
     const keypair = Keypair.fromSecretKey(privateKeyBytes);
+    console.log('🔐 Keypair created successfully');
     
     // Verify the keypair matches the configured public key
-    if (keypair.publicKey.toBase58() !== FEE_PAYER_WALLET.publicKey) {
-      throw new Error('Private key does not match the configured public key');
+    const derivedPublicKey = keypair.publicKey.toBase58();
+    console.log('🔐 Derived public key:', derivedPublicKey);
+    console.log('🔐 Expected public key:', FEE_PAYER_WALLET.publicKey);
+    
+    if (derivedPublicKey !== FEE_PAYER_WALLET.publicKey) {
+      throw new Error(`Private key does not match the configured public key. Derived: ${derivedPublicKey}, Expected: ${FEE_PAYER_WALLET.publicKey}`);
     }
     
+    console.log('✅ Fee payer keypair validated successfully');
     return keypair;
   } catch (error) {
     console.error('❌ Fee payer keypair validation failed:', error);
+    if (error.message.includes('Invalid base58')) {
+      throw new Error('Invalid private key format. Please ensure the private key is in base58 encoding.');
+    }
     throw new Error(`Invalid fee payer private key: ${error.message}`);
   }
 };
