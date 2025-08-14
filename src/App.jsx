@@ -657,15 +657,37 @@ const App = () => {
     console.log('👤 honeycombProfileExists changed to:', honeycombProfileExists);
   }, [honeycombProfileExists]);
 
+  // Initialize user when wallet connects (handles both Honeycomb and Firebase)
   useEffect(() => {
-    console.log('👤 User data loading effect:', { publicKey: publicKey?.toBase58() });
-    if (publicKey) {
+    console.log('👤 Wallet connection effect:', { 
+      publicKey: publicKey?.toBase58(), 
+      connected: connected,
+      hasWallet: !!wallet,
+      hasSignMessage: !!signMessage
+    });
+    
+    if (publicKey && connected && wallet && signMessage) {
+      console.log('👤 Wallet connected, initializing user...');
+      initializeUser(publicKey.toBase58());
+    } else if (!publicKey) {
+      console.log('👤 No public key, clearing user data');
+      setCurrentUser(null);
+      setAchievements([]);
+      setLeaderboardData([]);
+      setHoneycombProfileExists(false);
+    }
+  }, [publicKey, connected, wallet, signMessage]);
+
+  // Fallback Firebase user data loading (for when Honeycomb fails)
+  useEffect(() => {
+    console.log('👤 Firebase fallback user data loading effect:', { publicKey: publicKey?.toBase58() });
+    if (publicKey && !currentUser) {
       const userRef = ref(db, `users/${publicKey.toBase58()}`);
       const unsubscribe = onValue(userRef, snapshot => {
-        console.log('👤 User data snapshot:', { exists: snapshot.exists(), data: snapshot.val() });
+        console.log('👤 Firebase user data snapshot:', { exists: snapshot.exists(), data: snapshot.val() });
         if (snapshot.exists()) {
           const userData = { id: publicKey.toBase58(), ...snapshot.val() };
-          console.log('👤 Setting current user:', userData);
+          console.log('👤 Setting current user from Firebase:', userData);
           setCurrentUser(userData);
           
           // Only update lastActive if it's been more than 30 seconds
@@ -676,18 +698,12 @@ const App = () => {
             onDisconnect(userRef).update({ lastActive: serverTimestamp() });
           }
         } else {
-          console.log('👤 No user data found for public key');
+          console.log('👤 No Firebase user data found for public key');
         }
       });
       return () => unsubscribe();
-    } else {
-      console.log('👤 No public key, clearing user data');
-      setCurrentUser(null);
-      setAchievements([]);
-      setLeaderboardData([]);
-      setHoneycombProfileExists(false);
     }
-  }, [publicKey]);
+  }, [publicKey, currentUser]);
 
   useEffect(() => {
     const roomsRef = ref(db, 'rooms');
