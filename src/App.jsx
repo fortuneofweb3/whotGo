@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand, setupFeePayerWallet, getFeePayerInfo, configureFeePayerWithAddress } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
@@ -1248,66 +1248,16 @@ const App = () => {
       const rpcTest = await testRPCConnection();
       console.log('🔧 RPC test result:', rpcTest);
       
-      // Test airdrop
-      console.log('💰 Testing airdrop...');
-      const airdropResult = await ensureWalletHasSOL(publicKey, 0.01);
-      console.log('💰 Airdrop test result:', airdropResult);
-      
-      alert(`Airdrop test completed!\nRPC Test: ${rpcTest ? '✅ Passed' : '❌ Failed'}\nAirdrop: ${airdropResult ? '✅ Performed' : '✅ Not needed'}`);
-    } catch (error) {
-      console.error('❌ Airdrop test failed:', error);
-      alert(`Airdrop test failed: ${error.message}`);
-    }
-  };
-
-  // Setup fee payer wallet
-  const setupFeePayer = async () => {
-    try {
-      console.log('💰 Setting up fee payer wallet...');
-      
-      const result = await setupFeePayerWallet();
-      
-      if (result.success) {
-        alert(`Fee payer wallet setup successful!\nAddress: ${result.address}\n\nThis wallet will now pay for transaction fees.`);
-      } else {
-        alert(`Fee payer setup failed: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('❌ Fee payer setup failed:', error);
-      alert(`Fee payer setup failed: ${error.message}`);
-    }
-  };
-
-  // Configure fee payer with specific address
-  const configureFeePayer = async () => {
-    try {
-      const walletAddress = prompt('Enter the wallet address to use as fee payer:');
-      
-      if (!walletAddress) {
-        alert('No wallet address provided.');
-        return;
-      }
-      
-      const privateKey = prompt('Enter the private key (base58 encoded) for the fee payer wallet:');
-      
-      if (!privateKey) {
-        alert('No private key provided.');
-        return;
-      }
-      
-      console.log('💰 Configuring fee payer with address:', walletAddress);
-      
-      const result = await configureFeePayerWithAddress(walletAddress, privateKey);
-      
-      if (result.success) {
-        alert(`Fee payer configured successfully!\nAddress: ${result.address}\nBalance: ${result.balance.toFixed(4)} SOL\n\nThis wallet will now automatically pay for all transaction fees.`);
-      } else {
-        alert(`Fee payer configuration failed: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('❌ Fee payer configuration failed:', error);
-      alert(`Fee payer configuration failed: ${error.message}`);
-    }
+             // Test wallet funding
+       console.log('💰 Testing wallet funding...');
+       const fundingResult = await ensureWalletHasSOL(publicKey, 0.005);
+       console.log('💰 Funding test result:', fundingResult);
+       
+       alert(`Wallet funding test completed!\nRPC Test: ${rpcTest ? '✅ Passed' : '❌ Failed'}\nFunding: ${fundingResult ? '✅ Performed' : '✅ Not needed'}`);
+         } catch (error) {
+       console.error('❌ Wallet funding test failed:', error);
+       alert(`Wallet funding test failed: ${error.message}`);
+     }
   };
 
   const fetchLeaderboard = () => {
@@ -4097,15 +4047,14 @@ const App = () => {
                         try {
                           // Ensure wallet has SOL
                           console.log('💰 Ensuring wallet has SOL...');
-                          try {
-                            await ensureWalletHasSOL(publicKey, 0.01);
-                          } catch (airdropError) {
-                            console.error('❌ Airdrop failed:', airdropError);
-                            const manualCommand = getManualAirdropCommand(publicKey.toBase58());
-                            alert(`Insufficient balance on Honeycomb testnet! Please run this command in your terminal:\n\n${manualCommand}\n\nThen try again.`);
-                            setIsCreatingProfile(false);
-                            return;
-                          }
+                                                     try {
+                             await ensureWalletHasSOL(publicKey, 0.005);
+                           } catch (fundingError) {
+                             console.error('❌ Wallet funding failed:', fundingError);
+                             alert(`Unable to fund wallet: ${fundingError.message}\n\nPlease try again or contact support.`);
+                             setIsCreatingProfile(false);
+                             return;
+                           }
                           
                           const result = await createUserProfile({ 
                             publicKey, 
@@ -4636,8 +4585,6 @@ const App = () => {
                   }}
                   onDebugUpdate={updateCurrentUserLeaderboard}
                 onTestAirdrop={testAirdrop}
-                onSetupFeePayer={setupFeePayer}
-                onConfigureFeePayer={configureFeePayer}
                 />}
                 {activePopup === 'config' && <SettingsPopup 
                   musicVolume={musicVolume}

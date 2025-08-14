@@ -23,7 +23,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
               signMessage,
               username: newUsername.trim(),
               bio: newBio.trim() || userProfile?.bio || '',
-              pfp: newProfilePicture.trim() || userProfile?.profilePicture || ''
+              profilePicture: newProfilePicture.trim() || userProfile?.profilePicture || ''
             });
             console.log('Profile updated on Honeycomb');
           } catch (honeycombError) {
