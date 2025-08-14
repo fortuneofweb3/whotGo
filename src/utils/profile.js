@@ -17,10 +17,10 @@ const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 // Fee payer wallet configuration (for paying transaction fees)
 const FEE_PAYER_WALLET = {
   // This is a dedicated wallet with SOL for paying transaction fees
-  publicKey: null, // Will be set when configured
-  privateKey: null, // Will be set when configured (base58 encoded)
+  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY || 'HhEQWQdVL9wagu3tHj6vSBAR4YB9UtkuQkiHZ3cLMU1y', // Your funded wallet address
+  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY || 'Dr2kjAFqGTBANf2nn4EauNQrdeFdL4sN5ib5VjQp729A2RbLw2ogJud4ApMXsgWRAoCSMewbJVEajVFdwWyNByu', // Your private key (base58 encoded)
   useUserAsFeePayer: false, // Set to false to use dedicated fee payer wallet
-  isConfigured: false // Set to true when wallet is properly configured
+  isConfigured: true // Set to true when wallet is properly configured
 };
 
 // Network configuration
@@ -921,9 +921,23 @@ export const getFeePayerKeypair = () => {
   
   try {
     const privateKeyBytes = bs58.decode(FEE_PAYER_WALLET.privateKey);
-    return Keypair.fromSecretKey(privateKeyBytes);
+    
+    // Validate private key length (should be 64 bytes for Solana)
+    if (privateKeyBytes.length !== 64) {
+      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes (expected 64)`);
+    }
+    
+    const keypair = Keypair.fromSecretKey(privateKeyBytes);
+    
+    // Verify the keypair matches the configured public key
+    if (keypair.publicKey.toBase58() !== FEE_PAYER_WALLET.publicKey) {
+      throw new Error('Private key does not match the configured public key');
+    }
+    
+    return keypair;
   } catch (error) {
-    throw new Error('Invalid fee payer private key');
+    console.error('❌ Fee payer keypair validation failed:', error);
+    throw new Error(`Invalid fee payer private key: ${error.message}`);
   }
 };
 
