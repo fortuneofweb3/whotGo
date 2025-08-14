@@ -9,6 +9,36 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Handle null userProfile
+  if (!userProfile) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] p-4 fade-in" onClick={closePopup}>
+        <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto scale-in" onClick={e => e.stopPropagation()}>
+          <div className="bg-black">
+            <div className="p-8 bg-[#80142C]">
+              <div className="text-center mb-10">
+                <div className="flex justify-between items-center mb-4">
+                  <div></div>
+                  <span onClick={closePopup} className="text-white text-2xl cursor-pointer">×</span>
+                </div>
+                <h1 className="text-4xl font-bold mb-2 text-white">
+                  Player Profile
+                </h1>
+                <div className="text-gray-200 text-lg tracking-wider">
+                  Loading Profile...
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                <p className="text-white">Please wait while we load your profile...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleUpdateUsername = async () => {
     if (newUsername.trim()) {
       setIsUpdating(true);
@@ -85,7 +115,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                             value={newUsername}
                             onChange={e => setNewUsername(e.target.value)}
                             className="bg-gray-700 text-white px-3 py-1 border border-gray-600 focus:border-[#80142C] outline-none"
-                            placeholder={userProfile.username || 'Enter username'}
+                            placeholder={userProfile?.username || 'Enter username'}
                             maxLength={20}
                           />
                         </div>
@@ -94,7 +124,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                             value={newBio}
                             onChange={e => setNewBio(e.target.value)}
                             className="bg-gray-700 text-white px-3 py-1 border border-gray-600 focus:border-[#80142C] outline-none flex-1"
-                            placeholder={userProfile.bio || 'Enter bio'}
+                            placeholder={userProfile?.bio || 'Enter bio'}
                             maxLength={100}
                             rows={2}
                           />
@@ -115,18 +145,18 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                     ) : (
                       <div className="space-y-2">
                         <div className="flex items-center">
-                          <span className="text-lg font-bold text-white mr-3">{userProfile.username || 'Player'}</span>
+                          <span className="text-lg font-bold text-white mr-3">{userProfile?.username || 'Player'}</span>
                           <button onClick={() => {
                             setIsEditing(true);
-                            setNewUsername(userProfile.username || '');
-                            setNewBio(userProfile.bio || '');
+                            setNewUsername(userProfile?.username || '');
+                            setNewBio(userProfile?.bio || '');
                           }} className="px-3 py-1 bg-[#80142C] text-white hover:bg-[#4a0c1a] transition-colors text-sm">
                             Edit
                           </button>
                         </div>
-                        {userProfile.bio && (
+                        {userProfile?.bio && (
                           <div className="text-gray-300 text-sm">
-                            {userProfile.bio}
+                            {userProfile?.bio}
                           </div>
                         )}
                       </div>
@@ -178,15 +208,15 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{userProfile.gamesPlayed || 0}</div>
+                    <div className="text-2xl font-bold text-white">{userProfile?.gamesPlayed || 0}</div>
                     <div className="text-gray-200 text-sm">Games Played</div>
                   </div>
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{userProfile.gamesWon || 0}</div>
+                    <div className="text-2xl font-bold text-white">{userProfile?.gamesWon || 0}</div>
                     <div className="text-gray-200 text-sm">Games Won</div>
                   </div>
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{userProfile.gamesPlayed > 0 ? ((userProfile.gamesWon || 0) / userProfile.gamesPlayed * 100).toFixed(1) : 0}%</div>
+                    <div className="text-2xl font-bold text-white">{userProfile?.gamesPlayed > 0 ? ((userProfile?.gamesWon || 0) / userProfile?.gamesPlayed * 100).toFixed(1) : 0}%</div>
                     <div className="text-gray-200 text-sm">Win Rate</div>
                   </div>
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
