@@ -877,29 +877,30 @@ const App = () => {
       let userData = null;
       let dataSource = 'none';
       
-      // Determine which data to use and merge if both exist
-      if (firebaseData.status === 'fulfilled' && firebaseData.value) {
-        userData = firebaseData.value;
-        dataSource = 'firebase';
-        console.log('✅ Using Firebase data as primary source');
-      }
-      
-      if (honeycombData.status === 'fulfilled' && honeycombData.value) {
-        if (userData) {
-          // Merge Honeycomb data with Firebase data
-          userData = {
-            ...userData,
-            ...honeycombData.value,
-            honeycombProfile: honeycombData.value.honeycombProfile || userData.honeycombProfile
-          };
-          dataSource = 'both';
-          console.log('✅ Merged Honeycomb data with Firebase data');
-        } else {
-          userData = honeycombData.value;
-          dataSource = 'honeycomb';
-          console.log('✅ Using Honeycomb data as primary source');
-        }
-      }
+             // Determine which data to use and merge if both exist
+       if (firebaseData.status === 'fulfilled' && firebaseData.value) {
+         userData = firebaseData.value;
+         dataSource = 'firebase';
+         console.log('✅ Using Firebase data as primary source');
+       }
+       
+       if (honeycombData.status === 'fulfilled' && honeycombData.value) {
+         if (userData) {
+           // Merge Honeycomb data with Firebase data (Honeycomb takes precedence for game stats)
+           userData = {
+             ...userData,
+             ...honeycombData.value,
+             honeycombProfile: honeycombData.value.honeycombProfile || userData.honeycombProfile
+           };
+           dataSource = 'both';
+           console.log('✅ Merged Honeycomb data with Firebase data');
+         } else {
+           // User exists in Honeycomb but not Firebase - sync to Firebase
+           userData = honeycombData.value;
+           dataSource = 'honeycomb_only';
+           console.log('✅ User exists in Honeycomb but not Firebase - will sync to Firebase');
+         }
+       }
       
       if (userData) {
         // Ensure user data has all required fields
@@ -1000,9 +1001,9 @@ const App = () => {
   // Sync user data to both Firebase and Honeycomb
   const syncUserDataToBothSources = async (userData, currentSource) => {
     try {
-      console.log('🔄 Syncing user data to both sources...');
+      console.log('🔄 Syncing user data to both sources...', { currentSource });
       
-      // Always sync to Firebase
+      // Always sync to Firebase (especially important for honeycomb_only case)
       const userRef = ref(db, `users/${userData.id}`);
       await set(userRef, {
         ...userData,
@@ -1010,8 +1011,8 @@ const App = () => {
       });
       console.log('✅ User data synced to Firebase');
       
-      // Sync to Honeycomb if not already from Honeycomb
-      if (currentSource !== 'honeycomb' && publicKey && wallet && signMessage) {
+      // Sync to Honeycomb if not already from Honeycomb and wallet is connected
+      if (currentSource !== 'honeycomb' && currentSource !== 'honeycomb_only' && publicKey && wallet && signMessage) {
         try {
           await updateUserProfileWithSOLManagement(
             publicKey,
@@ -1035,23 +1036,7 @@ const App = () => {
       }
       
       // Update leaderboard
-      const leaderboardRef = ref(db, `leaderboard/users/${userData.id}`);
-      const leaderboardData = {
-        id: userData.id,
-        username: userData.username,
-        xp: userData.xp,
-        level: userData.level,
-        gamesPlayed: userData.gamesPlayed,
-        gamesWon: userData.gamesWon,
-        winRate: userData.gamesPlayed > 0 ? (userData.gamesWon / userData.gamesPlayed * 100) : 0,
-        totalCardsPlayed: userData.totalCardsPlayed,
-        perfectWins: userData.perfectWins,
-        currentWinStreak: userData.currentWinStreak,
-        bestWinStreak: userData.bestWinStreak,
-        lastActive: serverTimestamp()
-      };
-      await set(leaderboardRef, leaderboardData);
-      console.log('✅ Leaderboard updated');
+      await updateLeaderboardEntry(userData);
       
     } catch (error) {
       console.error('❌ Error syncing user data:', error);
@@ -1507,29 +1492,28 @@ const App = () => {
     }
   };
 
-  // Test airdrop functionality
-  const testAirdrop = async () => {
-    if (!publicKey) {
-      console.log('❌ No wallet connected');
-      return;
-    }
-    
-    console.log('🧪 Testing airdrop functionality...');
+  // Update leaderboard entry
+  const updateLeaderboardEntry = async (userData) => {
     try {
-      // Test RPC connection first
-      console.log('🔧 Testing RPC connection...');
-      const rpcTest = await testRPCConnection();
-      console.log('🔧 RPC test result:', rpcTest);
-      
-      // Test airdrop
-      console.log('💰 Testing airdrop...');
-      const airdropResult = await ensureWalletHasSOL(publicKey, 0.01);
-      console.log('💰 Airdrop test result:', airdropResult);
-      
-      alert(`Airdrop test completed!\nRPC Test: ${rpcTest ? '✅ Passed' : '❌ Failed'}\nAirdrop: ${airdropResult ? '✅ Performed' : '✅ Not needed'}`);
+      const leaderboardRef = ref(db, `leaderboard/users/${userData.id}`);
+      const leaderboardData = {
+        id: userData.id,
+        username: userData.username,
+        xp: userData.xp,
+        level: userData.level,
+        gamesPlayed: userData.gamesPlayed,
+        gamesWon: userData.gamesWon,
+        winRate: userData.gamesPlayed > 0 ? (userData.gamesWon / userData.gamesPlayed * 100) : 0,
+        totalCardsPlayed: userData.totalCardsPlayed,
+        perfectWins: userData.perfectWins,
+        currentWinStreak: userData.currentWinStreak,
+        bestWinStreak: userData.bestWinStreak,
+        lastActive: serverTimestamp()
+      };
+      await set(leaderboardRef, leaderboardData);
+      console.log('✅ Leaderboard entry updated');
     } catch (error) {
-      console.error('❌ Airdrop test failed:', error);
-      alert(`Airdrop test failed: ${error.message}`);
+      console.error('❌ Error updating leaderboard entry:', error);
     }
   };
 
@@ -1575,7 +1559,8 @@ const App = () => {
   const updateUsername = async (newUsernameValue, newBioValue = null) => {
     if (!currentUser || !newUsernameValue.trim()) return;
     try {
-      const userRef = ref(db, `users/${currentUser.id}`);
+      console.log('🔄 Updating username with bidirectional sync...');
+      
       const updateData = { username: newUsernameValue.trim() };
       
       // Also update bio if provided
@@ -1583,22 +1568,46 @@ const App = () => {
         updateData.bio = newBioValue.trim();
       }
       
+      // Update Firebase
+      const userRef = ref(db, `users/${currentUser.id}`);
       await update(userRef, updateData);
+      console.log('✅ Username updated in Firebase');
+      
+      // Update Honeycomb if wallet is connected
+      if (publicKey && wallet && signMessage) {
+        try {
+          await updateProfileInfo({
+            publicKey,
+            wallet,
+            signMessage,
+            username: newUsernameValue.trim(),
+            bio: newBioValue !== null ? newBioValue.trim() : currentUser.bio || ''
+          });
+          console.log('✅ Username updated in Honeycomb');
+        } catch (honeycombError) {
+          console.error('❌ Failed to update Honeycomb username:', honeycombError);
+        }
+      }
+      
+      // Update local state
       setCurrentUser(prev => ({ 
         ...prev, 
         username: newUsernameValue.trim(),
         ...(newBioValue !== null && { bio: newBioValue.trim() })
       }));
       
-      // Update leaderboard with new username
-      const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
-      await update(leaderboardRef, { username: newUsernameValue.trim() });
-      console.log('✅ Username updated in leaderboard');
+      // Update leaderboard
+      await updateLeaderboardEntry({
+        ...currentUser,
+        username: newUsernameValue.trim(),
+        ...(newBioValue !== null && { bio: newBioValue.trim() })
+      });
       
       setIsEditingUsername(false);
       setNewUsername('');
+      console.log('✅ Username updated successfully in all sources');
     } catch (error) {
-      console.error('Error updating username:', error);
+      console.error('❌ Error updating username:', error);
     }
   };
 
@@ -1831,21 +1840,21 @@ const App = () => {
     };
   };
 
-  // Comprehensive game tracking and statistics update
+    // Comprehensive game tracking and statistics update with bidirectional sync
   const updateGameStatistics = async (gameData, isWinner, gameMode = 'ai') => {
     if (!currentUser) return;
-    
-    console.log('📊 Updating game statistics...', { isWinner, gameMode });
-    
+
+    console.log('📊 Updating game statistics with bidirectional sync...', { isWinner, gameMode });
+
     // Calculate game statistics
     const roundsPlayed = gameData.roundNumber || 1;
     const totalCardsPlayed = gameData.totalCardsPlayed || 0;
     const cardsPlayed = gameData.cardsPlayed || 0;
     const perfectWin = isWinner && roundsPlayed === 1;
     const xpEarned = getXPFromGame(isWinner, roundsPlayed, cardsPlayed);
-    
-    // Prepare Firebase update data
-    const firebaseUpdate = {
+
+    // Prepare update data
+    const updateData = {
       gamesPlayed: (currentUser.gamesPlayed || 0) + 1,
       gamesWon: isWinner ? (currentUser.gamesWon || 0) + 1 : (currentUser.gamesWon || 0),
       xp: (currentUser.xp || 0) + xpEarned,
@@ -1854,58 +1863,37 @@ const App = () => {
       totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + totalCardsPlayed,
       lastActive: serverTimestamp()
     };
-    
+
     // Add perfect wins tracking
     if (perfectWin) {
-      firebaseUpdate.perfectWins = (currentUser.perfectWins || 0) + 1;
+      updateData.perfectWins = (currentUser.perfectWins || 0) + 1;
     }
-    
+
     // Calculate new level data
-    const newXP = firebaseUpdate.xp;
+    const newXP = updateData.xp;
     const levelData = calculateLevel(newXP);
     const updatedUserData = {
       ...currentUser,
-      ...firebaseUpdate,
+      ...updateData,
       level: levelData.level,
       currentLevelXP: levelData.currentLevelXP,
       xpNeededForNext: levelData.xpNeededForNext
     };
-    
+
     // Update Firebase
     try {
       const userRef = ref(db, `users/${currentUser.id}`);
       await update(userRef, {
-        ...firebaseUpdate,
+        ...updateData,
         level: levelData.level,
         currentLevelXP: levelData.currentLevelXP,
         xpNeededForNext: levelData.xpNeededForNext
       });
       console.log('✅ Firebase stats updated successfully');
-      
-      // Update leaderboard with user data
-      const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
-      const leaderboardData = {
-        id: currentUser.id,
-        username: currentUser.username || 'Unknown Player',
-        xp: firebaseUpdate.xp,
-        level: levelData.level,
-        gamesPlayed: firebaseUpdate.gamesPlayed,
-        gamesWon: firebaseUpdate.gamesWon,
-        winRate: firebaseUpdate.gamesPlayed > 0 ? (firebaseUpdate.gamesWon / firebaseUpdate.gamesPlayed) * 100 : 0,
-        totalCardsPlayed: firebaseUpdate.totalCardsPlayed,
-        perfectWins: firebaseUpdate.perfectWins || 0,
-        currentWinStreak: firebaseUpdate.currentWinStreak,
-        bestWinStreak: firebaseUpdate.bestWinStreak,
-        lastActive: serverTimestamp()
-      };
-      
-      await set(leaderboardRef, leaderboardData);
-      console.log('✅ Leaderboard updated successfully');
-      
     } catch (error) {
       console.error('❌ Error updating Firebase stats:', error);
     }
-    
+
     // Update Honeycomb if wallet is connected
     if (publicKey && wallet && signMessage) {
       try {
@@ -1916,7 +1904,7 @@ const App = () => {
           gameMode: gameMode,
           roundsPlayed: roundsPlayed
         };
-        
+
         const honeycombResult = await updateGameStats({
           publicKey,
           wallet,
@@ -1924,29 +1912,32 @@ const App = () => {
           gameResult: isWinner ? 'win' : 'loss',
           gameStats: honeycombGameStats
         });
-        
+
         if (honeycombResult.success) {
           console.log('✅ Honeycomb stats updated successfully');
-          
+
           // Check for new achievements after updating stats
           await checkAndUnlockAchievements(updatedUserData);
         } else {
           console.warn('⚠️ Honeycomb stats update failed, but continuing with Firebase update');
         }
-        
+
       } catch (error) {
         console.error('❌ Error updating Honeycomb stats:', error);
         console.warn('⚠️ Continuing with Firebase update despite Honeycomb error');
       }
     }
-    
+
+    // Update leaderboard
+    await updateLeaderboardEntry(updatedUserData);
+
     // Update local state
     setCurrentUser(updatedUserData);
-    
+
     // Update leaderboard data
     await fetchLeaderboard();
-    
-    console.log('📊 Game statistics update complete');
+
+    console.log('📊 Game statistics update complete with bidirectional sync');
     return updatedUserData;
   };
 
@@ -4841,7 +4832,7 @@ const App = () => {
                     setActivePopup('profile');
                   }}
                   onDebugUpdate={updateCurrentUserLeaderboard}
-                onTestAirdrop={testAirdrop}
+
                 />}
                 {activePopup === 'config' && <SettingsPopup 
                   musicVolume={musicVolume}
