@@ -1009,30 +1009,24 @@ const App = () => {
       let userData = null;
       let dataSource = 'none';
       
-             // Determine which data to use and merge if both exist
-       if (firebaseData.status === 'fulfilled' && firebaseData.value) {
-         userData = firebaseData.value;
-         dataSource = 'firebase';
-         console.log('✅ Using Firebase data as primary source');
-       }
-       
-       if (honeycombData.status === 'fulfilled' && honeycombData.value) {
-         if (userData) {
-           // Merge Honeycomb data with Firebase data (Honeycomb takes precedence for game stats)
-           userData = {
-             ...userData,
-             ...honeycombData.value,
-             honeycombProfile: honeycombData.value.honeycombProfile || userData.honeycombProfile
-           };
-           dataSource = 'both';
-           console.log('✅ Merged Honeycomb data with Firebase data');
-         } else {
-           // User exists in Honeycomb but not Firebase - sync to Firebase
-           userData = honeycombData.value;
-           dataSource = 'honeycomb_only';
-           console.log('✅ User exists in Honeycomb but not Firebase - will sync to Firebase');
-         }
-       }
+             // Firebase is the primary storage - only use Honeycomb for new users
+      if (firebaseData.status === 'fulfilled' && firebaseData.value) {
+        // User exists in Firebase - use Firebase as primary source
+        userData = firebaseData.value;
+        dataSource = 'firebase';
+        console.log('✅ Using Firebase data as primary source');
+        
+        // Only sync to Honeycomb if wallet is connected and user has Honeycomb profile
+        if (honeycombData.status === 'fulfilled' && honeycombData.value && honeycombData.value.honeycombProfile) {
+          console.log('🔄 User has both Firebase and Honeycomb data - will sync Firebase to Honeycomb');
+          dataSource = 'firebase_with_honeycomb_sync';
+        }
+      } else if (honeycombData.status === 'fulfilled' && honeycombData.value) {
+        // User exists in Honeycomb but not Firebase - this is a new user
+        userData = honeycombData.value;
+        dataSource = 'honeycomb_only';
+        console.log('✅ New user exists in Honeycomb but not Firebase - will sync to Firebase');
+      }
       
       if (userData) {
         // Ensure user data has all required fields
@@ -1144,27 +1138,36 @@ const App = () => {
       });
       console.log('✅ User data synced to Firebase');
       
-      // Sync to Honeycomb if not already from Honeycomb and wallet is connected
-      if (currentSource !== 'honeycomb' && currentSource !== 'honeycomb_only' && publicKey && wallet && signMessage) {
-        try {
-          await updateUserProfileWithSOLManagement(
-            publicKey,
-            wallet,
-            signMessage,
-            {
-              username: userData.username,
-              xp: userData.xp,
-              gamesPlayed: userData.gamesPlayed,
-              gamesWon: userData.gamesWon,
-              totalCardsPlayed: userData.totalCardsPlayed,
-              perfectWins: userData.perfectWins,
-              currentWinStreak: userData.currentWinStreak,
-              bestWinStreak: userData.bestWinStreak
-            }
-          );
-          console.log('✅ User data synced to Honeycomb');
-        } catch (honeycombError) {
-          console.warn('⚠️ Failed to sync to Honeycomb:', honeycombError.message);
+      // Sync to Honeycomb based on data source
+      if (publicKey && wallet && signMessage) {
+        if (currentSource === 'firebase_with_honeycomb_sync') {
+          // Sync Firebase data to Honeycomb (Firebase is primary)
+          try {
+            await updateUserProfileWithSOLManagement(
+              publicKey,
+              wallet,
+              signMessage,
+              {
+                username: userData.username,
+                xp: userData.xp,
+                gamesPlayed: userData.gamesPlayed,
+                gamesWon: userData.gamesWon,
+                totalCardsPlayed: userData.totalCardsPlayed,
+                perfectWins: userData.perfectWins,
+                currentWinStreak: userData.currentWinStreak,
+                bestWinStreak: userData.bestWinStreak
+              }
+            );
+            console.log('✅ Firebase data synced to Honeycomb');
+          } catch (honeycombError) {
+            console.warn('⚠️ Failed to sync Firebase data to Honeycomb:', honeycombError.message);
+          }
+        } else if (currentSource === 'honeycomb_only') {
+          // New user from Honeycomb - no need to sync back since we just synced to Firebase
+          console.log('✅ New user data synced from Honeycomb to Firebase');
+        } else if (currentSource === 'new') {
+          // Brand new user - no Honeycomb profile yet, so no sync needed
+          console.log('✅ New user created in Firebase only');
         }
       }
       
