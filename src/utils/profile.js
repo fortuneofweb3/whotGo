@@ -275,20 +275,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     } else {
       // Use fee payer keypair for signing
       console.log('📝 Using fee payer keypair for transaction signing...');
-      const feePayerKeypair = getFeePayerKeypair();
-      
-      // Create a custom wallet adapter that uses the fee payer keypair
-      walletAdapter = {
-        publicKey: feePayerKeypair.publicKey,
-        signTransaction: async (transaction) => {
-          transaction.partialSign(feePayerKeypair);
-          return transaction;
-        },
-        signAllTransactions: async (transactions) => {
-          transactions.forEach(tx => tx.partialSign(feePayerKeypair));
-          return transactions;
-        }
-      };
+      walletAdapter = createFeePayerWalletAdapter();
     }
     
     // Send the transaction using the client's helper
@@ -1318,20 +1305,7 @@ export const updateProfileInfo = async ({ publicKey, wallet, signMessage, userna
     } else {
       // Use fee payer keypair for signing
       console.log('📝 Using fee payer keypair for transaction signing...');
-      const feePayerKeypair = getFeePayerKeypair();
-      
-      // Create a custom wallet adapter that uses the fee payer keypair
-      walletAdapter = {
-        publicKey: feePayerKeypair.publicKey,
-        signTransaction: async (transaction) => {
-          transaction.partialSign(feePayerKeypair);
-          return transaction;
-        },
-        signAllTransactions: async (transactions) => {
-          transactions.forEach(tx => tx.partialSign(feePayerKeypair));
-          return transactions;
-        }
-      };
+      walletAdapter = createFeePayerWalletAdapter();
     }
     
     // Wrap transaction in object format expected by sendClientTransactions
