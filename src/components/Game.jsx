@@ -1219,7 +1219,7 @@ const Game = ({
   };
 
   return (
-    <div className="h-full relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%)', perspective: '1000px' }}>
+    <div className="min-h-screen relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%)', perspective: '1000px' }}>
       <div className="fixed top-4 left-4 z-30">
         <button onClick={() => {
           playSoundEffect.back();
@@ -1483,20 +1483,35 @@ const Game = ({
                       <div
                         key={`${card.id}-${cardIndex}`}
                         className={`${cardDimensions} shadow-lg smooth-transition ${isThisCardPlayable ? 'cursor-pointer' : ''}`}
-                        style={{ backgroundColor: isCurrentUserPlayer ? 'transparent' : '#2a2a2a', zIndex: cardIndex, transform: 'none', opacity: isCurrentUserPlayer ? (isThisCardPlayable || !canPlayAnyCard ? 1 : 0.4) : 1 }}
+                        style={{ 
+                          backgroundColor: isCurrentUserPlayer ? 'transparent' : '#2a2a2a', 
+                          zIndex: cardIndex, 
+                          transform: 'none', 
+                          opacity: isCurrentUserPlayer ? (isThisCardPlayable || !canPlayAnyCard ? 1 : 0.4) : 1,
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent'
+                        }}
                         onClick={(e) => {
                           if (isThisCardPlayable && isCurrentUserPlayer && isCurrentUserTurn) {
+                            // Prevent default to avoid any unwanted behaviors
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
                             if (currentRoom) {
-                              const clickX = e.clientX;
-                              const clickY = e.clientY;
+                              const clickX = e.clientX || e.touches?.[0]?.clientX || 0;
+                              const clickY = e.clientY || e.touches?.[0]?.clientY || 0;
                               handlePlayMultiplayerCard(cardIndex, { x: clickX, y: clickY });
                             } else {
                               // Get the exact click position relative to the viewport
-                              const clickX = e.clientX;
-                              const clickY = e.clientY;
+                              const clickX = e.clientX || e.touches?.[0]?.clientX || 0;
+                              const clickY = e.clientY || e.touches?.[0]?.clientY || 0;
                               handlePlayCard(cardIndex, { x: clickX, y: clickY });
                             }
                           }
+                        }}
+                        onTouchStart={(e) => {
+                          // Prevent zoom on double tap
+                          e.preventDefault();
                         }}
                       >
                         <div className="h-full flex flex-col items-center justify-center text-white font-bold relative">

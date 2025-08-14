@@ -4169,7 +4169,7 @@ const App = () => {
   const renderContent = () => {
     if (gameState === 'landing') {
       return (
-        <div className="h-full flex flex-col relative" style={pageStyles.landing}>
+        <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.landing}>
           <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-10">
             <div className="relative w-80 h-32">
               {cards.map((card, index) => (
@@ -4348,8 +4348,8 @@ const App = () => {
       );
     } else if (gameState === 'rooms') {
       return (
-        <div className="h-full flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
-          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8 min-h-0">
+        <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
+          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8">
             <div className="w-full max-w-lg md:max-w-2xl lg:max-w-4xl relative">
               <button onClick={() => {
                 playSoundEffect.back();
@@ -4591,8 +4591,8 @@ const App = () => {
       );
     } else if (gameState === 'menu') {
         return (
-        <div className="h-full flex flex-col relative" style={pageStyles.menu}>
-          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8 min-h-0">
+        <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
+          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8">
             <div className="w-full max-w-6xl relative">
               <button onClick={() => {
                 playSoundEffect.back();
