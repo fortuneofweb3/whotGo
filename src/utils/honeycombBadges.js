@@ -1,4 +1,4 @@
-import { claimBadge, getUserProfile, hasBadge, getBadgeName, BADGE_CRITERIA } from './profile';
+import { claimBadge, getUserProfile, hasBadge, getBadgeName, BADGE_CRITERIA, executeTransactionWithAutoFunding } from './profile';
 
 // Badge achievement conditions and tracking
 export const BADGE_CONDITIONS = {

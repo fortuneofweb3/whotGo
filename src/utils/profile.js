@@ -149,15 +149,8 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       throw new Error('Wallet not properly connected or missing signAllTransactions method');
     }
 
-    // Ensure wallet has SOL for transaction fees
-    console.log('💰 Ensuring wallet has SOL for transaction fees...');
-    try {
-      await ensureWalletHasSOL(publicKey, 0.005);
-      console.log('✅ User now has SOL for profile creation');
-    } catch (fundingError) {
-      console.error('❌ Wallet funding failed:', fundingError);
-      throw new Error(`Unable to fund wallet for profile creation: ${fundingError.message}`);
-    }
+    // Note: SOL funding will be handled automatically by executeTransactionWithAutoFunding
+    console.log('💰 SOL funding will be handled automatically if needed during transaction...');
 
     const walletAddress = publicKey.toBase58();
     const displayName = username || `Player${Math.floor(Math.random() * 10000)}`;
@@ -233,8 +226,11 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     // Sign and send the transaction as per docs
     const walletAdapter = getWalletAdapter(wallet);
     
-    // Send the transaction using the client's helper
-    const response = await sendClientTransactions(client, walletAdapter, txResponse);
+    // Send the transaction using the client's helper with auto-funding
+    const response = await executeTransactionWithAutoFunding(publicKey, async () => {
+      return await sendClientTransactions(client, walletAdapter, txResponse);
+    });
+    
     console.log('✅ Honeycomb user profile created successfully');
     console.log('📋 Transaction response:', response);
     
@@ -745,6 +741,60 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
   }
 };
 
+// Execute transaction with automatic SOL funding and retry
+export const executeTransactionWithAutoFunding = async (publicKey, transactionFunction, maxRetries = 2) => {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Transaction attempt ${attempt}/${maxRetries}...`);
+      
+      // Execute the transaction
+      const result = await transactionFunction();
+      console.log('✅ Transaction successful!');
+      return result;
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Transaction attempt ${attempt} failed:`, error.message);
+      
+      // Check if it's an insufficient SOL error
+      const isInsufficientSOL = error.message && (
+        error.message.includes('insufficient') ||
+        error.message.includes('Insufficient') ||
+        error.message.includes('0x1') || // Solana insufficient funds error code
+        error.message.includes('insufficient lamports') ||
+        error.message.includes('insufficient balance')
+      );
+      
+      if (isInsufficientSOL && attempt < maxRetries) {
+        console.log('💰 Insufficient SOL detected, funding wallet automatically...');
+        
+        try {
+          // Fund the wallet
+          await ensureWalletHasSOL(publicKey, 0.005);
+          console.log('✅ Wallet funded, retrying transaction...');
+          
+          // Wait a moment for the funding to settle
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          continue; // Retry the transaction
+          
+        } catch (fundingError) {
+          console.error('❌ Auto-funding failed:', fundingError.message);
+          throw new Error(`Transaction failed and auto-funding failed: ${fundingError.message}`);
+        }
+      } else {
+        // Not an insufficient SOL error or max retries reached
+        throw error;
+      }
+    }
+  }
+  
+  // If we get here, all retries failed
+  throw lastError;
+};
+
 // Test Honeycomb API connection and configuration
 export const testHoneycombConnection = async () => {
   try {
@@ -1010,7 +1060,10 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
       hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
     });
     
-    const response = await sendClientTransactions(client, walletAdapter, transactionObject);
+    const response = await executeTransactionWithAutoFunding(publicKey, async () => {
+      return await sendClientTransactions(client, walletAdapter, transactionObject);
+    });
+    
     console.log('✅ Honeycomb profile updated successfully:', response);
     
     return { success: true, response };
@@ -1319,7 +1372,10 @@ export const claimBadge = async ({ publicKey, wallet, signMessage, badgeIndex })
       hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
     });
     
-    const response = await sendClientTransactions(client, walletAdapter, transactionObject);
+    const response = await executeTransactionWithAutoFunding(publicKey, async () => {
+      return await sendClientTransactions(client, walletAdapter, transactionObject);
+    });
+    
     console.log('Honeycomb badge claimed successfully');
     
     return { success: true, badgeIndex, response };

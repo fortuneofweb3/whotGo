@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand } from './utils/profile';
+import { createUserProfile, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, getManualAirdropCommand, executeTransactionWithAutoFunding } from './utils/profile';
 import { updateGameStats, checkUnlockableBadges, claimSpecificBadge } from './utils/honeycombBadges';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
@@ -4047,14 +4047,8 @@ const App = () => {
                         try {
                           // Ensure wallet has SOL
                           console.log('💰 Ensuring wallet has SOL...');
-                                                     try {
-                             await ensureWalletHasSOL(publicKey, 0.005);
-                           } catch (fundingError) {
-                             console.error('❌ Wallet funding failed:', fundingError);
-                             alert(`Unable to fund wallet: ${fundingError.message}\n\nPlease try again or contact support.`);
-                             setIsCreatingProfile(false);
-                             return;
-                           }
+                                                     // Note: SOL funding will be handled automatically by executeTransactionWithAutoFunding
+                           console.log('💰 SOL funding will be handled automatically if needed during profile creation...');
                           
                           const result = await createUserProfile({ 
                             publicKey, 
