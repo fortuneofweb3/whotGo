@@ -2304,7 +2304,7 @@ const App = () => {
           
           const newData = { ...prevData };
           const updatedPlayers = newData.players.map(p => ({ ...p, cards: [...p.cards] }));
-          const actualPlayerIndex = (updatedPlayers || []).findIndex(p => p.id === currentPlayer.id);
+          const actualPlayerIndex = updatedPlayers.findIndex(p => p.id === currentPlayer.id);
           if (actualPlayerIndex !== -1 && !updatedPlayers[actualPlayerIndex].eliminated) {
             updatedPlayers[actualPlayerIndex].cards.push(cardToDeal);
           }
@@ -3209,7 +3209,8 @@ const App = () => {
         });
         nextRoundGameData.playPile = [];
         nextRoundGameData.drawPile = shuffledNewDeck;
-        const firstPlayerIndex = (nextRoundGameData.players || []).findIndex(p => !p.eliminated);
+        const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
+        const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
         nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
         nextRoundGameData.pendingPickCount = 0;
         nextRoundGameData.generalMarketActive = false;

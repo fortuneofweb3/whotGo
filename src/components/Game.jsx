@@ -886,9 +886,10 @@ const Game = ({
 
   const hasPlayableCardsOutsideRange = () => {
     if (!gameData) return { left: false, right: false };
-    const currentUserActualIndex = currentRoom ? (gameData.players || []).findIndex(p => p.id === currentUser?.id) : 0;
+    const players = ensurePlayersArray(gameData.players);
+    const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
     if (gameData.currentPlayer !== currentUserActualIndex) return { left: false, right: false };
-    const player = gameData.players?.[currentUserActualIndex];
+    const player = players[currentUserActualIndex];
     if (!player) return { left: false, right: false };
     const topCard = gameData.playPile?.[gameData.playPile.length - 1];
     const leftCards = (player.cards || []).slice(0, playerScrollIndex);
