@@ -1,0 +1,37 @@
+{
+  "name": "whotgo",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Whot Go! card game with Solana wallet and Honeycomb integration",
+  "main": "src/index.jsx",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@honeycomb-protocol/edge-client": "0.0.7-beta.15",
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-coinbase": "^0.1.0",
+    "@solana/wallet-adapter-react": "^0.15.35",
+    "@solana/wallet-adapter-react-ui": "^0.9.34",
+    "@solana/wallet-adapter-wallets": "^0.19.23",
+    "@solana/web3.js": "^1.95.3",
+    "bs58": "^5.0.0",
+    "buffer": "^6.0.3",
+    "firebase": "^12.1.0",
+    "lottie-react": "^2.4.1",
+    "lucide-react": "^0.263.0",
+    "react": "^18.2.0",
+    "react-confetti": "^6.1.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.4.17",
+    "vite": "^7.1.2"
+  }
+}
