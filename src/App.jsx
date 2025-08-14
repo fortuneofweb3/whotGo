@@ -1015,7 +1015,11 @@ const App = () => {
             ...firebaseData,
             level: levelData.level,
             currentLevelXP: levelData.currentLevelXP,
-            xpNeededForNext: levelData.xpNeededForNext
+            xpNeededForNext: levelData.xpNeededForNext,
+            totalCardsPlayed: firebaseData.totalCardsPlayed || 0,
+            perfectWins: firebaseData.perfectWins || 0,
+            currentWinStreak: firebaseData.currentWinStreak || 0,
+            bestWinStreak: firebaseData.bestWinStreak || 0
           };
           setCurrentUser(userData);
           initializeAchievements(userData);
@@ -1023,7 +1027,11 @@ const App = () => {
             lastActive: serverTimestamp(),
             level: levelData.level,
             currentLevelXP: levelData.currentLevelXP,
-            xpNeededForNext: levelData.xpNeededForNext
+            xpNeededForNext: levelData.xpNeededForNext,
+            totalCardsPlayed: firebaseData.totalCardsPlayed || 0,
+            perfectWins: firebaseData.perfectWins || 0,
+            currentWinStreak: firebaseData.currentWinStreak || 0,
+            bestWinStreak: firebaseData.bestWinStreak || 0
           });
           
           // Update leaderboard with user data
@@ -1055,6 +1063,10 @@ const App = () => {
             xpNeededForNext: levelData.xpNeededForNext,
             gamesPlayed: 0,
             gamesWon: 0,
+            totalCardsPlayed: 0,
+            perfectWins: 0,
+            currentWinStreak: 0,
+            bestWinStreak: 0,
             createdAt: serverTimestamp(),
             lastActive: serverTimestamp()
           };
@@ -1097,7 +1109,11 @@ const App = () => {
         currentLevelXP: levelData.currentLevelXP,
         xpNeededForNext: levelData.xpNeededForNext,
         gamesPlayed: 0,
-        gamesWon: 0
+        gamesWon: 0,
+        totalCardsPlayed: 0,
+        perfectWins: 0,
+        currentWinStreak: 0,
+        bestWinStreak: 0
       });
     }
   };
@@ -2789,7 +2805,9 @@ const App = () => {
               currentLevelXP: levelData.currentLevelXP,
               xpNeededForNext: levelData.xpNeededForNext,
               currentWinStreak: isWinner ? (currentUser.currentWinStreak || 0) + 1 : 0,
-              bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : currentUser.bestWinStreak || 0
+              bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : currentUser.bestWinStreak || 0,
+              totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + (gameData?.totalCardsPlayed || 0),
+              perfectWins: isWinner && (gameData?.roundsPlayed || 1) === 1 ? (currentUser.perfectWins || 0) + 1 : currentUser.perfectWins || 0
           });
           
           // Update Honeycomb stats and check for badges
