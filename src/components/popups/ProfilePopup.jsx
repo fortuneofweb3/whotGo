@@ -6,6 +6,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
   const { publicKey, wallet, signMessage } = useWallet();
   const [newUsername, setNewUsername] = useState('');
   const [newBio, setNewBio] = useState('');
+  const [newProfilePicture, setNewProfilePicture] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -21,7 +22,8 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
               wallet,
               signMessage,
               username: newUsername.trim(),
-              bio: newBio.trim() || userProfile?.bio || ''
+              bio: newBio.trim() || userProfile?.bio || '',
+              profilePicture: newProfilePicture.trim() || userProfile?.profilePicture || ''
             });
             console.log('Profile updated on Honeycomb');
           } catch (honeycombError) {
@@ -30,7 +32,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
         }
         
         // Always update Firebase for compatibility
-        updateUsername(newUsername.trim(), newBio.trim() || userProfile?.bio || '');
+        updateUsername(newUsername.trim(), newBio.trim() || userProfile?.bio || '', newProfilePicture.trim() || userProfile?.profilePicture || '');
         setIsEditing(false);
       } catch (error) {
         console.error('Error updating profile:', error);
@@ -66,7 +68,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
               </div>
             </div>
             <div className="space-y-6 max-w-4xl mx-auto">
-              {/* Username Section */}
+              {/* Profile Picture and Info Section */}
               <div className="bg-black p-6">
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center">
                   <span className="w-8 h-8 bg-blue-600 flex items-center justify-center mr-3 text-white text-sm">
@@ -74,65 +76,131 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                   </span>
                   Player Info
                 </h2>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <span className="text-white font-medium mr-4">Username:</span>
-                    {isEditing ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={newUsername}
-                            onChange={e => setNewUsername(e.target.value)}
-                            className="bg-gray-700 text-white px-3 py-1 border border-gray-600 focus:border-[#80142C] outline-none"
-                            placeholder={userProfile.username || 'Enter username'}
-                            maxLength={20}
+                
+                {isEditing ? (
+                  <div className="space-y-4">
+                    {/* Profile Picture */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
+                        {newProfilePicture ? (
+                          <img 
+                            src={newProfilePicture} 
+                            alt="Profile" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
                           />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <textarea
-                            value={newBio}
-                            onChange={e => setNewBio(e.target.value)}
-                            className="bg-gray-700 text-white px-3 py-1 border border-gray-600 focus:border-[#80142C] outline-none flex-1"
-                            placeholder={userProfile.bio || 'Enter bio'}
-                            maxLength={100}
-                            rows={2}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={handleUpdateUsername} 
-                            disabled={!newUsername.trim() || isUpdating} 
-                            className="px-3 py-1 bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                          >
-                            {isUpdating ? 'Saving...' : 'Save'}
-                          </button>
-                          <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-600 text-white hover:bg-gray-700 transition-colors text-sm">
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center">
-                          <span className="text-lg font-bold text-white mr-3">{userProfile.username || 'Player'}</span>
-                          <button onClick={() => {
-                            setIsEditing(true);
-                            setNewUsername(userProfile.username || '');
-                            setNewBio(userProfile.bio || '');
-                          }} className="px-3 py-1 bg-[#80142C] text-white hover:bg-[#4a0c1a] transition-colors text-sm">
-                            Edit
-                          </button>
-                        </div>
-                        {userProfile.bio && (
-                          <div className="text-gray-300 text-sm">
-                            {userProfile.bio}
+                        ) : (
+                          <div className="w-full h-full bg-gray-600 flex items-center justify-center text-white text-2xl">
+                            👤
                           </div>
                         )}
                       </div>
-                    )}
+                      <div className="flex-1">
+                        <label className="block text-white text-sm mb-2">Profile Picture URL:</label>
+                        <input
+                          type="url"
+                          value={newProfilePicture}
+                          onChange={e => setNewProfilePicture(e.target.value)}
+                          className="w-full bg-gray-700 text-white px-3 py-2 border border-gray-600 focus:border-[#80142C] outline-none rounded"
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Username */}
+                    <div>
+                      <label className="block text-white text-sm mb-2">Username:</label>
+                      <input
+                        type="text"
+                        value={newUsername}
+                        onChange={e => setNewUsername(e.target.value)}
+                        className="w-full bg-gray-700 text-white px-3 py-2 border border-gray-600 focus:border-[#80142C] outline-none rounded"
+                        placeholder={userProfile.username || 'Enter username'}
+                        maxLength={20}
+                      />
+                    </div>
+                    
+                    {/* Bio */}
+                    <div>
+                      <label className="block text-white text-sm mb-2">Bio:</label>
+                      <textarea
+                        value={newBio}
+                        onChange={e => setNewBio(e.target.value)}
+                        className="w-full bg-gray-700 text-white px-3 py-2 border border-gray-600 focus:border-[#80142C] outline-none rounded"
+                        placeholder={userProfile.bio || 'Enter bio'}
+                        maxLength={100}
+                        rows={3}
+                      />
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={handleUpdateUsername} 
+                        disabled={!newUsername.trim() || isUpdating} 
+                        className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded"
+                      >
+                        {isUpdating ? 'Saving...' : 'Save'}
+                      </button>
+                      <button 
+                        onClick={() => setIsEditing(false)} 
+                        className="px-4 py-2 bg-gray-600 text-white hover:bg-gray-700 transition-colors rounded"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-4">
+                    {/* Profile Picture Display */}
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center flex-shrink-0">
+                      {userProfile?.profilePicture ? (
+                        <img 
+                          src={userProfile.profilePicture} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-600 flex items-center justify-center text-white text-2xl">
+                          👤
+                        </div>
+                      )}
+                      <div className="w-full h-full bg-gray-600 flex items-center justify-center text-white text-2xl" style={{ display: 'none' }}>
+                        👤
+                      </div>
+                    </div>
+                    
+                    {/* User Info */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-xl font-bold text-white">{userProfile.username || 'Player'}</span>
+                        <button 
+                          onClick={() => {
+                            setIsEditing(true);
+                            setNewUsername(userProfile.username || '');
+                            setNewBio(userProfile.bio || '');
+                            setNewProfilePicture(userProfile.profilePicture || '');
+                          }} 
+                          className="px-3 py-1 bg-[#80142C] text-white hover:bg-[#4a0c1a] transition-colors text-sm rounded"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                      {userProfile.bio && (
+                        <div className="text-gray-300 text-sm">
+                          {userProfile.bio}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Level Progress Section */}

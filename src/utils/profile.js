@@ -256,6 +256,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       perfectWins: 0,
       currentWinStreak: 0,
       bestWinStreak: 0,
+      profilePicture: "https://whotgo.com/default-avatar.png", // Default profile picture
       honeycombProfileExists: true,
       profileAddress: profileAddress || null,
       transactionSignature: transactionSignature || null
@@ -647,12 +648,35 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.01) => {
   try {
     console.log('💰 Checking wallet SOL balance...');
     
-    // Connect to Honeynet RPC
-    const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
+    // Try multiple RPC endpoints for better reliability
+    const rpcEndpoints = [
+      'https://api.devnet.solana.com', // Solana devnet (most reliable for airdrops)
+      'https://rpc.test.honeycombprotocol.com', // Honeycomb testnet
+      'https://solana-devnet.rpc.extrnode.com' // Alternative devnet
+    ];
     
-    // Get current balance
-    const balance = await connection.getBalance(publicKey);
-    const solBalance = balance / LAMPORTS_PER_SOL;
+    let connection;
+    let balance;
+    let solBalance;
+    
+    // Try each RPC endpoint until one works
+    for (const rpcUrl of rpcEndpoints) {
+      try {
+        console.log(`💰 Trying RPC endpoint: ${rpcUrl}`);
+        connection = new Connection(rpcUrl, 'confirmed');
+        balance = await connection.getBalance(publicKey);
+        solBalance = balance / LAMPORTS_PER_SOL;
+        console.log(`✅ RPC endpoint ${rpcUrl} working, balance: ${solBalance.toFixed(4)} SOL`);
+        break;
+      } catch (rpcError) {
+        console.warn(`⚠️ RPC endpoint ${rpcUrl} failed:`, rpcError.message);
+        continue;
+      }
+    }
+    
+    if (!connection || balance === undefined) {
+      throw new Error('All RPC endpoints failed');
+    }
     
     console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
     
@@ -662,13 +686,13 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.01) => {
       const walletAddress = publicKey.toBase58();
       const airdropAmount = 0.1;
       
-      console.log(`💰 Requesting airdrop: solana airdrop ${airdropAmount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`);
+      console.log(`💰 Requesting airdrop: solana airdrop ${airdropAmount} ${walletAddress} -u ${connection._rpcEndpoint}`);
       
       // Request airdrop
       const airdropSignature = await connection.requestAirdrop(publicKey, airdropAmount * LAMPORTS_PER_SOL);
       console.log('💰 Airdrop requested, signature:', airdropSignature);
       
-      // Wait for confirmation
+      // Wait for confirmation with longer timeout
       console.log('💰 Waiting for confirmation...');
       const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
       
@@ -742,7 +766,8 @@ export const testRPCConnection = async () => {
 
 // Get manual airdrop command for users
 export const getManualAirdropCommand = (walletAddress, amount = 0.1) => {
-  const command = `solana airdrop ${amount} ${walletAddress} -u https://rpc.test.honeycombprotocol.com`;
+  // Use Solana devnet for more reliable airdrops
+  const command = `solana airdrop ${amount} ${walletAddress} -u https://api.devnet.solana.com`;
   console.log('💰 Manual airdrop command:', command);
   return command;
 };

@@ -1299,7 +1299,7 @@ const App = () => {
     return () => unsubscribe();
   };
 
-  const updateUsername = async (newUsernameValue, newBioValue = null) => {
+  const updateUsername = async (newUsernameValue, newBioValue = null, newProfilePictureValue = null) => {
     if (!currentUser || !newUsernameValue.trim()) return;
     try {
       const userRef = ref(db, `users/${currentUser.id}`);
@@ -1310,11 +1310,17 @@ const App = () => {
         updateData.bio = newBioValue.trim();
       }
       
+      // Also update profile picture if provided
+      if (newProfilePictureValue !== null) {
+        updateData.profilePicture = newProfilePictureValue.trim();
+      }
+      
       await update(userRef, updateData);
       setCurrentUser(prev => ({ 
         ...prev, 
         username: newUsernameValue.trim(),
-        ...(newBioValue !== null && { bio: newBioValue.trim() })
+        ...(newBioValue !== null && { bio: newBioValue.trim() }),
+        ...(newProfilePictureValue !== null && { profilePicture: newProfilePictureValue.trim() })
       }));
       
       // Update leaderboard with new username
