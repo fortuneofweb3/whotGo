@@ -4250,7 +4250,7 @@ const App = () => {
                     backgroundColor: card.color,
                     width: '72px', // 50% bigger than 48px (w-12)
                     height: '96px', // 50% bigger than 64px (h-16)
-                    left: `${(index * 12 - 204) + Math.sin(Date.now() * 0.001 + index) * 3}px`,
+                    left: `calc(50% - 36px + ${(index * 12) + Math.sin(Date.now() * 0.001 + index) * 3}px)`,
                     top: `${Math.cos(Date.now() * 0.001 + index) * 2}px`,
                     zIndex: index === currentCard ? 20 : 10 - index,
                     opacity: index === currentCard ? 1 : 0.7,
@@ -4430,11 +4430,7 @@ const App = () => {
     } else if (gameState === 'rooms') {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
-          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8 overflow-y-auto" style={{
-            height: '100vh',
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch'
-          }}>
+          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8">
             <div className="w-full max-w-lg md:max-w-2xl lg:max-w-4xl relative">
               <button onClick={() => {
                 playSoundEffect.back();
@@ -4489,9 +4485,7 @@ const App = () => {
                     <p className="text-sm">Create a new room to get started!</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-96 overflow-y-auto" style={{
-                    WebkitOverflowScrolling: 'touch'
-                  }}>
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
                     {rooms.map(room => {
                       const playerCount = Object.keys(room.players || {}).length;
                       const canJoin = playerCount < room.maxPlayers && room.status === 'waiting';
@@ -4679,11 +4673,7 @@ const App = () => {
     } else if (gameState === 'menu') {
         return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
-          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8 overflow-y-auto" style={{
-            height: '100vh',
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch'
-          }}>
+          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8">
             <div className="w-full max-w-6xl relative">
               <button onClick={() => {
                 playSoundEffect.back();
