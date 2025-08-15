@@ -711,7 +711,7 @@ const APP_WALLET_CONFIG = {
 /**
  * Ensure wallet has sufficient SOL balance with automatic airdrop
  */
-export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
+export const ensureWalletHasSOL = async (publicKey, minSOL = 0.0049) => {
   try {
     // Connect to Honeynet RPC
     const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
@@ -724,34 +724,7 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
       return { success: true, method: 'none', balance: solBalance };
     }
     
-    // Step 1: Try web3.js airdrop
-    try {
-      console.log('🪂 Attempting web3.js airdrop...');
-      const airdropAmount = 0.005 * LAMPORTS_PER_SOL; // 0.005 SOL
-      const airdropSignature = await connection.requestAirdrop(publicKey, airdropAmount);
-      
-      // Wait for confirmation
-      const confirmation = await connection.confirmTransaction(airdropSignature, 'confirmed');
-      
-      if (confirmation.value && confirmation.value.err) {
-        throw new Error(`Airdrop failed: ${JSON.stringify(confirmation.value.err)}`);
-      }
-      
-      // Verify balance increased
-      const newBalance = await connection.getBalance(publicKey);
-      const newSolBalance = newBalance / LAMPORTS_PER_SOL;
-      
-      if (newSolBalance > solBalance) {
-        console.log('✅ Web3.js airdrop successful!');
-        console.log('💰 Balance increased from', solBalance.toFixed(4), 'to', newSolBalance.toFixed(4), 'SOL');
-        return { success: true, method: 'airdrop', balance: newSolBalance, signature: airdropSignature };
-      }
-      
-    } catch (airdropError) {
-      console.warn('⚠️ Web3.js airdrop failed:', airdropError.message);
-    }
-    
-    // Step 2: Use app wallet to send SOL
+    // Use app wallet to send SOL (skipping web3.js airdrop)
     try {
       console.log('🏦 Attempting app wallet transfer...');
       
@@ -774,7 +747,7 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
       }
       
       // Create transfer transaction
-      const transferAmount = 0.005 * LAMPORTS_PER_SOL; // 0.005 SOL
+      const transferAmount = 0.005 * LAMPORTS_PER_SOL; // 0.005 SOL (slightly more than minimum 0.0049)
       const transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: appWalletPublicKey,
@@ -896,7 +869,7 @@ export const createUserProfileWithSOLManagement = async (publicKey, wallet, sign
   
   // Execute profile creation with automatic retry
   return await executeTransactionWithSOLRetry(
-    () => createUserProfile(publicKey, wallet, signMessage, displayName),
+    () => createUserProfile({ publicKey, wallet, signMessage, username: displayName }),
     publicKey,
     3
   );

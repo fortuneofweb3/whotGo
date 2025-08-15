@@ -113,24 +113,20 @@ const Game = ({
   const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
   
   React.useEffect(() => {
-    if (gameData && gameData.drawPile && needNewMarketPositions) {
-      if (marketCardPositionsRef.current.length === 0) {
-        const positions = Array.from({
-          length: 8
-        }, (_, index) => {
-          const randomX = (Math.random() - 0.5) * 8;
-          const randomY = (Math.random() - 0.5) * 8;
-          const randomRotate = (Math.random() - 0.5) * 15;
-          return {
-            transform: `translate(${randomX}px, ${randomY}px) rotate(${randomRotate}deg)`,
-            zIndex: index
-          };
-        });
-        marketCardPositionsRef.current = positions;
-        setMarketCardPositions(positions);
-      } else {
-        setMarketCardPositions(marketCardPositionsRef.current);
-      }
+    if (gameData && gameData.drawPile && (needNewMarketPositions || marketCardPositionsRef.current.length === 0)) {
+      const positions = Array.from({
+        length: 8
+      }, (_, index) => {
+        const randomX = (Math.random() - 0.5) * 8;
+        const randomY = (Math.random() - 0.5) * 8;
+        const randomRotate = (Math.random() - 0.5) * 15;
+        return {
+          transform: `translate(${randomX}px, ${randomY}px) rotate(${randomRotate}deg)`,
+          zIndex: index
+        };
+      });
+      marketCardPositionsRef.current = positions;
+      setMarketCardPositions(positions);
       setNeedNewMarketPositions(false);
     }
   }, [gameData?.drawPile, needNewMarketPositions]);
@@ -1698,7 +1694,25 @@ const Game = ({
         </div>
       )}
       {showWhotChoice && <WhotShapePopup selectShape={chooseWhotShape} closePopup={() => setShowWhotChoice(false)} />}
-      {showRoundEndPopup && roundEndData && <RoundEndPopup roundEndData={roundEndData} isMultiplayer={!!currentRoom} currentUser={currentUser} />}
+      {showRoundEndPopup && roundEndData && <RoundEndPopup 
+        roundEndData={roundEndData} 
+        isMultiplayer={!!currentRoom} 
+        currentUser={currentUser}
+        onContinue={() => {
+          // Check if current user is eliminated
+          const players = ensurePlayersArray(gameData.players);
+          const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
+          const currentUserPlayer = players[currentUserActualIndex];
+          
+          if (currentUserPlayer && currentUserPlayer.eliminated) {
+            // Player is eliminated - return to menu
+            returnToMenu();
+          } else {
+            // Player is not eliminated - continue to next round
+            setShowRoundEndPopup(false);
+          }
+        }}
+      />}
       {showEliminatedPopup && <EliminatedPopup setShowEliminatedPopup={setShowEliminatedPopup} returnToMenu={returnToMenu} />}
       {showAdminDeckOverview && isAdmin && (
         <div className="absolute inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] fade-in">

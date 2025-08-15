@@ -9,6 +9,10 @@ const RoundEndPopup = ({ roundEndData, onContinue, isMultiplayer = false, curren
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer);
+          // Auto-continue when countdown reaches zero
+          if (onContinue) {
+            onContinue();
+          }
           return 0;
         }
         return prev - 1;
@@ -16,7 +20,7 @@ const RoundEndPopup = ({ roundEndData, onContinue, isMultiplayer = false, curren
     }, 1000);
     
     return () => clearInterval(timer);
-  }, []);
+  }, [onContinue]);
   return (
     <div className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-[100] opacity-0 p-8" style={{ animation: 'fadeIn 0.6s ease-out forwards' }}>
       <div className="bg-gray-900 p-6 border-2 border-[#80142C] max-w-4xl max-h-[80vh] opacity-0 transform scale-95" style={{ animation: 'scaleInCard 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards' }}>
