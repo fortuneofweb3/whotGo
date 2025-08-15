@@ -1,27 +1,10 @@
-export const getCardSVGContent = card => {
-  const numberText = card.number;
-  if (card.special === 'whot' || card.shape === '🔥') {
-    const hasChosenShape = card.chosenShape;
-    const firstWhotY = hasChosenShape ? "110" : "120";
-    const secondWhotY = hasChosenShape ? "150" : "140";
-    const chosenShapeElement = hasChosenShape ? `<text x="93.15" y="180" font-family="Helvetica, Arial, sans-serif" font-size="36px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">${card.chosenShape}</text>` : '';
-    return `
-      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
-      <g>
-        <path fill="white" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
-          c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
-        <text transform="matrix(1 0 0 1 15.942 31.6153)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
-        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
-        <text x="93.15" y="${firstWhotY}" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">Whot</text>
-        <text x="93.15" y="${secondWhotY}" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 ${secondWhotY})">Whot</text>
-        ${chosenShapeElement}
-      </g>
-      </svg>
-    `;
-  }
-  const svgTemplates = {
-    '●': num => `
+// SVG Templates Cache - Preload all templates for better performance
+const SVG_TEMPLATES_CACHE = new Map();
+
+// Preload all SVG templates when the module is imported
+const preloadSVGTemplates = () => {
+  const templates = {
+    '●': (num) => `
       <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
         viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
       <g>
@@ -39,7 +22,7 @@ export const getCardSVGContent = card => {
       </g>
       </svg>
     `,
-    '✚': num => `
+    '✚': (num) => `
       <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
         viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
       <g>
@@ -66,7 +49,7 @@ export const getCardSVGContent = card => {
       </g>
       </svg>
     `,
-    '■': num => `
+    '■': (num) => `
       <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
         viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
       <g>
@@ -84,7 +67,7 @@ export const getCardSVGContent = card => {
       </g>
       </svg>
     `,
-    '▲': num => `
+    '▲': (num) => `
       <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
         viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
       <g>
@@ -108,7 +91,7 @@ export const getCardSVGContent = card => {
       </g>
       </svg>
     `,
-    '★': num => `
+    '★': (num) => `
       <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
         viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
       <g>
@@ -129,11 +112,35 @@ export const getCardSVGContent = card => {
       </svg>
     `
   };
-  return svgTemplates[card.shape] ? svgTemplates[card.shape](numberText) : '';
-};
 
-export const getCardBackSVG = () => {
-  return `
+  // Pre-generate all possible card combinations for instant access
+  const numbers = ['1', '2', '3', '4', '5', '7', '8', '10', '11', '12', '13', '14'];
+  const shapes = Object.keys(templates);
+
+  shapes.forEach(shape => {
+    numbers.forEach(num => {
+      const key = `${shape}-${num}`;
+      SVG_TEMPLATES_CACHE.set(key, templates[shape](num));
+    });
+  });
+
+  // Pre-generate Whot cards
+  SVG_TEMPLATES_CACHE.set('whot-default', `
+    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+      viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+    <g>
+      <path fill="white" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+        c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+      <text transform="matrix(1 0 0 1 15.942 31.6153)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
+      <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
+      <text x="93.15" y="120" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">Whot</text>
+      <text x="93.15" y="140" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 140)">Whot</text>
+    </g>
+    </svg>
+  `);
+
+  // Pre-generate card back
+  SVG_TEMPLATES_CACHE.set('card-back', `
     <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
       viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
     <g>
@@ -143,5 +150,56 @@ export const getCardBackSVG = () => {
       <text x="93.15" y="140" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 140)">Whot</text>
     </g>
     </svg>
-  `;
+  `);
+
+  console.log(`SVG Templates preloaded: ${SVG_TEMPLATES_CACHE.size} templates cached`);
+};
+
+// Initialize SVG templates on module load
+preloadSVGTemplates();
+
+// Optimized card SVG content getter with caching
+export const getCardSVGContent = (card) => {
+  if (!card) return '';
+
+  // Handle Whot cards
+  if (card.special === 'whot' || card.shape === '🔥') {
+    if (card.chosenShape) {
+      // Generate Whot card with chosen shape on demand (rare case)
+      const firstWhotY = "110";
+      const secondWhotY = "150";
+      return `
+        <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+          viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+        <g>
+          <path fill="white" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+            c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+          <text transform="matrix(1 0 0 1 15.942 31.6153)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
+          <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
+          <text x="93.15" y="${firstWhotY}" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">Whot</text>
+          <text x="93.15" y="${secondWhotY}" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 ${secondWhotY})">Whot</text>
+          <text x="93.15" y="180" font-family="Helvetica, Arial, sans-serif" font-size="36px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">${card.chosenShape}</text>
+        </g>
+        </svg>
+      `;
+    }
+    return SVG_TEMPLATES_CACHE.get('whot-default') || '';
+  }
+
+  // Get cached template for regular cards
+  const key = `${card.shape}-${card.number}`;
+  return SVG_TEMPLATES_CACHE.get(key) || '';
+};
+
+// Optimized card back SVG getter
+export const getCardBackSVG = () => {
+  return SVG_TEMPLATES_CACHE.get('card-back') || '';
+};
+
+// Performance monitoring
+export const getSVGCacheStats = () => {
+  return {
+    cacheSize: SVG_TEMPLATES_CACHE.size,
+    isPreloaded: SVG_TEMPLATES_CACHE.size > 0
+  };
 };

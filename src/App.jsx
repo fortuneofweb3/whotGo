@@ -56,6 +56,11 @@ const App = () => {
     PLAYER_DRAW: 'player-draw',
     DEALING: 'dealing'
   };
+
+  // Performance optimization: Memoize expensive calculations
+  const memoizedCardAnimation = useRef({});
+  const lastAnimationTime = useRef(0);
+  const animationFrameId = useRef(null);
   
   // Load initial state from localStorage with error handling
   const getInitialState = (key, defaultValue) => {
@@ -603,13 +608,32 @@ const App = () => {
     return () => window.removeEventListener('resize', calculateMaxCards);
   }, []);
 
+  // Optimized landing page card animation with requestAnimationFrame
   useEffect(() => {
     setIsVisible(true);
-    const interval = setInterval(() => {
-      setCurrentCard(prev => (prev + 1) % cards.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    if (gameState === 'landing') {
+      let animationId;
+      let lastTime = 0;
+      const animationDuration = 2000; // 2 seconds per card
+      
+      const animate = (currentTime) => {
+        if (currentTime - lastTime >= animationDuration) {
+          setCurrentCard(prev => (prev + 1) % cards.length);
+          lastTime = currentTime;
+        }
+        animationId = requestAnimationFrame(animate);
+      };
+      
+      animationId = requestAnimationFrame(animate);
+      
+      return () => {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+      };
+    }
+  }, [gameState, cards.length]);
 
   // Simple wallet connection effect - just check if profile exists, no delays
   useEffect(() => {
@@ -4298,23 +4322,30 @@ const App = () => {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.landing}>
           <div className="absolute top-[5%] left-1/2 transform -translate-x-1/2 z-10">
-            <div className="relative w-80 h-32" style={{ transform: 'scale(1.3)', transformOrigin: 'center' }}>
+            <div className="relative w-48 h-24 sm:w-64 sm:h-28 md:w-80 md:h-32 lg:w-96 lg:h-36" style={{ transform: 'scale(1.1)', transformOrigin: 'center' }}>
               {cards.map((card, index) => (
                 <div
                   key={index}
-                  className={`absolute w-20 h-28 rounded-lg border-2 border-black shadow-2xl transform transition-all duration-700 ${index === currentCard ? 'scale-110 z-20 rotate-0' : 'scale-95'}`}
+                  className={`absolute w-12 h-16 sm:w-16 sm:h-20 md:w-20 md:h-28 lg:w-24 lg:h-32 rounded-lg border-2 border-black shadow-2xl transform transition-all duration-700 ${index === currentCard ? 'scale-110 z-20 rotate-0' : 'scale-95'}`}
                   style={{
                     backgroundColor: card.color,
-                    left: `${104 + index * 18 + Math.sin(Date.now() * 0.001 + index) * 5}px`,
-                    top: `${Math.cos(Date.now() * 0.001 + index) * 3}px`,
+                    left: `${60 + index * 12 + Math.sin(Date.now() * 0.001 + index) * 3}px`,
+                    top: `${Math.cos(Date.now() * 0.001 + index) * 2}px`,
                     zIndex: index === currentCard ? 20 : 10 - index,
                     opacity: index === currentCard ? 1 : 0.7,
-                    transform: `scale(${index === currentCard ? 1.1 : 0.95}) rotate(${index === currentCard ? 0 : (index - 2) * 8}deg) translateY(${Math.sin(Date.now() * 0.002 + index) * 2}px)`,
+                    transform: `scale(${index === currentCard ? 1.1 : 0.95}) rotate(${index === currentCard ? 0 : (index - 2) * 6}deg) translateY(${Math.sin(Date.now() * 0.002 + index) * 1}px)`,
                     transition: 'all 0.7s ease-in-out',
                     boxShadow: '3px 3px 0 rgba(0,0,0,0.8)'
                   }}
                 >
-                  <div className="flex items-center justify-center w-full h-full" dangerouslySetInnerHTML={{ __html: getCardSVGContent(card) }} />
+                  <div 
+                    className="flex items-center justify-center w-full h-full" 
+                    dangerouslySetInnerHTML={{ __html: getCardSVGContent(card) }}
+                    style={{ 
+                      willChange: 'transform',
+                      transform: 'translateZ(0)' // Force hardware acceleration
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -4376,15 +4407,16 @@ const App = () => {
                     console.log('🎮 Start Playing button clicked');
                     console.log('🎮 Button state debug:', { connected, currentUser: !!currentUser, honeycombProfileExists });
                     if (connected && honeycombProfileExists) {
-                      // Profile exists, initialize sounds and start music
-                              try {
-          await soundEffects.initializeAfterUserInteraction();
+                      // Profile exists, preload all sounds and start music
+                      try {
+                        await soundEffects.initializeAfterUserInteraction();
+                        await soundEffects.preloadAllSounds();
                         startBackgroundMusic();
                         setGameState('menu');
-                              } catch (error) {
-          // Still proceed to menu even if sounds fail
+                      } catch (error) {
+                        // Still proceed to menu even if sounds fail
                         startBackgroundMusic();
-                      setGameState('menu');
+                        setGameState('menu');
                       }
                     } else if (connected && !honeycombProfileExists) {
                       // Profile doesn't exist, create it
