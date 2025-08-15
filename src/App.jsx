@@ -22,7 +22,7 @@ import GameModePopup from './components/popups/GameModePopup';
 import HelpPopup from './components/popups/HelpPopup';
 import Confetti from 'react-confetti';
 import { createDeck, shuffleDeck } from './utils/deck';
-import { getCardSVGContent } from './utils/cardSVG';
+import { getCardSVGContent, getCardBackSVG } from './utils/cardSVG';
 import soundEffects, { playSoundEffect } from './utils/soundEffects';
 import { ensurePlayersArray } from './utils/gameUtils';
 import { ArrowLeft, ChevronRight, Play, Settings, Award, Shield, Wifi, Bot, X, Users, Plus, Crown, Clock } from 'lucide-react';
@@ -131,7 +131,7 @@ const App = () => {
     soundEffects.stopGameMusic();
     
     // Start background music when clearing game state
-    startBackgroundMusic();
+    soundEffects.startBackgroundMusic();
     
     // Clear all game-related localStorage items
     localStorage.removeItem('whotgo_gameState');
@@ -392,100 +392,31 @@ const App = () => {
   const [showHelp, setShowHelp] = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 
-  /**
-   * Start background music using the sound effects system
-   */
-  const startBackgroundMusic = () => {
-    if (isMusicPlaying) return;
-    
-    try {
-      setIsMusicPlaying(true);
-      
-      const backgroundAudio = soundEffects.sounds.background;
-      if (backgroundAudio) {
-        backgroundAudio.loop = true;
-        backgroundAudio.currentTime = 0;
-        backgroundAudio.volume = musicVolume / 100;
-        
-        backgroundAudio.play().then(() => {
-          // Music started successfully
-        }).catch(error => {
-          console.warn('Failed to start background music:', error);
-          setIsMusicPlaying(false);
-        });
-      } else {
-        console.warn('Background music not loaded in sound effects system');
-        setIsMusicPlaying(false);
-      }
-    } catch (error) {
-      console.warn('Error starting background music:', error);
-      setIsMusicPlaying(false);
+  // Handle music transitions between game states - instant transitions
+  useEffect(() => {
+    if (gameState === 'game') {
+      // Stop background music and start game music instantly
+      soundEffects.stopAllMusic();
+      soundEffects.startGameMusic();
+    } else if (gameState === 'menu') {
+      // Stop game music and start background music instantly
+      soundEffects.stopAllMusic();
+      soundEffects.startBackgroundMusic();
     }
+  }, [gameState]);
+
+  // Simplified music management using sound effects system
+  const startBackgroundMusic = () => {
+    soundEffects.startBackgroundMusic();
   };
 
-  /**
-   * Stop background music with fade out effect
-   */
   const stopBackgroundMusic = () => {
-    if (!isMusicPlaying) return;
-    
-    try {
-      const backgroundAudio = soundEffects.sounds.background;
-      if (backgroundAudio) {
-        // Fade out the music gradually
-        let volume = backgroundAudio.volume;
-        const fadeInterval = setInterval(() => {
-          volume = Math.max(0, volume - 0.02);
-          backgroundAudio.volume = volume;
-          
-          if (volume <= 0) {
-            clearInterval(fadeInterval);
-            backgroundAudio.pause();
-            backgroundAudio.currentTime = 0;
-            setIsMusicPlaying(false);
-          }
-        }, 50);
-      } else {
-        setIsMusicPlaying(false);
-      }
-    } catch (error) {
-      console.warn('Error stopping background music:', error);
-      setIsMusicPlaying(false);
-    }
+    soundEffects.stopBackgroundMusic();
   };
 
   const updateMusicVolume = (newVolume) => {
-    const backgroundAudio = soundEffects.sounds.background;
-    if (backgroundAudio && isMusicPlaying) {
-      backgroundAudio.volume = newVolume / 100;
-    }
+    // Volume is managed by sound effects system
   };
-
-  // Update music volume when musicVolume state changes
-  useEffect(() => {
-    const backgroundAudio = soundEffects.sounds.background;
-    if (backgroundAudio && isMusicPlaying) {
-      backgroundAudio.volume = musicVolume / 100;
-    }
-  }, [musicVolume, isMusicPlaying]);
-
-  // Cleanup background music on component unmount
-  useEffect(() => {
-    return () => {
-      const backgroundAudio = soundEffects.sounds.background;
-      if (backgroundAudio) {
-        backgroundAudio.pause();
-        backgroundAudio.currentTime = 0;
-      }
-    };
-  }, []);
-
-  // Stop background music when entering game state
-  useEffect(() => {
-    if (gameState === 'game' && isMusicPlaying) {
-      stopBackgroundMusic();
-    }
-  }, [gameState, isMusicPlaying]);
   
 
   const [confettiActive, setConfettiActive] = useState(false);
@@ -2350,19 +2281,7 @@ const App = () => {
     };
   };
 
-  const getCardBackSVG = () => {
-    return `
-      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
-      <g>
-        <path fill="#7D1228" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
-          c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
-        <text x="93.15" y="120" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">Whot</text>
-        <text x="93.15" y="140" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 140)">Whot</text>
-      </g>
-      </svg>
-    `;
-  };
+
 
   const canPlayCard = (card, topCard) => {
     if (!card) return false;
@@ -4411,11 +4330,12 @@ const App = () => {
                       try {
                         await soundEffects.initializeAfterUserInteraction();
                         await soundEffects.preloadAllSounds();
-                        startBackgroundMusic();
+                        await soundEffects.preloadMusic();
+                        soundEffects.startBackgroundMusic();
                         setGameState('menu');
                       } catch (error) {
                         // Still proceed to menu even if sounds fail
-                        startBackgroundMusic();
+                        soundEffects.startBackgroundMusic();
                         setGameState('menu');
                       }
                     } else if (connected && !honeycombProfileExists) {
@@ -4436,11 +4356,13 @@ const App = () => {
                             // Initialize sounds and start music
                             try {
                               await soundEffects.initializeAfterUserInteraction();
-                              startBackgroundMusic();
+                              await soundEffects.preloadAllSounds();
+                              await soundEffects.preloadMusic();
+                              soundEffects.startBackgroundMusic();
                               setGameState('menu');
                             } catch (error) {
                               // console.warn('🎵 Failed to initialize sounds:', error);
-                              startBackgroundMusic();
+                              soundEffects.startBackgroundMusic();
                               setGameState('menu');
                             }
                           }

@@ -1,17 +1,23 @@
-// Optimized Sound Effects Manager with lazy loading and performance improvements
+// Mobile-optimized Sound Effects Manager using Web Audio API
 class SoundEffectsManager {
   constructor() {
-    this.sounds = new Map();
+    this.audioContext = null;
     this.isEnabled = true;
     this.volume = 0.49;
+    this.gameMusicVolume = 0.3;
     this.isInitialized = false;
     this.isPreloaded = false;
-    this.gameMusicVolume = 0.3;
-    this.fadeInterval = null;
-    this.audioContext = null;
     this.playPitchVariations = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3];
     
-    // Sound file paths - using relative paths for better compatibility
+    // Audio buffers for instant playback
+    this.audioBuffers = new Map();
+    
+    // Music tracks
+    this.backgroundMusicSource = null;
+    this.gameMusicSource = null;
+    this.currentMusicSource = null;
+    
+    // Sound file paths
     this.soundFiles = {
       play: './assets/sounds/effects/Play.wav',
       market: './assets/sounds/effects/Market.wav',
@@ -24,61 +30,35 @@ class SoundEffectsManager {
       end: './assets/sounds/effects/End.mp3'
     };
 
-    // Priority sounds that should be loaded first
+    // Priority sounds for mobile
     this.prioritySounds = ['click', 'play', 'market'];
-    
-    // Initialize audio context lazily
-    this.initAudioContext();
   }
 
-  // Initialize Web Audio API context for better performance
-  initAudioContext() {
+  // Initialize Web Audio API context for mobile
+  async initAudioContext() {
     try {
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      // Create audio context with mobile-compatible options
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        latencyHint: 'interactive',
+        sampleRate: 44100
+      });
+      
+      // Resume context if suspended (mobile browsers often suspend)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+      
+      console.log('🎵 Audio context initialized:', this.audioContext.state);
+      return true;
     } catch (error) {
-      console.warn('Web Audio API not supported, falling back to HTML5 Audio');
-      this.audioContext = null;
+      console.warn('Failed to initialize audio context:', error);
+      return false;
     }
   }
 
-  // Preload priority sounds immediately
-  async preloadPrioritySounds() {
-    if (this.isPreloaded) return;
-    
-    const loadPromises = this.prioritySounds.map(soundName => 
-      this.loadSound(soundName, true)
-    );
-    
-    try {
-      await Promise.allSettled(loadPromises);
-      console.log('Priority sounds preloaded');
-    } catch (error) {
-      console.warn('Failed to preload some priority sounds:', error);
-    }
-  }
-
-  // Load all sounds when user starts playing
-  async preloadAllSounds() {
-    if (this.isPreloaded) return;
-    
-    console.log('Preloading all sounds...');
-    const loadPromises = Object.keys(this.soundFiles).map(soundName => 
-      this.loadSound(soundName, false)
-    );
-    
-    try {
-      await Promise.allSettled(loadPromises);
-      this.isPreloaded = true;
-      console.log('All sounds preloaded successfully');
-    } catch (error) {
-      console.warn('Failed to preload some sounds:', error);
-      this.isPreloaded = true; // Mark as preloaded anyway
-    }
-  }
-
-  // Load individual sound with error handling
-  async loadSound(soundName, isPriority = false) {
-    if (this.sounds.has(soundName)) return;
+  // Load audio file as buffer for instant playback
+  async loadAudioBuffer(soundName) {
+    if (this.audioBuffers.has(soundName)) return;
 
     const path = this.soundFiles[soundName];
     if (!path) {
@@ -86,130 +66,160 @@ class SoundEffectsManager {
       return;
     }
 
-    return new Promise((resolve) => {
-      try {
-        const audio = new Audio();
-        audio.preload = isPriority ? 'auto' : 'metadata';
-        audio.volume = this.volume;
-        
-        // Set up event listeners
-        const onLoad = () => {
-          this.sounds.set(soundName, audio);
-          resolve();
-        };
-        
-        const onError = (error) => {
-          console.warn(`Failed to load sound: ${soundName}`, error);
-          resolve(); // Resolve anyway to not block other sounds
-        };
-        
-        audio.addEventListener('canplaythrough', onLoad, { once: true });
-        audio.addEventListener('error', onError, { once: true });
-        
-        // Start loading
-        audio.src = path;
-        
-        // Timeout for loading
-        setTimeout(() => {
-          if (!this.sounds.has(soundName)) {
-            console.warn(`Sound loading timeout: ${soundName}`);
-            resolve();
-          }
-        }, 5000);
-        
-      } catch (error) {
-        console.warn(`Failed to create audio for: ${soundName}`, error);
-        resolve();
+    try {
+      const response = await fetch(path);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    });
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      
+      this.audioBuffers.set(soundName, audioBuffer);
+      console.log(`🎵 Buffer loaded: ${soundName}`);
+    } catch (error) {
+      console.warn(`Failed to load audio buffer: ${soundName}`, error);
+    }
   }
 
-  // Optimized play method with better error handling
-  play(soundName, options = {}) {
-    if (!this.isEnabled) return;
-
-    const audio = this.sounds.get(soundName);
-    if (!audio) {
-      // Try to load the sound on demand for non-priority sounds
-      if (!this.prioritySounds.includes(soundName)) {
-        this.loadSound(soundName).then(() => {
-          this.play(soundName, options);
-        });
+  // Enhanced preloading with mobile optimization
+  async preloadAllSounds() {
+    if (this.isPreloaded) return;
+    
+    console.log('🎵 Loading audio buffers for mobile...');
+    
+    // Ensure audio context is ready
+    if (!this.audioContext) {
+      const success = await this.initAudioContext();
+      if (!success) {
+        console.warn('Failed to initialize audio context, sounds may not work');
+        this.isPreloaded = true;
+        return;
       }
+    }
+    
+    // Load priority sounds first
+    const priorityPromises = this.prioritySounds.map(soundName => 
+      this.loadAudioBuffer(soundName)
+    );
+    
+    try {
+      await Promise.allSettled(priorityPromises);
+      console.log('🎵 Priority buffers loaded');
+    } catch (error) {
+      console.warn('Failed to load priority buffers:', error);
+    }
+    
+    // Load all other sounds
+    const allPromises = Object.keys(this.soundFiles).map(soundName => 
+      this.loadAudioBuffer(soundName)
+    );
+    
+    try {
+      await Promise.allSettled(allPromises);
+      this.isPreloaded = true;
+      console.log('🎵 All audio buffers loaded successfully');
+    } catch (error) {
+      console.warn('Failed to load some buffers:', error);
+      this.isPreloaded = true;
+    }
+  }
+
+  // Play sound using Web Audio API for instant playback
+  play(soundName, options = {}) {
+    if (!this.isEnabled || !this.audioContext) return;
+
+    const audioBuffer = this.audioBuffers.get(soundName);
+    if (!audioBuffer) {
+      console.warn(`Audio buffer not loaded: ${soundName}`);
       return;
     }
 
     try {
-      // Reset audio state
-      audio.currentTime = 0;
-      audio.volume = options.volume || this.volume;
+      // Create audio source
+      const source = this.audioContext.createBufferSource();
+      const gainNode = this.audioContext.createGain();
+      
+      // Connect nodes
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Set volume
+      const volume = options.volume || this.volume;
+      gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
       
       // Apply pitch variation if specified
       if (options.pitch) {
-        audio.playbackRate = options.pitch;
-      } else {
-        audio.playbackRate = 1.0;
+        source.playbackRate.setValueAtTime(options.pitch, this.audioContext.currentTime);
       }
       
-      // Play the sound
-      const playPromise = audio.play();
-      if (playPromise) {
-        playPromise.catch(error => {
-          console.warn(`Failed to play sound: ${soundName}`, error);
-          // Try to reinitialize audio context if suspended
-          if (error.name === 'NotAllowedError' && this.audioContext) {
-            this.audioContext.resume().then(() => {
-              this.play(soundName, options);
-            });
-          }
-        });
-      }
+      // Play immediately
+      source.start(0);
+      
+      console.log(`🎵 Playing: ${soundName}`);
     } catch (error) {
-      console.warn(`Error playing sound: ${soundName}`, error);
+      console.warn(`Failed to play sound: ${soundName}`, error);
     }
   }
 
-  // Initialize sounds after user interaction
+  // Initialize sounds after user interaction (mobile requirement)
   async initializeAfterUserInteraction() {
     if (this.isInitialized) return;
     
     try {
-      // Resume audio context if suspended
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
+      console.log('🎵 Initializing mobile sound system...');
+      
+      // Initialize audio context
+      const success = await this.initAudioContext();
+      if (!success) {
+        throw new Error('Failed to initialize audio context');
       }
       
-      // Preload priority sounds
-      await this.preloadPrioritySounds();
+      // Load all audio buffers
+      await this.preloadAllSounds();
       
       this.isInitialized = true;
-      console.log('Sound system initialized');
+      console.log('🎵 Mobile sound system initialized successfully');
     } catch (error) {
       console.warn('Failed to initialize sound system:', error);
       this.isInitialized = true; // Mark as initialized anyway
     }
   }
 
+  // Preload music files specifically
+  async preloadMusic() {
+    console.log('🎵 Preloading music buffers...');
+    
+    const musicFiles = ['background', 'gameMusic'];
+    const musicPromises = musicFiles.map(soundName => 
+      this.loadAudioBuffer(soundName)
+    );
+    
+    try {
+      await Promise.allSettled(musicPromises);
+      console.log('🎵 Music buffers preloaded');
+    } catch (error) {
+      console.warn('Failed to preload music buffers:', error);
+    }
+  }
+
   // Game-specific sound methods
   playCardPlay() {
     const randomPitch = this.playPitchVariations[Math.floor(Math.random() * this.playPitchVariations.length)];
-    this.play('play', { pitch: randomPitch });
+    this.play('play', { pitch: randomPitch, volume: 0.8 });
   }
 
   playMarketDraw() {
-    this.play('market');
+    this.play('market', { volume: 0.7 });
   }
 
   playSpecialCard() {
-    this.play('special');
+    this.play('special', { volume: 0.8 });
   }
 
   playShuffle() {
-    this.play('shuffle');
-  }
-
-  playBackground() {
-    this.play('background');
+    this.play('shuffle', { volume: 0.6 });
   }
 
   playClick() {
@@ -221,115 +231,104 @@ class SoundEffectsManager {
   }
 
   playEnd() {
-    const endAudio = this.sounds.get('end');
-    if (!endAudio) return;
-    
-    endAudio.currentTime = 0;
-    endAudio.volume = 0.7;
-    
-    endAudio.play().catch(error => {
-      console.warn('Failed to play end sound:', error);
-    });
-    
-    // Fade out effect
-    setTimeout(() => {
-      if (endAudio && !endAudio.paused) {
-        this.fadeOutAudio(endAudio, 3000);
-      }
-    }, 1000);
+    this.play('end', { volume: 0.7 });
   }
 
-  // Optimized fade out method
-  fadeOutAudio(audio, duration) {
-    if (this.fadeInterval) {
-      clearInterval(this.fadeInterval);
-    }
-
-    const startVolume = audio.volume;
-    const fadeSteps = 30;
-    const volumeStep = startVolume / fadeSteps;
-    const stepInterval = duration / fadeSteps;
-    
-    this.fadeInterval = setInterval(() => {
-      if (audio && !audio.paused) {
-        audio.volume = Math.max(0, audio.volume - volumeStep);
-        if (audio.volume <= 0) {
-          audio.pause();
-          audio.currentTime = 0;
-          clearInterval(this.fadeInterval);
-          this.fadeInterval = null;
-        }
-      } else {
-        clearInterval(this.fadeInterval);
-        this.fadeInterval = null;
-      }
-    }, stepInterval);
-  }
-
-  // Game Music Methods
+  // Music methods using Web Audio API
   startGameMusic() {
-    const gameAudio = this.sounds.get('gameMusic');
-    if (!gameAudio) {
-      console.warn('Game music not loaded');
+    this.stopAllMusic();
+    
+    const audioBuffer = this.audioBuffers.get('gameMusic');
+    if (!audioBuffer) {
+      console.warn('Game music buffer not loaded');
       return;
     }
 
-    if (this.fadeInterval) {
-      clearInterval(this.fadeInterval);
-      this.fadeInterval = null;
-    }
-
-    gameAudio.volume = 0;
-    gameAudio.loop = true;
-    
-    gameAudio.play().then(() => {
-      this.fadeInAudio(gameAudio, this.gameMusicVolume, 2000);
-    }).catch(error => {
+    try {
+      this.gameMusicSource = this.audioContext.createBufferSource();
+      const gainNode = this.audioContext.createGain();
+      
+      this.gameMusicSource.buffer = audioBuffer;
+      this.gameMusicSource.loop = true;
+      this.gameMusicSource.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      gainNode.gain.setValueAtTime(this.gameMusicVolume, this.audioContext.currentTime);
+      
+      this.gameMusicSource.start(0);
+      this.currentMusicSource = this.gameMusicSource;
+      
+      console.log('🎵 Game music started');
+    } catch (error) {
       console.warn('Failed to start game music:', error);
-    });
+    }
   }
 
   stopGameMusic() {
-    const gameAudio = this.sounds.get('gameMusic');
-    if (!gameAudio) return;
-
-    if (this.fadeInterval) {
-      clearInterval(this.fadeInterval);
-      this.fadeInterval = null;
+    if (this.gameMusicSource) {
+      try {
+        this.gameMusicSource.stop();
+      } catch (error) {
+        // Ignore errors when stopping
+      }
+      this.gameMusicSource = null;
+      if (this.currentMusicSource === this.gameMusicSource) {
+        this.currentMusicSource = null;
+      }
     }
-
-    this.fadeOutAudio(gameAudio, 1000);
   }
 
-  // Optimized fade in method
-  fadeInAudio(audio, targetVolume, duration) {
-    if (this.fadeInterval) {
-      clearInterval(this.fadeInterval);
+  startBackgroundMusic() {
+    this.stopAllMusic();
+    
+    const audioBuffer = this.audioBuffers.get('background');
+    if (!audioBuffer) {
+      console.warn('Background music buffer not loaded');
+      return;
     }
 
-    let volume = 0;
-    const fadeSteps = 40;
-    const volumeStep = targetVolume / fadeSteps;
-    const stepInterval = duration / fadeSteps;
-    
-    this.fadeInterval = setInterval(() => {
-      volume += volumeStep;
-      volume = Math.min(targetVolume, volume);
-      audio.volume = volume;
+    try {
+      this.backgroundMusicSource = this.audioContext.createBufferSource();
+      const gainNode = this.audioContext.createGain();
       
-      if (volume >= targetVolume) {
-        clearInterval(this.fadeInterval);
-        this.fadeInterval = null;
+      this.backgroundMusicSource.buffer = audioBuffer;
+      this.backgroundMusicSource.loop = true;
+      this.backgroundMusicSource.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      gainNode.gain.setValueAtTime(this.gameMusicVolume * 0.7, this.audioContext.currentTime);
+      
+      this.backgroundMusicSource.start(0);
+      this.currentMusicSource = this.backgroundMusicSource;
+      
+      console.log('🎵 Background music started');
+    } catch (error) {
+      console.warn('Failed to start background music:', error);
+    }
+  }
+
+  stopBackgroundMusic() {
+    if (this.backgroundMusicSource) {
+      try {
+        this.backgroundMusicSource.stop();
+      } catch (error) {
+        // Ignore errors when stopping
       }
-    }, stepInterval);
+      this.backgroundMusicSource = null;
+      if (this.currentMusicSource === this.backgroundMusicSource) {
+        this.currentMusicSource = null;
+      }
+    }
+  }
+
+  stopAllMusic() {
+    this.stopGameMusic();
+    this.stopBackgroundMusic();
   }
 
   // Utility methods
   setVolume(volume) {
     this.volume = Math.max(0, Math.min(1, volume));
-    this.sounds.forEach(audio => {
-      audio.volume = this.volume;
-    });
   }
 
   setEnabled(enabled) {
@@ -344,18 +343,16 @@ class SoundEffectsManager {
     return this.isEnabled && this.isInitialized;
   }
 
-  isGameMusicPlaying() {
-    const gameAudio = this.sounds.get('gameMusic');
-    return gameAudio && !gameAudio.paused;
-  }
-
   // Performance monitoring
   getSoundStats() {
     return {
-      loadedSounds: this.sounds.size,
       isInitialized: this.isInitialized,
       isPreloaded: this.isPreloaded,
-      totalSounds: Object.keys(this.soundFiles).length
+      audioContextState: this.audioContext?.state || 'not_initialized',
+      loadedBuffers: this.audioBuffers.size,
+      totalSounds: Object.keys(this.soundFiles).length,
+      gameMusicPlaying: !!this.gameMusicSource,
+      backgroundMusicPlaying: !!this.backgroundMusicSource
     };
   }
 }
@@ -370,7 +367,6 @@ export const playSoundEffect = {
   shuffle: () => soundEffects.playShuffle(),
   deal: () => soundEffects.playMarketDraw(),
   market: () => soundEffects.playMarketDraw(),
-  background: () => soundEffects.playBackground(),
   click: () => soundEffects.playClick(),
   back: () => soundEffects.playBack(),
   end: () => soundEffects.playEnd()

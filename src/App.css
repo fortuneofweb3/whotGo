@@ -23,6 +23,12 @@ body, html {
     overflow-x: hidden !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
   
   /* Hide scrollbars on mobile but keep scrolling */
@@ -53,9 +59,27 @@ body, html {
   }
   
   /* Prevent zoom on double tap */
-  * {
-    touch-action: manipulation;
+* {
+  touch-action: manipulation;
+}
+
+/* Game container styles */
+.game-container {
+  min-height: 100vh;
+  background: radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%);
+  perspective: 1000px;
+  font-family: 'Courier New', 'Liberation Mono', monospace;
+}
+
+/* Mobile game container */
+@media (max-width: 768px) {
+  .game-container {
+    height: 100vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
   }
+}
 }
 
 * {
@@ -87,9 +111,10 @@ button, input, select, textarea, div {
 
 /* Card Game Animations */
 .card-animation {
-  transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform, opacity;
   backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 @keyframes cardDeal {
@@ -223,6 +248,56 @@ button:active {
 
 .deck-scroll-transition {
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Performance optimizations for animations */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.deck-scroll-transition {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Browser-specific fixes for card visibility */
+.player-cards-container {
+  -webkit-transform: translateZ(0);
+  -moz-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -ms-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Ensure SVG content is visible across browsers */
+.player-cards-container svg {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  -webkit-transform: translateZ(0);
+  -moz-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* Force hardware acceleration for card elements */
+.player-cards-container > div {
+  -webkit-transform: translateZ(0);
+  -moz-transform: translateZ(0);
+  -ms-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -ms-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 /* Interactive element enhancements */

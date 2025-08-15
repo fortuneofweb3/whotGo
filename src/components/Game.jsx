@@ -12,6 +12,7 @@ import { playSoundEffect } from '../utils/soundEffects';
 import { getCardSVGContent, getCardBackSVG } from '../utils/cardSVG';
 
 
+
 const MAX_VISIBLE_AI_CARDS = 3;
 
 const Game = ({
@@ -1224,7 +1225,7 @@ const Game = ({
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%)', perspective: '1000px' }}>
+    <div className="game-container min-h-screen relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%)', perspective: '1000px' }}>
       <div className="fixed top-4 left-4 z-30">
         <button onClick={() => {
           playSoundEffect.back();
@@ -1496,6 +1497,22 @@ const Game = ({
                                       {(visibleCards || []).map((card, cardIndex) => {
                     const canPlayAnyCard = isCurrentUserPlayer && isCurrentUserTurn && canPlayerPlay && gameData.pendingPickCount === 0 && !(gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId) && !isAnyAnimationInProgress;
                     const isThisCardPlayable = canPlayAnyCard && isCardPlayable(card, topCard);
+                    
+                    // Debug logging
+                    if (cardIndex === 0) {
+                      console.log('🔍 Card Debug:', {
+                        playerName: player.name,
+                        isCurrentUserPlayer,
+                        visibleCardsLength: visibleCards.length,
+                        card: card,
+                        cardShape: card?.shape,
+                        cardNumber: card?.number,
+                        isDealingPhase,
+                        adminCardsRevealed,
+                        cardBackSVG: !isCurrentUserPlayer ? getCardBackSVG().substring(0, 100) + '...' : 'N/A'
+                      });
+                    }
+                    
                     return (
                       <div
                         key={`${card.id}-${cardIndex}`}
@@ -1503,10 +1520,15 @@ const Game = ({
                         style={{ 
                           backgroundColor: isCurrentUserPlayer ? 'transparent' : '#2a2a2a', 
                           zIndex: cardIndex, 
-                          transform: 'none', 
+                          transform: 'translateZ(0)', 
                           opacity: isCurrentUserPlayer ? (isThisCardPlayable || !canPlayAnyCard ? 1 : 0.4) : 1,
                           touchAction: 'manipulation',
-                          WebkitTapHighlightColor: 'transparent'
+                          WebkitTapHighlightColor: 'transparent',
+                          willChange: 'transform, opacity',
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                          MozBackfaceVisibility: 'hidden',
+                          msBackfaceVisibility: 'hidden'
                         }}
                         onClick={(e) => {
                           if (isThisCardPlayable && isCurrentUserPlayer && isCurrentUserTurn) {
@@ -1531,12 +1553,23 @@ const Game = ({
                           e.preventDefault();
                         }}
                       >
-                        <div className="h-full flex flex-col items-center justify-center text-white font-bold relative">
-                          <div className="flex items-center justify-center w-full h-full" dangerouslySetInnerHTML={{ __html:
+                        <div className="h-full flex flex-col items-center justify-center text-white font-bold relative" style={{
+                          willChange: 'transform',
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                          MozBackfaceVisibility: 'hidden',
+                          msBackfaceVisibility: 'hidden',
+                          backgroundColor: 'transparent',
+                          border: '2px solid #333',
+                          borderRadius: '8px'
+                        }}>
+                          {/* SVG Content - Using the same pattern as play pile and market cards */}
+                          <div className="h-full w-full" dangerouslySetInnerHTML={{ __html:
                             isCurrentUserPlayer
                               ? getCardSVGContent(card)
                               : (isDealingPhase ? getCardBackSVG() : (isAdmin && adminCardsRevealed ? getCardSVGContent(card) : getCardBackSVG()))
                           }} />
+                          
                           {card.special && (isCurrentUserPlayer || (isAdmin && adminCardsRevealed && !isDealingPhase)) && (
                             <div className="absolute bottom-1 text-xs bg-gray-900 bg-opacity-70 px-1">
                               {card.special === 'holdon' && 'HOLD'}
