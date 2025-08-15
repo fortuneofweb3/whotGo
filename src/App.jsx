@@ -4248,7 +4248,7 @@ const App = () => {
                   className={`absolute w-12 h-16 sm:w-16 sm:h-20 md:w-20 md:h-28 lg:w-24 lg:h-32 rounded-lg border-2 border-black shadow-2xl transform transition-all duration-700 ${index === currentCard ? 'scale-110 z-20 rotate-0' : 'scale-95'}`}
                   style={{
                     backgroundColor: card.color,
-                    left: `${60 + index * 12 + Math.sin(Date.now() * 0.001 + index) * 3}px`,
+                    left: `${(index * 12) + Math.sin(Date.now() * 0.001 + index) * 3}px`,
                     top: `${Math.cos(Date.now() * 0.001 + index) * 2}px`,
                     zIndex: index === currentCard ? 20 : 10 - index,
                     opacity: index === currentCard ? 1 : 0.7,
