@@ -4241,7 +4241,7 @@ const App = () => {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.landing}>
           <div className="absolute top-[5%] left-1/2 transform -translate-x-1/2 z-10">
-            <div className="relative w-72 h-36 sm:w-64 sm:h-28 md:w-80 md:h-32 lg:w-96 lg:h-36" style={{ transform: 'scale(1.1)', transformOrigin: 'center' }}>
+            <div className="relative w-72 h-36 sm:w-64 sm:h-28 md:w-80 md:h-32 lg:w-96 lg:h-36" style={{ transform: 'scale(1.1)', transformOrigin: 'center', display: 'flex', justifyContent: 'center' }}>
               {cards.map((card, index) => (
                 <div
                   key={index}
@@ -4250,7 +4250,7 @@ const App = () => {
                     backgroundColor: card.color,
                     width: '72px', // 50% bigger than 48px (w-12)
                     height: '96px', // 50% bigger than 64px (h-16)
-                    left: `${(index * 12 - 30) + Math.sin(Date.now() * 0.001 + index) * 3}px`,
+                    left: `${(index * 12) + Math.sin(Date.now() * 0.001 + index) * 3}px`,
                     top: `${Math.cos(Date.now() * 0.001 + index) * 2}px`,
                     zIndex: index === currentCard ? 20 : 10 - index,
                     opacity: index === currentCard ? 1 : 0.7,
