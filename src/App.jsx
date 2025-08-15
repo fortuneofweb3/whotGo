@@ -14,7 +14,7 @@ import SyncPopup from './components/popups/SyncPopup';
 import ProfileCreationStatus from './components/ProfileCreationStatus';
 import RoundEndPopup from './components/popups/RoundEndPopup';
 import EliminatedPopup from './components/popups/EliminatedPopup';
-import WhotShapePopup from './components/popups/WhotShapePopup';
+
 import ProfilePopup from './components/popups/ProfilePopup';
 import LeaderboardPopup from './components/popups/LeaderboardPopup';
 import SettingsPopup from './components/popups/SettingsPopup';
@@ -27,7 +27,6 @@ import soundEffects, { playSoundEffect } from './utils/soundEffects';
 import { ensurePlayersArray } from './utils/gameUtils';
 import { ArrowLeft, ChevronRight, Play, Settings, Award, Shield, Wifi, Bot, X, Users, Plus, Crown, Clock } from 'lucide-react';
 import './App.css';
-// getCardSVGContent is imported from utils/cardSVG.js
 
 const App = () => {
   const MAX_VISIBLE_AI_CARDS = 3;
@@ -49,7 +48,7 @@ const App = () => {
     }
   };
   
-  // Animation types
+  // Animation types for card movements
   const ANIMATION_TYPES = {
     OPPONENT_PLAY: 'opponent-play',
     OPPONENT_DRAW: 'opponent-draw',
@@ -58,7 +57,7 @@ const App = () => {
     DEALING: 'dealing'
   };
   
-  // Load initial state from localStorage
+  // Load initial state from localStorage with error handling
   const getInitialState = (key, defaultValue) => {
     try {
       const saved = localStorage.getItem(`whotgo_${key}`);
@@ -71,17 +70,17 @@ const App = () => {
 
   const [currentCard, setCurrentCard] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
-  const [gameState, setGameState] = useState('landing'); // Always start at landing, no localStorage
+  const [gameState, setGameState] = useState('landing');
   const [currentUser, setCurrentUser] = useState(null);
   const [rooms, setRooms] = useState([]);
-  const [currentRoom, setCurrentRoom] = useState(null); // Always start with no room, no localStorage
-  const [gameCountdown, setGameCountdown] = useState(null); // Always start with no countdown, no localStorage
+  const [currentRoom, setCurrentRoom] = useState(null);
+  const [gameCountdown, setGameCountdown] = useState(null);
   const lastRoomGameDataRef = useRef(null);
-  const [turnTimer, setTurnTimer] = useState(null); // Always start with no timer, no localStorage
-  const [gameData, setGameData] = useState(null); // Always start with no game data, no localStorage
+  const [turnTimer, setTurnTimer] = useState(null);
+  const [gameData, setGameData] = useState(null);
   const [dealtCountsByPlayer, setDealtCountsByPlayer] = useState([]);
   const [playPileRevealed, setPlayPileRevealed] = useState(false);
-  const [showWhotChoice, setShowWhotChoice] = useState(false);
+
   const [activePopup, setActivePopup] = useState(null);
   const [pendingWhotCard, setPendingWhotCard] = useState(null);
   const [animatingCards, setAnimatingCards] = useState([]);
@@ -104,15 +103,15 @@ const App = () => {
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [profileCreationError, setProfileCreationError] = useState(null);
   const [honeycombProfileExists, setHoneycombProfileExists] = useState(false);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [isAirdroppingSOL, setIsAirdroppingSOL] = useState(false);
 
   const [showGameLog, setShowGameLog] = useState(false);
   const [selectedLogRound, setSelectedLogRound] = useState(1);
   const [animationPositions, setAnimationPositions] = useState({});
   const [, setPlayPilePositions] = useState([]);
-  const prevGameDataRef = useRef(null);
   
-  // Save state to localStorage
+  // Save state to localStorage with error handling
   const saveToLocalStorage = (key, value) => {
     try {
       localStorage.setItem(`whotgo_${key}`, JSON.stringify(value));
@@ -120,10 +119,6 @@ const App = () => {
       console.warn(`Failed to save ${key} to localStorage:`, error);
     }
   };
-
-  // No longer saving user state to localStorage - all data comes from Firebase/Honeycomb
-
-  // Don't save game-related states to localStorage to prevent restoration
 
   // Clear localStorage when returning to menu or on reload
   const clearGameState = () => {
@@ -235,7 +230,7 @@ const App = () => {
     setLastGameActivity(Date.now());
   };
 
-  // Clear game after 5 minutes of inactivity
+  // Clear game after 5 minutes of inactivity (only for multiplayer games)
   useEffect(() => {
     if (!gameData || gameState !== 'game') {
       // Clear timeout if not in game
@@ -246,22 +241,27 @@ const App = () => {
       return;
     }
 
-    // Start/restart timeout when game is active
+    // Only set timeout for multiplayer games (when currentRoom exists)
+    // AI games should never timeout
+    if (!currentRoom) {
+      // Clear timeout for AI games
+      if (gameTimeoutRef.current) {
+        clearTimeout(gameTimeoutRef.current);
+        gameTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    // Start/restart timeout when multiplayer game is active
     if (gameTimeoutRef.current) {
       clearTimeout(gameTimeoutRef.current);
     }
 
     gameTimeoutRef.current = setTimeout(() => {
-      console.log('Game cleared due to 5 minutes of inactivity');
+
       
-      // Clear the game state
-      if (currentRoom) {
-        // For multiplayer, leave the room
-        leaveRoom();
-      } else {
-        // For AI game, return to menu
-        returnToMenu();
-      }
+      // Clear the game state (only for multiplayer)
+      leaveRoom();
       
       // Clear all game-related state
       clearGameState();
@@ -360,7 +360,7 @@ const App = () => {
           opacity: 1
         },
         3: {
-          left: 'calc(100% + 120px)',
+          right: '-120px',
           top: '50%',
           transform: 'translateY(-50%)',
           opacity: 1
@@ -387,25 +387,23 @@ const App = () => {
   const [showHelp, setShowHelp] = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 
-  // Background Music Functions using Sound Effects System
+  /**
+   * Start background music using the sound effects system
+   */
   const startBackgroundMusic = () => {
     if (isMusicPlaying) return;
     
     try {
-      // console.log('🎵 Starting background music via sound effects system...');
       setIsMusicPlaying(true);
       
-      // Use the sound effects system to play background music
       const backgroundAudio = soundEffects.sounds.background;
       if (backgroundAudio) {
         backgroundAudio.loop = true;
         backgroundAudio.currentTime = 0;
-        
-        // Set volume to target volume immediately (no fade in)
         backgroundAudio.volume = musicVolume / 100;
         
         backgroundAudio.play().then(() => {
-          // console.log('🎵 Background music started');
+          // Music started successfully
         }).catch(error => {
           console.warn('Failed to start background music:', error);
           setIsMusicPlaying(false);
@@ -420,18 +418,18 @@ const App = () => {
     }
   };
 
+  /**
+   * Stop background music with fade out effect
+   */
   const stopBackgroundMusic = () => {
     if (!isMusicPlaying) return;
     
     try {
-      // console.log('🎵 Stopping background music...');
-      
       const backgroundAudio = soundEffects.sounds.background;
       if (backgroundAudio) {
-        // Fade out the music
+        // Fade out the music gradually
         let volume = backgroundAudio.volume;
         const fadeInterval = setInterval(() => {
-          // Ensure volume doesn't go below 0 due to floating-point precision
           volume = Math.max(0, volume - 0.02);
           backgroundAudio.volume = volume;
           
@@ -440,7 +438,6 @@ const App = () => {
             backgroundAudio.pause();
             backgroundAudio.currentTime = 0;
             setIsMusicPlaying(false);
-            // console.log('🎵 Background music stopped');
           }
         }, 50);
       } else {
@@ -617,23 +614,24 @@ const App = () => {
   // Simple wallet connection effect - just check if profile exists, no delays
   useEffect(() => {
     if (connected && publicKey) {
-      console.log('✅ Wallet connected, checking if profile exists...');
+  
+      setIsCheckingProfile(true);
       
       // Simple check - if profile doesn't exist, we'll handle it when user clicks Start Playing
       checkUserProfileExists(publicKey, currentUser).then(result => {
-        console.log('👤 Profile exists check:', result);
-        console.log('👤 Setting honeycombProfileExists to:', result.exists);
+        
         setHoneycombProfileExists(result.exists);
+        setIsCheckingProfile(false);
         
         // Check if user needs to be created
         if (result.needsCreation) {
-          console.log('🆕 User needs to be created on Honeycomb');
+  
           // We'll handle profile creation when user clicks "Start Playing"
         }
         
         // Check if data sync is needed - only show if there's a significant mismatch
         if (result.exists && result.needsSync && currentUser) {
-          console.log('🔄 Significant data sync needed, showing sync popup...');
+  
           
           // Check if we've already shown the sync popup recently for this user
           const lastSyncTime = localStorage.getItem(`sync_popup_${currentUser.id}`);
@@ -649,39 +647,36 @@ const App = () => {
             setShowSyncPopup(true);
             localStorage.setItem(`sync_popup_${currentUser.id}`, now.toString());
     } else {
-            console.log('🔄 Sync popup shown recently, skipping...');
+    
           }
         }
       }).catch(error => {
-        console.log('👤 Profile check failed, assuming it doesn\'t exist:', error);
+
         setHoneycombProfileExists(false);
+        setIsCheckingProfile(false);
       });
     } else {
-      console.log('👤 Wallet not connected or no public key, setting honeycombProfileExists to false');
+      
       setHoneycombProfileExists(false);
+      setIsCheckingProfile(false);
     }
   }, [connected, publicKey, currentUser]);
 
   // Debug useEffect to monitor honeycombProfileExists changes
   useEffect(() => {
-    console.log('👤 honeycombProfileExists changed to:', honeycombProfileExists);
+  
   }, [honeycombProfileExists]);
 
   // Initialize user when wallet connects (always fetch from both Firebase and Honeycomb)
   useEffect(() => {
-    console.log('👤 Wallet connection effect:', { 
-      publicKey: publicKey?.toBase58(), 
-      connected: connected,
-      hasWallet: !!wallet,
-      hasSignMessage: !!signMessage
-    });
+
     
     if (publicKey && connected && wallet && signMessage) {
       const walletAddress = publicKey.toBase58();
-      console.log('👤 Wallet connected, initializing user from both sources...');
+
       initializeUserFromBothSources(walletAddress);
     } else if (!publicKey) {
-      console.log('👤 No public key, clearing user data');
+
       setCurrentUser(null);
       setAchievements([]);
       setLeaderboardData([]);
@@ -696,7 +691,6 @@ const App = () => {
       const unsubscribe = onValue(userRef, snapshot => {
         if (snapshot.exists()) {
           const firebaseData = snapshot.val();
-          // console.log('👤 Firebase real-time update received:', firebaseData);
           
           // Merge Firebase data with current user data
           const updatedUserData = {
@@ -707,7 +701,6 @@ const App = () => {
           
           // Only update if data actually changed
           if (JSON.stringify(updatedUserData) !== JSON.stringify(currentUser)) {
-            // console.log('👤 Updating user data from Firebase sync');
             setCurrentUser(updatedUserData);
           }
         }
@@ -716,15 +709,15 @@ const App = () => {
     }
   }, [currentUser?.id]);
 
-  // Room cleanup function
+  /**
+   * Clean up inactive rooms to prevent database bloat
+   */
   const cleanupInactiveRooms = async () => {
     try {
-      // console.log('🧹 Starting room cleanup...');
       const roomsRef = ref(db, 'rooms');
       const snapshot = await get(roomsRef);
       
       if (!snapshot.exists()) {
-        // console.log('🧹 No rooms to clean up');
         return;
       }
       
@@ -742,28 +735,24 @@ const App = () => {
         
         // Check if room is older than 6 hours
         if (roomCreatedAt < sixHoursAgo) {
-          // console.log(`🧹 Room ${roomId} is older than 6 hours, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
         
         // Check if room is stuck in starting phase for more than 5 minutes
         if (room.status === 'waiting' && lastActivity < fiveMinutesAgo) {
-          // console.log(`🧹 Room ${roomId} is stuck in waiting phase for more than 5 minutes, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
         
         // Check if room is in countdown but no activity for 5+ minutes
         if (room.status === 'countdown' && lastActivity < fiveMinutesAgo) {
-          // console.log(`🧹 Room ${roomId} is stuck in countdown for more than 5 minutes, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
         
-        // Check if room is playing but no activity for 5+ minutes
+        // Check if room is in playing but no activity for 5+ minutes
         if (room.status === 'playing' && lastActivity < fiveMinutesAgo) {
-          // console.log(`🧹 Room ${roomId} has been inactive for more than 5 minutes, marking for deletion`);
           roomsToDelete.push(roomId);
           return;
         }
@@ -771,21 +760,16 @@ const App = () => {
       
       // Delete inactive rooms
       if (roomsToDelete.length > 0) {
-        // console.log(`🧹 Deleting ${roomsToDelete.length} inactive rooms:`, roomsToDelete);
-        
         const deletePromises = roomsToDelete.map(roomId => {
           const roomRef = ref(db, `rooms/${roomId}`);
           return remove(roomRef);
         });
         
         await Promise.all(deletePromises);
-        // console.log(`🧹 Successfully deleted ${roomsToDelete.length} inactive rooms`);
-    } else {
-        // console.log('🧹 No inactive rooms found');
       }
       
     } catch (error) {
-      console.error('❌ Error during room cleanup:', error);
+      console.error('Error during room cleanup:', error);
     }
   };
 
@@ -831,12 +815,10 @@ const App = () => {
       // Set up real-time leaderboard listener
       const lbRef = ref(db, 'leaderboard/users');
       const unsubscribe = onValue(lbRef, snapshot => {
-        // console.log('📊 Leaderboard real-time update received');
         if (snapshot.exists()) {
           const snapshotData = snapshot.val();
           if (snapshotData) {
             const data = Object.values(snapshotData);
-            // console.log('📊 Leaderboard users:', data.length, 'users found');
             
             const sorted = data
               .sort((a, b) => (b.xp || 0) - (a.xp || 0)) // Sort by XP (highest first)
@@ -850,7 +832,6 @@ const App = () => {
                 xp: u.xp || 0
               }));
             
-            // console.log('📊 Real-time leaderboard updated:', sorted.length, 'players');
             setLeaderboardData(sorted);
           } else {
             setLeaderboardData([]);
@@ -870,9 +851,7 @@ const App = () => {
   useEffect(() => {
     if (currentRoom) {
       const roomRef = ref(db, `rooms/${currentRoom.id}`);
-      // console.log('🔥 Setting up Firebase room listener for room:', currentRoom.id);
       const unsubscribe = onValue(roomRef, snapshot => {
-        // console.log('🔥 Firebase room update received for room:', currentRoom.id, 'Data:', snapshot.val());
         if (snapshot.exists()) {
           const roomData = {
             id: currentRoom.id,
@@ -896,28 +875,47 @@ const App = () => {
             const newGameData = roomData.gameData;
             
             // Update gameData immediately - animations will be handled separately
-            // console.log('🔥 Updating gameData from Firebase:', newGameData);
+            console.log('Firebase listener updating gameData:', {
+              lastAction: newGameData.lastAction,
+              gameLog: newGameData.gameLog[newGameData.roundNumber],
+              currentPlayer: newGameData.currentPlayer,
+              roundNumber: newGameData.roundNumber,
+              fullGameLog: newGameData.gameLog,
+              generalMarketActive: newGameData.generalMarketActive,
+              generalMarketOriginatorId: newGameData.generalMarketOriginatorId
+            });
             setGameData(newGameData);
             stopBackgroundMusic();
             setGameState('game');
             
-            // Handle dealingCards phase transition
-            if (newGameData.gamePhase === 'dealingCards') {
-              // console.log('🎴 Multiplayer game started - cards already dealt, showing immediately');
+            // Handle dealingCards phase transition (only for AI games)
+            if (newGameData.gamePhase === 'dealingCards' && !currentRoom) {
               // Change game phase to playing immediately since cards are already dealt
-              if (currentRoom) {
-                update(ref(db, `rooms/${currentRoom.id}/gameData`), {
-                  gamePhase: 'playing',
-                  lastAction: 'Game started!'
-                });
-              }
+              const updatedGameData = {
+                ...newGameData,
+                gamePhase: 'playing',
+                lastAction: 'Game started!'
+              };
+              setGameData(updatedGameData);
+              stopBackgroundMusic();
+              setGameState('game');
+              return; // Don't continue with the old data
             }
             
             // Only update gameData if no animations were triggered
-            // console.log('🔥 Updating gameData from Firebase (no animations):', newGameData);
             setGameData(newGameData);
             stopBackgroundMusic();
             setGameState('game');
+            
+            // Handle round end data for all players
+            if (newGameData.gamePhase === 'roundEnd' && newGameData.roundEndData && !roundEndData) {
+              console.log('🎉 Round end detected in Firebase, showing popup for all players');
+              setRoundEndData(newGameData.roundEndData);
+              setTimeout(() => {
+                setShowRoundEndPopup(true);
+                setTimeout(() => startConfetti(), 200);
+              }, 2500);
+            }
           }
         } else {
           setCurrentRoom(null);
@@ -926,55 +924,9 @@ const App = () => {
       });
       return () => off(roomRef, 'value', unsubscribe);
     }
-  }, [currentRoom?.id, gameData, currentUser, animationPositions]);
+  }, [currentRoom?.id, currentUser, animationPositions]);
 
-  // Handle opponent animations based on gameData changes
-  useEffect(() => {
-    if (!gameData || !currentRoom || !currentUser) return;
-    
-    const prevGameData = prevGameDataRef.current;
-    prevGameDataRef.current = gameData;
-    
-    if (!prevGameData) return; // Skip first render
-    
-    console.log('🎴 Animation useEffect triggered - checking for animations...');
-    
-    // Detect opponent moves using the animations module
-    const moves = detectOpponentMoves(prevGameData, gameData, currentUser);
-    
-    if (moves.cardPlay || moves.cardDraw.length > 0) {
-      console.log('🎴 Detected opponent moves:', moves);
-      
-      // Create wrappers for functions that use current context
-      const getVisualPlayerMappingWrapper = () => getVisualPlayerMapping(currentRoom, currentUser);
-      const getPlayPilePositionWrapper = (index, updatePositions) => getPlayPilePosition(index, updatePositions);
-      const getTopMarketCardPositionWrapper = () => getTopMarketCardPosition();
-      
-      // Process animations
-      const animations = processOpponentAnimations(
-        moves, 
-        animationPositions, 
-        getVisualPlayerMappingWrapper, 
-        getPlayPilePositionWrapper,
-        getTopMarketCardPositionWrapper,
-        currentRoom,
-        currentUser
-      );
-      
-      if (animations.length > 0) {
-        console.log('🎴 Starting animations:', animations);
-        
-        // Start animations with completion callback
-        startAnimations(animations, setAnimatingCards, () => {
-          console.log('🎴 All animations completed');
-          // Update play pile positions after animation
-          if (moves.cardPlay) {
-            getPlayPilePosition(gameData.playPile.length - 1, true);
-          }
-        });
-      }
-    }
-  }, [gameData, currentRoom, currentUser, animationPositions]);
+
 
   // Listen for ready players in multiplayer
   useEffect(() => {
@@ -986,7 +938,7 @@ const App = () => {
   // Stop game music when game ends
   useEffect(() => {
     if (gameData?.gamePhase === 'gameEnd') {
-      // console.log('🎵 Game ended, stopping game music...');
+      
       soundEffects.stopGameMusic();
     }
   }, [gameData?.gamePhase]);
@@ -996,7 +948,7 @@ const App = () => {
   // Initialize user from both Firebase and Honeycomb sources
   const initializeUserFromBothSources = async walletAddress => {
     try {
-      console.log('🔄 Initializing user from both Firebase and Honeycomb sources...');
+  
       
       // First, try to get data from both sources simultaneously
       const [firebaseData, honeycombData] = await Promise.allSettled([
@@ -1004,10 +956,7 @@ const App = () => {
         getHoneycombUserData(walletAddress)
       ]);
       
-      console.log('📊 Data fetch results:', {
-        firebase: firebaseData.status === 'fulfilled' ? 'success' : 'failed',
-        honeycomb: honeycombData.status === 'fulfilled' ? 'success' : 'failed'
-      });
+
       
       let userData = null;
       let dataSource = 'none';
@@ -1017,18 +966,18 @@ const App = () => {
         // User exists in Firebase - use Firebase as primary source
         userData = firebaseData.value;
         dataSource = 'firebase';
-        console.log('✅ Using Firebase data as primary source');
+  
         
         // Only sync to Honeycomb if wallet is connected and user has Honeycomb profile
         if (honeycombData.status === 'fulfilled' && honeycombData.value && honeycombData.value.honeycombProfile) {
-          console.log('🔄 User has both Firebase and Honeycomb data - will sync Firebase to Honeycomb');
+    
           dataSource = 'firebase_with_honeycomb_sync';
         }
       } else if (honeycombData.status === 'fulfilled' && honeycombData.value) {
         // User exists in Honeycomb but not Firebase - this is a new user
         userData = honeycombData.value;
         dataSource = 'honeycomb_only';
-        console.log('✅ New user exists in Honeycomb but not Firebase - will sync to Firebase');
+  
       }
       
       if (userData) {
@@ -1054,7 +1003,7 @@ const App = () => {
           lastActive: Date.now()
         };
         
-        console.log('👤 Setting user data from', dataSource, ':', completeUserData);
+  
         setCurrentUser(completeUserData);
         setHoneycombProfileExists(!!userData.honeycombProfile);
         initializeAchievements(completeUserData);
@@ -1062,10 +1011,33 @@ const App = () => {
         // Sync data to both sources if needed
         await syncUserDataToBothSources(completeUserData, dataSource);
         
+        // Deferred Honeycomb syncing - sync any pending game stats
+        if (publicKey && wallet && signMessage && completeUserData) {
+          try {
+            // Check if there are any pending stats to sync
+            const pendingStats = completeUserData.pendingHoneycombSync;
+            if (pendingStats) {
+              console.log('🔄 Syncing pending game stats to Honeycomb...');
+              await updateGameStats({
+                publicKey,
+                wallet,
+                signMessage,
+                gameResult: pendingStats.gameResult,
+                gameStats: pendingStats.gameStats,
+                currentUser: completeUserData
+              });
+              // Clear pending sync
+              update(ref(db, `users/${walletAddress}`), { pendingHoneycombSync: null });
+            }
+          } catch (error) {
+            console.error('❌ Error syncing pending stats to Honeycomb:', error);
+          }
+        }
+        
         return completeUserData;
       } else {
         // No existing data found, create new user
-        console.log('🆕 No existing user data found, creating new user...');
+  
         return await createNewUser(walletAddress);
       }
       
@@ -1130,7 +1102,7 @@ const App = () => {
   // Sync user data to both Firebase and Honeycomb
   const syncUserDataToBothSources = async (userData, currentSource) => {
     try {
-      console.log('🔄 Syncing user data to both sources...', { currentSource });
+  
       
       // Always sync to Firebase (especially important for honeycomb_only case)
       const userRef = ref(db, `users/${userData.id}`);
@@ -1139,17 +1111,11 @@ const App = () => {
         ...sanitizedUserData,
         lastActive: serverTimestamp()
       });
-      // console.log('✅ User data synced to Firebase');
+      
       
       // Sync to Honeycomb based on data source
       if (publicKey && wallet && signMessage && connected) {
-        // console.log('🔗 Wallet connected, attempting Honeycomb sync...', {
-        //   hasPublicKey: !!publicKey,
-        //   hasWallet: !!wallet,
-        //   hasSignMessage: !!signMessage,
-        //   isConnected: connected,
-        //   publicKeyAddress: publicKey?.toBase58()
-        // });
+
         
         if (currentSource === 'firebase_with_honeycomb_sync') {
           // Sync Firebase data to Honeycomb (Firebase is primary)
@@ -1169,24 +1135,19 @@ const App = () => {
                 bestWinStreak: userData.bestWinStreak
               }
             );
-            // console.log('✅ Firebase data synced to Honeycomb');
+
           } catch (honeycombError) {
             console.warn('⚠️ Failed to sync Firebase data to Honeycomb:', honeycombError.message);
           }
         } else if (currentSource === 'honeycomb_only') {
           // New user from Honeycomb - no need to sync back since we just synced to Firebase
-          // console.log('✅ New user data synced from Honeycomb to Firebase');
+
         } else if (currentSource === 'new') {
           // Brand new user - no Honeycomb profile yet, so no sync needed
-          // console.log('✅ New user created in Firebase only');
+
         }
       } else {
-        // console.log('⚠️ Wallet not fully connected, skipping Honeycomb sync:', {
-        //   hasPublicKey: !!publicKey,
-        //   hasWallet: !!wallet,
-        //   hasSignMessage: !!signMessage,
-        //   isConnected: connected
-        // });
+
       }
       
       // Update leaderboard
@@ -1200,7 +1161,7 @@ const App = () => {
   // Create new user in both Firebase and Honeycomb
   const createNewUser = async (walletAddress) => {
     try {
-      console.log('🆕 Creating new user in both Firebase and Honeycomb...');
+  
       
       // Try to create Honeycomb profile first
       let honeycombProfile = null;
@@ -1212,7 +1173,7 @@ const App = () => {
             signMessage,
             `Player${Math.floor(Math.random() * 10000)}`
           );
-          console.log('✅ Honeycomb profile created');
+      
         } catch (honeycombError) {
           console.warn('⚠️ Failed to create Honeycomb profile:', honeycombError.message);
         }
@@ -1243,7 +1204,7 @@ const App = () => {
       // Sync to both sources
       await syncUserDataToBothSources(newUserData, 'new');
       
-      console.log('👤 New user created:', newUserData);
+  
       setCurrentUser(newUserData);
       setHoneycombProfileExists(!!honeycombProfile);
       initializeAchievements(newUserData);
@@ -1258,7 +1219,7 @@ const App = () => {
 
   const initializeUser = async walletAddress => {
     try {
-      console.log('Initializing user with wallet:', walletAddress);
+  
       
       // Check if wallet is connected for Honeycomb integration
       if (publicKey && wallet) {
@@ -1273,24 +1234,24 @@ const App = () => {
         
         // Ensure wallet is properly connected and has required methods
         if (!wallet?.connected || !wallet?.signAllTransactions || !signMessage) {
-          console.log('⚠️ Wallet not properly connected or missing required methods, falling back to Firebase');
+  
           throw new Error('Wallet not properly connected');
         }
         
         try {
           // Debug: Check API status
           const apiStatus = getApiStatus();
-          console.log('🔍 Honeycomb API Status:', apiStatus);
+
           
           // Debug: Check if project exists
           const projectExists = await checkProjectExists();
-          console.log('🔍 Project exists check:', projectExists);
+
           
           // First, try to login to existing Honeycomb profile
           const loginResult = await loginUserProfile(publicKey);
           
           if (loginResult.exists && loginResult.profile) {
-            console.log('Found existing Honeycomb profile:', loginResult.profile);
+
             
             // Convert Honeycomb profile to app format
             const levelData = calculateLevel(loginResult.profile.xp || 0);
@@ -1323,7 +1284,7 @@ const App = () => {
             
             return;
           } else {
-            console.log('No existing Honeycomb profile found, creating new one...');
+
             
             // Create new Honeycomb profile
             setIsCreatingProfile(true);
@@ -1338,11 +1299,11 @@ const App = () => {
               );
               
               if (newHoneycombProfile.success) {
-                console.log('Created new Honeycomb profile:', newHoneycombProfile);
+
                 
                 // Check if this is a mock profile
                 if (newHoneycombProfile.isMock) {
-                  console.log('⚠️ Using mock Honeycomb profile due to API issues');
+
                 }
                 
                 // Create app user data
@@ -1392,7 +1353,7 @@ const App = () => {
                   lastActive: serverTimestamp()
                 };
                 await set(leaderboardRef, leaderboardData);
-                console.log('✅ New user added to leaderboard');
+            
                 
                 return;
               }
@@ -1402,7 +1363,7 @@ const App = () => {
               
               // If it's a user rejection, don't fall back to Firebase
               if (honeycombError.message && honeycombError.message.includes('cancelled')) {
-                console.log('User cancelled profile creation');
+            
                 return;
               }
             } finally {
@@ -1416,7 +1377,7 @@ const App = () => {
         }
       
       // Fallback to Firebase-only user
-      console.log('Using Firebase-only user initialization');
+  
       const userRef = ref(db, `users/${walletAddress}`);
       const unsubscribe = onValue(userRef, async snapshot => {
         if (snapshot.exists()) {
@@ -1463,7 +1424,7 @@ const App = () => {
             lastActive: serverTimestamp()
           };
           await set(leaderboardRef, leaderboardData);
-          console.log('✅ Existing user added to leaderboard');
+      
         } else {
           const levelData = calculateLevel(0);
           const newUserData = {
@@ -1503,7 +1464,7 @@ const App = () => {
             lastActive: serverTimestamp()
           };
           await set(leaderboardRef, leaderboardData);
-          console.log('✅ New Firebase user added to leaderboard');
+      
         }
         onDisconnect(userRef).update({
           lastActive: serverTimestamp()
@@ -1571,7 +1532,7 @@ const App = () => {
     }
     
     try {
-      console.log('🔄 Starting Firebase to Honeycomb sync...');
+
       
       const result = await syncFirebaseToHoneycomb(
         publicKey,
@@ -1581,12 +1542,12 @@ const App = () => {
       );
       
       if (result.success) {
-        console.log('✅ Sync completed successfully');
+
         setShowSyncPopup(false);
         setSyncPopupData(null);
         
         // Wait a moment for Honeycomb data to be updated
-        console.log('⏳ Waiting for Honeycomb data to be updated...');
+
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Refresh profile check
@@ -1622,7 +1583,7 @@ const App = () => {
         lastActive: serverTimestamp()
       };
       await set(leaderboardRef, leaderboardData);
-      console.log('✅ Leaderboard entry updated');
+
     } catch (error) {
       console.error('❌ Error updating leaderboard entry:', error);
     }
@@ -1633,7 +1594,7 @@ const App = () => {
   const updateUsername = async (newUsernameValue, newBioValue = null) => {
     if (!currentUser || !newUsernameValue.trim()) return;
     try {
-      console.log('🔄 Updating username with bidirectional sync...');
+
       
       const updateData = { username: newUsernameValue.trim() };
       
@@ -1645,7 +1606,7 @@ const App = () => {
       // Update Firebase
       const userRef = ref(db, `users/${currentUser.id}`);
       await update(userRef, updateData);
-      console.log('✅ Username updated in Firebase');
+
       
       // Update Honeycomb if wallet is connected
       if (publicKey && wallet && signMessage) {
@@ -1657,7 +1618,7 @@ const App = () => {
             username: newUsernameValue.trim(),
             bio: newBioValue !== null ? newBioValue.trim() : currentUser.bio || ''
           });
-          console.log('✅ Username updated in Honeycomb');
+
         } catch (honeycombError) {
           console.error('❌ Failed to update Honeycomb username:', honeycombError);
         }
@@ -1679,7 +1640,7 @@ const App = () => {
       
       setIsEditingUsername(false);
       setNewUsername('');
-      console.log('✅ Username updated successfully in all sources');
+
     } catch (error) {
       console.error('❌ Error updating username:', error);
     }
@@ -1691,7 +1652,7 @@ const App = () => {
     if (!achievement || !achievement.unlocked || achievement.claimed) return;
     
     try {
-      console.log(`🏆 Claiming achievement: ${achievementId}`);
+  
       
       // Claim badge in Honeycomb if wallet is connected
       if (publicKey && wallet && signMessage) {
@@ -1703,7 +1664,7 @@ const App = () => {
             badgeCriteria: achievementId
           });
           
-          console.log(`✅ Achievement claimed in Honeycomb: ${achievementId}`);
+  
           
           // Update local achievement state
           setAchievements(prev => prev.map(a => 
@@ -1744,7 +1705,7 @@ const App = () => {
                   level: levelData.level
                 });
                 
-                console.log(`✅ User profile and leaderboard updated after claiming achievement`);
+        
               }
             } catch (error) {
               console.error('❌ Error refreshing user profile after claiming:', error);
@@ -1785,7 +1746,7 @@ const App = () => {
               level: levelData.level
             });
             
-            console.log(`✅ User profile and leaderboard updated after claiming achievement (Firebase fallback)`);
+    
       }
       setAchievements(prev => prev.map(a => a.id === achievementId ? { ...a, claimed: true } : a));
         }
@@ -1821,12 +1782,12 @@ const App = () => {
             level: levelData.level
           });
           
-          console.log(`✅ User profile and leaderboard updated after claiming achievement (Firebase-only)`);
+  
         }
         setAchievements(prev => prev.map(a => a.id === achievementId ? { ...a, claimed: true } : a));
       }
       
-      console.log(`🏆 Achievement claimed successfully: ${achievementId}`);
+  
       
     } catch (error) {
       console.error('❌ Error claiming achievement:', error);
@@ -1864,7 +1825,7 @@ const App = () => {
   const checkAndUnlockAchievements = async (userData) => {
     if (!publicKey) return;
     
-    console.log('🏆 Checking for unlockable achievements...');
+
     
     try {
       // Check for unlockable badges using the Honeycomb badge system
@@ -1875,7 +1836,7 @@ const App = () => {
       });
       
       if (unlockableBadges.length > 0) {
-        console.log(`🏆 ${unlockableBadges.length} badges ready to claim:`, unlockableBadges);
+    
         
         // Show achievement popup for unlockable badges
         setAchievementPopupData({
@@ -1895,35 +1856,30 @@ const App = () => {
     }
   };
 
-  // Track card plays for statistics
-  const trackCardPlay = (gameData) => {
-    if (!gameData) return {};
-    
-    // Initialize tracking if not exists
-    if (!gameData.totalCardsPlayed) {
-      gameData.totalCardsPlayed = 0;
-    }
-    if (!gameData.cardsPlayed) {
-      gameData.cardsPlayed = 0;
-    }
-    
-    // Return updated properties
-    return {
-      totalCardsPlayed: gameData.totalCardsPlayed + 1,
-      cardsPlayed: gameData.cardsPlayed + 1
-    };
-  };
+
 
     // Comprehensive game tracking and statistics update with bidirectional sync
   const updateGameStatistics = async (gameData, isWinner, gameMode = 'ai') => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log('No currentUser for updateGameStatistics');
+      return null;
+    }
+    
+    console.log('📊 updateGameStatistics called with:', {
+      isWinner,
+      gameMode,
+      currentUser: currentUser.id,
+      gameData: {
+        roundNumber: gameData?.roundNumber
+      }
+    });
 
-    console.log('📊 Updating game statistics with bidirectional sync...', { isWinner, gameMode });
+
 
     // Calculate game statistics
     const roundsPlayed = gameData.roundNumber || 1;
-    const totalCardsPlayed = gameData.totalCardsPlayed || 0;
-    const cardsPlayed = gameData.cardsPlayed || 0;
+    // Each game gives 5 "cards" for achievement tracking
+    const cardsPlayed = 5;
     const perfectWin = isWinner && roundsPlayed === 1;
     const xpEarned = getXPFromGame(isWinner, roundsPlayed, cardsPlayed);
 
@@ -1934,7 +1890,7 @@ const App = () => {
       xp: (currentUser.xp || 0) + xpEarned,
       currentWinStreak: isWinner ? (currentUser.currentWinStreak || 0) + 1 : 0,
       bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : (currentUser.bestWinStreak || 0),
-      totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + totalCardsPlayed,
+      totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + cardsPlayed,
       lastActive: serverTimestamp()
     };
 
@@ -1957,13 +1913,17 @@ const App = () => {
     // Update Firebase
     try {
       const userRef = ref(db, `users/${currentUser.id}`);
-      await update(userRef, {
+      const firebaseUpdateData = {
         ...updateData,
         level: levelData.level,
         currentLevelXP: levelData.currentLevelXP,
         xpNeededForNext: levelData.xpNeededForNext
-      });
-      console.log('✅ Firebase stats updated successfully');
+      };
+      
+      console.log('📊 Updating Firebase with data:', firebaseUpdateData);
+      await update(userRef, firebaseUpdateData);
+      console.log('Firebase stats updated successfully');
+  
     } catch (error) {
       console.error('❌ Error updating Firebase stats:', error);
     }
@@ -1973,32 +1933,27 @@ const App = () => {
       try {
         const honeycombGameStats = {
           xp: xpEarned,
-          cardsPlayed: totalCardsPlayed,
+          cardsPlayed: cardsPlayed,
           perfectWin: perfectWin,
           gameMode: gameMode,
           roundsPlayed: roundsPlayed
         };
 
-        const honeycombResult = await updateGameStats({
-          publicKey,
-          wallet,
-          signMessage,
+        // Store pending Honeycomb sync data for later
+        const pendingSyncData = {
           gameResult: isWinner ? 'win' : 'loss',
-          gameStats: honeycombGameStats
+          gameStats: honeycombGameStats,
+          timestamp: Date.now()
+        };
+        
+        // Update Firebase with pending sync data
+        await update(ref(db, `users/${currentUser.id}`), {
+          pendingHoneycombSync: pendingSyncData
         });
-
-        if (honeycombResult.success) {
-          console.log('✅ Honeycomb stats updated successfully');
-
-          // Check for new achievements after updating stats
-          await checkAndUnlockAchievements(updatedUserData);
-        } else {
-          console.warn('⚠️ Honeycomb stats update failed, but continuing with Firebase update');
-        }
-
+        
+        console.log('📊 Game stats updated in Firebase, Honeycomb sync data stored for later');
       } catch (error) {
-        console.error('❌ Error updating Honeycomb stats:', error);
-        console.warn('⚠️ Continuing with Firebase update despite Honeycomb error');
+        console.error('❌ Error in deferred Honeycomb sync:', error);
       }
     }
 
@@ -2010,7 +1965,7 @@ const App = () => {
 
 
 
-    console.log('📊 Game statistics update complete with bidirectional sync');
+
     return updatedUserData;
   };
 
@@ -2096,20 +2051,12 @@ const App = () => {
     const uniqueKeys = new Set(cardKeys);
     if (cardKeys.length !== uniqueKeys.size) {
       console.error('CRITICAL: Duplicate cards found in deck after creation!');
-      console.log('Total regular cards:', cardKeys.length);
-      console.log('Unique combinations:', uniqueKeys.size);
+      
       const duplicates = cardKeys.filter((key, index) => cardKeys.indexOf(key) !== index);
       console.error('Duplicate cards found:', [...new Set(duplicates)]);
       throw new Error('Deck creation failed - duplicate cards detected');
     }
-    console.log(`✓ Deck created successfully: ${deck.length} total cards`);
-    console.log(` - Circles: ${deck.filter(c => c.shape === '●').length}`);
-    console.log(` - Triangles: ${deck.filter(c => c.shape === '▲').length}`);
-    console.log(` - Crosses: ${deck.filter(c => c.shape === '✚').length}`);
-    console.log(` - Squares: ${deck.filter(c => c.shape === '■').length}`);
-    console.log(` - Stars: ${deck.filter(c => c.shape === '★').length}`);
-    console.log(` - WHOT cards: ${deck.filter(c => c.shape === '🔥').length}`);
-    console.log(`✓ All ${uniqueKeys.size} regular card combinations are unique`);
+    
     return deck;
   };
 
@@ -2122,151 +2069,7 @@ const App = () => {
     return shuffled;
   };
 
-  // Animation utility functions
-  const detectOpponentMoves = (prevGameData, newGameData, currentUser) => {
-    const moves = {
-      cardPlay: null,
-      cardDraw: []
-    };
 
-    // Detect card play
-    if (prevGameData?.playPile && newGameData?.playPile && newGameData.playPile.length > prevGameData.playPile.length) {
-      const lastCard = newGameData.playPile[newGameData.playPile.length - 1];
-      
-      const prevPlayers = ensurePlayersArray(prevGameData.players);
-      const newPlayers = ensurePlayersArray(newGameData.players);
-      
-      // Determine who played by card count difference
-      let playerWhoPlayed = -1;
-      for (let i = 0; i < prevPlayers.length; i++) {
-        const prevPlayer = prevPlayers[i];
-        const newPlayer = newPlayers.find(np => np.id === prevPlayer.id);
-        if (newPlayer && (prevPlayer.cards || []).length > (newPlayer.cards || []).length) {
-          playerWhoPlayed = i;
-          break;
-        }
-      }
-      
-      // Fallback to currentPlayer if no difference found
-      if (playerWhoPlayed === -1) {
-        playerWhoPlayed = newGameData.currentPlayer;
-      }
-      
-      const currentUserIndex = newPlayers.findIndex(p => p.id === currentUser?.id);
-      
-      console.log('🎴 Card play detection:', {
-        playerWhoPlayed,
-        currentUserIndex,
-        lastCard,
-        playPileLength: newGameData.playPile.length,
-        prevPlayPileLength: prevGameData.playPile.length
-      });
-      
-      if (playerWhoPlayed !== -1 && playerWhoPlayed !== currentUserIndex) {
-        moves.cardPlay = {
-          card: lastCard,
-          playerIndex: playerWhoPlayed,
-          playPileLength: newGameData.playPile.length
-        };
-        console.log('🎴 Card play detected for opponent:', moves.cardPlay);
-      }
-    }
-
-    // Detect card draws
-    if (prevGameData?.players && newGameData?.players) {
-      const prevPlayers = ensurePlayersArray(prevGameData.players);
-      const newPlayers = ensurePlayersArray(newGameData.players);
-      
-      newPlayers.forEach((newPlayer, playerIndex) => {
-        const oldPlayer = prevPlayers.find(p => p.id === newPlayer.id);
-        if (oldPlayer && newPlayer.cards.length > oldPlayer.cards.length && playerIndex !== newPlayers.findIndex(p => p.id === currentUser?.id)) {
-          const cardsDifference = newPlayer.cards.length - oldPlayer.cards.length;
-          moves.cardDraw.push({
-            playerIndex,
-            cardsCount: cardsDifference
-          });
-        }
-      });
-    }
-
-    return moves;
-  };
-
-  const processOpponentAnimations = (moves, animationPositions, getVisualPlayerMapping, getPlayPilePosition, getTopMarketCardPosition, currentRoom, currentUser) => {
-    const animations = [];
-
-    // Process card play animation
-    if (moves.cardPlay) {
-      const { card, playerIndex, playPileLength } = moves.cardPlay;
-      const mapping = getVisualPlayerMapping(currentRoom, currentUser);
-      const visualPlayerIndex = mapping.actualToVisual[playerIndex] !== undefined ? mapping.actualToVisual[playerIndex] : playerIndex;
-      
-      const newCardRelativeStyle = getPlayPilePosition(playPileLength - 1, false);
-      const endPosition = {
-        ...animationPositions.playPile,
-        transform: `${animationPositions.playPile.transform} ${newCardRelativeStyle.transform}`,
-        zIndex: newCardRelativeStyle.zIndex
-      };
-
-      const animatingCard = {
-        ...card,
-        id: `opponent-play-${Date.now()}`,
-        startPos: animationPositions.animationStarts?.[visualPlayerIndex] || {
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)'
-        },
-        endPos: endPosition,
-        isPlayerCard: true
-      };
-
-      animations.push(animatingCard);
-    }
-
-    // Process card draw animations
-    moves.cardDraw.forEach(({ playerIndex, cardsCount }) => {
-      const mapping = getVisualPlayerMapping(currentRoom, currentUser);
-      const visualPlayerIndex = mapping.actualToVisual[playerIndex] !== undefined ? mapping.actualToVisual[playerIndex] : playerIndex;
-      
-      for (let i = 0; i < cardsCount; i++) {
-        const animatingCard = {
-          id: `opponent-draw-${Date.now()}-${i}`,
-          startPos: getTopMarketCardPosition(),
-          endPos: {
-            ...animationPositions.drawEnds[visualPlayerIndex],
-            opacity: 0
-          },
-          isPlayerCard: false
-        };
-        animations.push(animatingCard);
-      }
-    });
-
-    return animations;
-  };
-
-  const startAnimations = (animations, setAnimatingCards, onComplete) => {
-    if (animations.length === 0) return;
-
-    // Add all animations to state
-    setAnimatingCards(prev => [...prev, ...animations]);
-
-    // Calculate total animation duration
-    const maxDuration = Math.max(...animations.map(anim => {
-      if (anim.id.includes('opponent-draw')) {
-        // Draw animations are staggered, so calculate total time
-        const index = parseInt(anim.id.split('-').pop());
-        return (index * 100) + 800; // 100ms stagger + 800ms animation
-      }
-      return 800; // Default animation duration
-    }));
-
-    // Remove animations after completion
-    setTimeout(() => {
-      setAnimatingCards(prev => prev.filter(card => !animations.some(anim => anim.id === card.id)));
-      if (onComplete) onComplete();
-    }, maxDuration);
-  };
 
   const startDealingAnimation = async (deckToDeal, players, cardsPerPlayer) => {
     // Safety check to prevent map operations on undefined data
@@ -2286,7 +2089,7 @@ const App = () => {
       
       let visualPlayerIndex = currentPlayerIndex;
       if (currentRoom && gameData) {
-        const mapping = getVisualPlayerMapping();
+        const mapping = getVisualPlayerMapping(currentRoom, currentUser);
         visualPlayerIndex = mapping.actualToVisual[currentPlayerIndex] !== undefined ? mapping.actualToVisual[currentPlayerIndex] : currentPlayerIndex;
       }
       
@@ -2294,10 +2097,16 @@ const App = () => {
       const animatingCard = {
         ...cardToDeal,
         id: `dealing-${Date.now()}-${i}`,
-        startPos: getTopMarketCardPosition(),
+        startPos: {
+          ...getTopMarketCardPosition(),
+          position: 'fixed',
+          zIndex: 1000
+        },
         endPos: {
           ...animationPositions.drawEnds[visualPlayerIndex],
-          opacity: 0
+          opacity: 0,
+          position: 'fixed',
+          zIndex: 1000
         },
         isPlayerCard: false
       };
@@ -2350,11 +2159,16 @@ const App = () => {
       const playPileCard = {
         ...playCard,
         id: `dealing-play-${Date.now()}`,
-        startPos: getTopMarketCardPosition(),
+        startPos: {
+          ...getTopMarketCardPosition(),
+          position: 'fixed',
+          zIndex: 1000
+        },
         endPos: {
           ...animationPositions.playPile,
           transform: `${animationPositions.playPile.transform} ${endPosition.transform}`,
-          zIndex: endPosition.zIndex
+          zIndex: endPosition.zIndex,
+          position: 'fixed'
         },
         isPlayerCard: true
       };
@@ -2385,6 +2199,7 @@ const App = () => {
               lastAction: prevData.roundNumber === 1 ? `Game started - ${playCard.number}${playCard.shape} played${specialMessage}` : `Round ${prevData.roundNumber}`,
               ...initialCardEffects,
               generalMarketDrawCount: initialCardEffects.generalMarketActive ? 0 : undefined,
+
               gameLog: {
                 ...prevData.gameLog,
                 [prevData.roundNumber]: prevData.roundNumber === 1 ? [...(prevData.gameLog[1] || []), `Initial card: ${playCard.number}${playCard.shape} placed on table${specialMessage}`] : [...(prevData.gameLog[prevData.roundNumber] || []), `Round ${prevData.roundNumber} begins`]
@@ -2393,9 +2208,9 @@ const App = () => {
             if (newData.players[newData.currentPlayer].isAI) {
               setTimeout(() => {
                 setIsAITurnInProgress(true);
-                setTimeout(() => {
+                setTimeout(async () => {
                   if (!isAnyAnimationInProgress) {
-                    handleAITurn({ ...newData });
+                    await aiTurn({ ...newData });
                   }
                 }, 1000);
               }, 500);
@@ -2423,16 +2238,22 @@ const App = () => {
       const playerActualIndex = players.findIndex(p => p.id === player.id);
       let visualPlayerIndex = playerActualIndex;
       if (currentRoom) {
-        const mapping = getVisualPlayerMapping();
+        const mapping = getVisualPlayerMapping(currentRoom, currentUser);
         visualPlayerIndex = mapping.actualToVisual[playerActualIndex] !== undefined ? mapping.actualToVisual[playerActualIndex] : playerActualIndex;
       }
       const animatingCard = {
         ...drawnCard,
         id: `draw-${Date.now()}-${i}`,
-        startPos: getTopMarketCardPosition(),
+        startPos: {
+          ...getTopMarketCardPosition(),
+          position: 'fixed',
+          zIndex: 1000
+        },
         endPos: {
           ...animationPositions.drawEnds[visualPlayerIndex],
-          opacity: 0
+          opacity: 0,
+          position: 'fixed',
+          zIndex: 1000
         },
         isPlayerCard: false
       };
@@ -2453,17 +2274,33 @@ const App = () => {
       if (newTotal > maxVisiblePlayerCards) setPlayerScrollIndex(newTotal - maxVisiblePlayerCards);
       setIsPlayerActionInProgress(false);
     }
-    gameDataToUse.lastAction = isPending ? `${player.name.split(' ')[0]} - pick${count}` : isGeneral ? `${player.name.split(' ')[0]} - market` : `${player.name.split(' ')[0]} - market`;
-    gameDataToUse.gameLog = {
-      ...gameDataToUse.gameLog,
-      [gameDataToUse.roundNumber]: [...(gameDataToUse.gameLog[gameDataToUse.roundNumber] || []), isPending ? `${player.name} drew ${count} card${count > 1 ? 's' : ''} (penalty)` : isGeneral ? `${player.name} drew ${count} card${count > 1 ? 's' : ''} (general market)` : `${player.name} drew ${count} card${count > 1 ? 's' : ''} from market`]
-    };
+    // Only set log messages for AI games
+    // Multiplayer handles logging separately to avoid conflicts
+    if (!currentRoom) {
+      gameDataToUse.lastAction = isPending ? `${player.name.split(' ')[0]} - pick${count}` : isGeneral ? `${player.name.split(' ')[0]} - market` : `${player.name.split(' ')[0]} - market`;
+      gameDataToUse.gameLog = {
+        ...gameDataToUse.gameLog,
+        [gameDataToUse.roundNumber]: [...(gameDataToUse.gameLog[gameDataToUse.roundNumber] || []), isPending ? `${player.name} drew ${count} card${count > 1 ? 's' : ''} (penalty)` : isGeneral ? `${player.name} drew ${count} card${count > 1 ? 's' : ''} (general market)` : `${player.name} drew ${count} card${count > 1 ? 's' : ''} from market`]
+      };
+    }
     if (isPending) gameDataToUse.pendingPickCount = 0;
-    setGameData({
-      ...gameDataToUse
-    });
-    setIsAnyAnimationInProgress(false);
-    nextTurn(gameDataToUse);
+    
+    // Only update game state and call nextTurn for AI games
+    // Multiplayer handles state updates and turn transitions separately
+    if (!currentRoom) {
+      setGameData({
+        ...gameDataToUse
+      });
+      setIsAnyAnimationInProgress(false);
+      nextTurn(gameDataToUse);
+    } else {
+      // For multiplayer, just mark animation as complete
+      // The calling function (drawMultiplayerCard) will handle state updates
+      setIsAnyAnimationInProgress(false);
+    }
+    
+    // Return the updated game data for multiplayer
+    return gameDataToUse;
   };
 
   const reshuffleMarket = gameData => {
@@ -2575,20 +2412,39 @@ const App = () => {
     return 6;
   };
 
-  const getVisualPlayerMapping = () => {
-    if (!currentRoom) return { actualToVisual: {}, visualToActual: {} };
+  const getVisualPlayerMapping = (currentRoomParam, currentUserParam) => {
+    // For single-player games (no currentRoom), use default mapping
+    if (!currentRoomParam || !gameData) {
+      return {
+        visualToActual: [0, 1, 2, 3],
+        actualToVisual: {
+          0: 0,
+          1: 1,
+          2: 2,
+          3: 3
+        }
+      };
+    }
     
     // Convert room players object to array
-    const playersArray = ensurePlayersArray(currentRoom.players);
+    const playersArray = ensurePlayersArray(currentRoomParam.players);
     
-    const currentUserIndex = playersArray.findIndex(p => p.id === currentUser?.id);
+    const currentUserIndex = playersArray.findIndex(p => p.id === currentUserParam?.id);
     
     if (currentUserIndex === -1) {
       console.warn('Current user not found in room players:', {
-        currentUserId: currentUser?.id,
+        currentUserId: currentUserParam?.id,
         playerIds: playersArray.map(p => p.id)
       });
-      return { actualToVisual: {}, visualToActual: {} };
+      return {
+        visualToActual: [0, 1, 2, 3],
+        actualToVisual: {
+          0: 0,
+          1: 1,
+          2: 2,
+          3: 3
+        }
+      };
     }
     
     const actualToVisual = {};
@@ -2678,12 +2534,12 @@ const App = () => {
     let nextPlayer = gameData.currentPlayer;
     let playersToSkip = gameData.skipNextPlayer ? 1 : 0;
     do {
-      nextPlayer = (nextPlayer + 1) % gamePlayers.length;
-    } while (gamePlayers[nextPlayer].eliminated);
+      nextPlayer = (nextPlayer + 1) % turnPlayers.length;
+    } while (turnPlayers[nextPlayer].eliminated);
     while (playersToSkip > 0) {
       do {
-        nextPlayer = (nextPlayer + 1) % gamePlayers.length;
-      } while (gamePlayers[nextPlayer].eliminated);
+        nextPlayer = (nextPlayer + 1) % turnPlayers.length;
+      } while (turnPlayers[nextPlayer].eliminated);
       playersToSkip--;
     }
     gameData.currentPlayer = nextPlayer;
@@ -2702,9 +2558,9 @@ const App = () => {
     if (gamePlayers[nextPlayer].isAI) {
       setTimeout(() => {
         setIsAITurnInProgress(true);
-        setTimeout(() => {
+        setTimeout(async () => {
           if (!isAnyAnimationInProgress) {
-            handleAITurn({ ...gameData });
+            await aiTurn({ ...gameData });
           }
         }, 1000);
       }, 500);
@@ -2815,8 +2671,7 @@ const App = () => {
   };
 
   const aiTurn = async gameData => {
-    const aiPlayers = ensurePlayersArray(gameData.players);
-    if (!aiPlayers[gameData.currentPlayer].isAI || isAnyAnimationInProgress) {
+    if (!gameData.players[gameData.currentPlayer].isAI || isAnyAnimationInProgress) {
       setIsAITurnInProgress(false);
       return;
     }
@@ -2869,15 +2724,22 @@ const App = () => {
       const endPosition = {
         ...animationPositions.playPile,
         transform: `${animationPositions.playPile.transform} ${newCardRelativeStyle.transform}`,
-        zIndex: newCardRelativeStyle.zIndex
+        zIndex: newCardRelativeStyle.zIndex,
+        opacity: 1
       };
       const animatingCard = {
         ...cardToPlay,
         id: `animating-${Date.now()}-${randomCard.index}`,
-        startPos: animationPositions.animationStarts[currentPlayer.id],
+        startPos: {
+          ...animationPositions.playerDecks[currentPlayer.id],
+          opacity: 1,
+          position: 'fixed',
+          zIndex: 1000
+        },
         endPos: endPosition,
         isPlayerCard: true
       };
+
       setAnimatingCards(prev => [...prev, animatingCard]);
       if (cardToPlay.special === 'whot') {
         playSoundEffect.specialPlay();
@@ -2890,57 +2752,61 @@ const App = () => {
       } else {
         playSoundEffect.normalPlay();
       }
-      await new Promise(resolve => setTimeout(resolve, 800));
-      currentPlayer.cards = currentPlayer.cards.filter((_, idx) => idx !== randomCard.index);
-      newGameData.playPile = [...newGameData.playPile, cardToPlay];
-      setAnimatingCards(prev => prev.filter(c => c.id !== animatingCard.id));
-      if (cardToPlay.special === 'whot') {
-        const shapes = ['●', '▲', '✚', '■', '★'];
-        cardToPlay.chosenShape = shapes[Math.floor(Math.random() * shapes.length)];
-        newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - WHOT → ${cardToPlay.chosenShape}`;
-        newGameData.gameLog = {
-          ...newGameData.gameLog,
-          [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played WHOT and chose ${cardToPlay.chosenShape} as the active shape`]
-        };
-      } else if (cardToPlay.special === 'pick2') {
-        newGameData.pendingPickCount += 2;
-        newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape} pick2`;
-        newGameData.gameLog = {
-          ...newGameData.gameLog,
-          [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (Pick 2) - Next player must draw 2 cards`]
-        };
-      } else if (cardToPlay.special === 'holdon') {
-        newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape} hold`;
-        newGameData.skipNextPlayer = true;
-        newGameData.gameLog = {
-          ...newGameData.gameLog,
-          [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (Hold On) - Next player's turn skipped`]
-        };
-      } else if (cardToPlay.special === 'generalmarket') {
-        newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape} gen`;
-        newGameData.generalMarketActive = true;
-        newGameData.generalMarketOriginatorId = newGameData.currentPlayer;
-        newGameData.gameLog = {
-          ...newGameData.gameLog,
-          [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (General Market) - All other players must draw from market`]
-        };
-      } else {
-        newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape}`;
-        newGameData.gameLog = {
-          ...newGameData.gameLog,
-          [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape}`]
-        };
-      }
-      if (currentPlayer.cards.length === 0) {
-        endRound(newGameData);
+      setTimeout(() => {
+        currentPlayer.cards = currentPlayer.cards.filter((_, idx) => idx !== randomCard.index);
+        newGameData.playPile = [...newGameData.playPile, cardToPlay];
+  
+        setAnimatingCards(prev => prev.filter(c => c.id !== animatingCard.id));
+        
+        if (cardToPlay.special === 'whot') {
+          const shapes = ['●', '▲', '✚', '■', '★'];
+          cardToPlay.chosenShape = shapes[Math.floor(Math.random() * shapes.length)];
+          newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - WHOT → ${cardToPlay.chosenShape}`;
+          newGameData.gameLog = {
+            ...newGameData.gameLog,
+            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played WHOT and chose ${cardToPlay.chosenShape} as the active shape`]
+          };
+        } else if (cardToPlay.special === 'pick2') {
+          newGameData.pendingPickCount += 2;
+          newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape} pick2`;
+          newGameData.gameLog = {
+            ...newGameData.gameLog,
+            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (Pick 2) - Next player must draw 2 cards`]
+          };
+        } else if (cardToPlay.special === 'holdon') {
+          newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape} hold`;
+          newGameData.skipNextPlayer = true;
+          newGameData.gameLog = {
+            ...newGameData.gameLog,
+            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (Hold On) - Next player's turn skipped`]
+          };
+        } else if (cardToPlay.special === 'generalmarket') {
+          newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape} gen`;
+          newGameData.generalMarketActive = true;
+          newGameData.generalMarketOriginatorId = newGameData.currentPlayer;
+          newGameData.gameLog = {
+            ...newGameData.gameLog,
+            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (General Market) - All other players must draw from market`]
+          };
+        } else {
+          newGameData.lastAction = `${currentPlayer.name.split(' ')[0]} - ${cardToPlay.number}${cardToPlay.shape}`;
+          newGameData.gameLog = {
+            ...newGameData.gameLog,
+            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape}`]
+          };
+        }
+        
+        if (currentPlayer.cards.length === 0) {
+          endRound(newGameData);
+          setGameData(newGameData);
+          setIsAITurnInProgress(false);
+          return;
+        }
         setGameData(newGameData);
         setIsAITurnInProgress(false);
-        return;
-      }
-      setGameData(newGameData);
-      setIsAITurnInProgress(false);
-      setIsAnyAnimationInProgress(false);
-      nextTurn(newGameData);
+        setIsAnyAnimationInProgress(false);
+        nextTurn(newGameData);
+      }, 800);
     } else {
       await animateDrawCards(newGameData, currentPlayer, 1, false, false);
       setIsAITurnInProgress(false);
@@ -2948,147 +2814,12 @@ const App = () => {
     }
   };
 
-  const handleAITurn = async (gameData) => {
-    if (!gameData || isPlayerActionInProgress || isAnyAnimationInProgress || animatingCards.length > 0) {
-      setIsAITurnInProgress(false);
-      return;
-    }
-    const handlePlayers = ensurePlayersArray(gameData.players);
-    const currentPlayer = handlePlayers[gameData.currentPlayer];
-    if (!currentPlayer.isAI || currentPlayer.eliminated) {
-      setIsAITurnInProgress(false);
-      return;
-    }
-    isAnimationInProgressRef.current = true;
-    setIsAnyAnimationInProgress(true);
-    const newGameData = { ...gameData };
-    const topCard = newGameData.playPile[newGameData.playPile.length - 1];
-    if (newGameData.pendingPickCount > 0 || (newGameData.generalMarketActive && newGameData.currentPlayer !== newGameData.generalMarketOriginatorId)) {
-      const count = newGameData.pendingPickCount > 0 ? newGameData.pendingPickCount : 1;
-      const isPending = newGameData.pendingPickCount > 0;
-      const isGeneral = newGameData.generalMarketActive && newGameData.currentPlayer !== newGameData.generalMarketOriginatorId && !isPending;
-      await animateDrawCards(newGameData, currentPlayer, count, isPending, isGeneral);
-    } else {
-      const playableCards = currentPlayer.cards.filter(card => canPlayCard(card, topCard));
-      if (playableCards.length > 0) {
-        const cardToPlay = playableCards[Math.floor(Math.random() * playableCards.length)];
-        const cardIndex = (currentPlayer.cards || []).findIndex(c => c.id === cardToPlay.id);
-        const mapping = getVisualPlayerMapping();
-        const visualPlayerIndex = mapping.actualToVisual[gameData.currentPlayer] !== undefined ? mapping.actualToVisual[gameData.currentPlayer] : gameData.currentPlayer;
-        // Use the new animation system for AI card play
-        const getVisualPlayerMappingWrapper = () => getVisualPlayerMapping(currentRoom, currentUser);
-        const getPlayPilePositionWrapper = (index, updatePositions) => getPlayPilePosition(index, updatePositions);
-        const getExactCardPositionWrapper = (playerIndex, cardIndex, totalCards, isPlayer) => getExactCardPosition(playerIndex, cardIndex, totalCards, isPlayer);
-        
-        const animatingCard = createPlayerPlayAnimation(
-          cardToPlay, 
-          cardIndex, 
-          gameData.currentPlayer, 
-          currentPlayer.cards.length, 
-          animationPositions, 
-          getExactCardPositionWrapper
-        );
-        
-        // Update end position with correct play pile position
-        const newCardRelativeStyle = getPlayPilePosition(newGameData.playPile.length, false);
-        animatingCard.endPos = {
-          ...animationPositions.playPile,
-          transform: `${animationPositions.playPile.transform} ${newCardRelativeStyle.transform}`,
-          zIndex: newCardRelativeStyle.zIndex
-        };
-        
-        // Play sound effect based on card type immediately
-        if (cardToPlay.special === 'whot') {
-          playSoundEffect.specialPlay();
-        } else if (cardToPlay.special === 'pick2') {
-          playSoundEffect.specialPlay();
-        } else if (cardToPlay.special === 'holdon') {
-          playSoundEffect.specialPlay();
-        } else if (cardToPlay.special === 'generalmarket') {
-          playSoundEffect.specialPlay();
-        } else {
-          playSoundEffect.normalPlay();
-        }
-        
-        // Start animation using the new system
-        startAnimations([animatingCard], setAnimatingCards, () => {
-          getPlayPilePosition(newGameData.playPile.length - 1, true);
-        });
-        
-        // Wait for animation to complete
-        await new Promise(resolve => setTimeout(resolve, 800));
-        currentPlayer.cards = currentPlayer.cards.filter((_, idx) => idx !== cardIndex);
-        newGameData.playPile = [...newGameData.playPile, cardToPlay];
-        if (cardToPlay.special === 'pick2') {
-          newGameData.pendingPickCount += 2;
-          newGameData.lastAction = `${currentPlayer.name} - ${cardToPlay.number}${cardToPlay.shape} pick2`;
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (Pick 2) - Next player must draw 2 cards`]
-          };
-        } else if (cardToPlay.special === 'whot') {
-          const shapes = ['●', '▲', '✚', '■', '★'];
-          const chosenShape = shapes[Math.floor(Math.random() * shapes.length)];
-          newGameData.playPile[newGameData.playPile.length - 1] = { ...cardToPlay, chosenShape };
-          newGameData.lastAction = `${currentPlayer.name} - WHOT → ${chosenShape}`;
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played WHOT and chose ${chosenShape} as the active shape`]
-          };
-        } else if (cardToPlay.special === 'holdon') {
-          newGameData.lastAction = `${currentPlayer.name} - ${cardToPlay.number}${cardToPlay.shape} hold`;
-          newGameData.skipNextPlayer = true;
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (Hold On) - Next player's turn skipped`]
-          };
-        } else if (cardToPlay.special === 'generalmarket') {
-          newGameData.lastAction = `${currentPlayer.name} - ${cardToPlay.number}${cardToPlay.shape} gen`;
-          newGameData.generalMarketActive = true;
-          newGameData.generalMarketOriginatorId = gameData.currentPlayer;
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape} (General Market) - All other players must draw from market`]
-          };
-        } else {
-          newGameData.lastAction = `${currentPlayer.name} - ${cardToPlay.number}${cardToPlay.shape}`;
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${cardToPlay.number}${cardToPlay.shape}`]
-          };
-        }
-        if (currentPlayer.cards.length === 0) {
-          setGameData(newGameData);
-          await handleRoundEnd(newGameData);
-          setIsAITurnInProgress(false);
-          isAnimationInProgressRef.current = false;
-          setIsAnyAnimationInProgress(false);
-          return;
-        }
-        const nextPlayerIndex = getNextPlayer(newGameData);
-        newGameData.currentPlayer = nextPlayerIndex;
-        newGameData.skipNextPlayer = false;
-        if (newGameData.generalMarketActive && nextPlayerIndex === newGameData.generalMarketOriginatorId) {
-          newGameData.generalMarketActive = false;
-          newGameData.generalMarketOriginatorId = null;
-          newGameData.lastAction += ' General Market effect ends.';
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
-          };
-        }
-        setGameData(newGameData);
-      } else {
-        await animateDrawCards(newGameData, currentPlayer, 1, false, false);
-      }
-    }
-    setIsAITurnInProgress(false);
-    setIsAnyAnimationInProgress(false);
-  };
-
 
 
   const handleRoundEnd = async gameData => {
+    // Play end sound when round ends
+    playSoundEffect.end();
+    
     console.log('=== handleRoundEnd called ===');
     console.log('Game data:', gameData);
     console.log('Current gameData state:', gameData);
@@ -3105,15 +2836,23 @@ const App = () => {
     const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
     const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
     
-    // Check if this round ends the game (only one player left)
+    // Check if this round ends the game (only one player left after elimination)
     const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
-    const isGameEnd = remainingPlayers.length <= 1;
+    const isGameEnd = remainingPlayers.length === 1; // Exactly 1 player left = final winner
     
     // Determine if current user is the winner of this round
     const isWinner = currentUser && roundWinner.id === currentUser.id;
     
     // Update game statistics for this round (count as a game)
     if (currentUser) {
+      console.log('📊 Updating game statistics for round end:', {
+        isWinner,
+        gameMode: 'ai',
+        currentUser: currentUser.id,
+        gameData: {
+          roundNumber: gameData.roundNumber
+        }
+      });
       await updateGameStatistics(gameData, isWinner, 'ai');
     }
     
@@ -3127,7 +2866,8 @@ const App = () => {
       })),
       eliminatedPlayer,
       maxCards: maxTotal,
-      roundNumber: gameData.roundNumber
+      roundNumber: gameData.roundNumber,
+      isGameEnd: isGameEnd
     };
     setRoundEndData(roundEndInfo);
     
@@ -3135,10 +2875,141 @@ const App = () => {
       setShowRoundEndPopup(true);
       setTimeout(() => startConfetti(), 200);
     }, 2500);
+    
+    // Auto-continue after 15 seconds
+    setTimeout(() => {
+      if (isGameEnd) {
+        // Game is over - redirect to main menu
+        returnToMenu();
+      } else {
+        // Continue to next round
+        handleContinueToNextRound();
+      }
+    }, 15000);
 
   // Function to handle continuing to next round (called when button is clicked)
   const handleContinueToNextRound = () => {
-    if (!roundEndData) return;
+    console.log('🎮 handleContinueToNextRound called:', { currentRoom: !!currentRoom, roundEndData: !!roundEndData });
+    
+    // Handle multiplayer case
+    if (currentRoom) {
+      if (!roundEndData || !currentRoom) return;
+      
+      const eliminatedPlayer = roundEndData.eliminatedPlayer;
+      const players = ensurePlayersArray(gameData.players);
+      const remainingPlayers = players.filter(p => !p.eliminated && p.id !== eliminatedPlayer.id);
+      
+      setGameData(prevData => {
+        if (!prevData) return prevData;
+        
+        const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
+        const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
+        const eliminatedPlayerInNewData = nextPlayers.find(p => p.id === eliminatedPlayer.id);
+        if (eliminatedPlayerInNewData) {
+          eliminatedPlayerInNewData.eliminated = true;
+        }
+        
+        nextRoundGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
+        nextRoundGameData.gameLog = {
+          ...nextRoundGameData.gameLog,
+          [nextRoundGameData.roundNumber]: [
+            ...(nextRoundGameData.gameLog[nextRoundGameData.roundNumber] || []),
+            `Round ${nextRoundGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${roundEndData.maxCards} total card points`
+          ]
+        };
+        
+        if (eliminatedPlayer.id === currentUser?.id) {
+          setShowEliminatedPopup(true);
+        }
+        
+        nextRoundGameData.roundNumber++;
+        
+        if (remainingPlayers.length <= 1) {
+          // Game ends - only one player left
+          nextRoundGameData.gamePhase = 'gameEnd';
+          const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundEndData.winner;
+          nextRoundGameData.winner = winner;
+          nextRoundGameData.lastAction = `${winner.name.split(' ')[0]} wins!`;
+          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`GAME OVER: ${winner.name} wins the game!`];
+          
+          // Update Firebase with game end
+          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
+          
+          // Reset room after delay
+          setTimeout(() => {
+            update(ref(db, `rooms/${currentRoom.id}`), {
+              status: 'waiting',
+              gameData: null,
+              countdown: null
+            });
+          }, 10000);
+          
+          setShowRoundEndPopup(false);
+          return nextRoundGameData;
+        } else {
+          // Continue to next round
+          const newDeck = createDeck();
+          const shuffledNewDeck = shuffleDeck(newDeck);
+          
+          // Reset all players' cards
+          nextRoundGameData.players.forEach(player => {
+            player.cards = [];
+          });
+          
+          // Reset game state
+          nextRoundGameData.playPile = [];
+          nextRoundGameData.drawPile = shuffledNewDeck;
+          nextRoundGameData.pendingPickCount = 0;
+          nextRoundGameData.generalMarketActive = false;
+          nextRoundGameData.generalMarketOriginatorId = null;
+          nextRoundGameData.skipNextPlayer = false;
+          nextRoundGameData.gamePhase = 'dealingCards';
+          nextRoundGameData.lastAction = 'Dealing cards...';
+          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [
+            `Round ${nextRoundGameData.roundNumber} begins with remaining players.`,
+            `New deck created and shuffled.`
+          ];
+          
+          // Set current player to first non-eliminated player
+          const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
+          nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
+          
+          // Update Firebase with next round data
+          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
+          
+          // Reset UI state
+          setAnimatingCards([]);
+          setPlayerScrollIndex(0);
+          setNeedNewMarketPositions(true);
+          playPilePositionsRef.current = [];
+          setPlayPileCardPositions({});
+          setIsAITurnInProgress(false);
+          setIsPlayerActionInProgress(false);
+          setIsAnyAnimationInProgress(false);
+          setSelectedLogRound(nextRoundGameData.roundNumber);
+          setShowRoundEndPopup(false);
+          setRoundEndData(null);
+          setConfettiActive(false);
+          
+          // Start dealing animation
+          setTimeout(() => {
+            const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
+            startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
+          }, 100);
+          
+          return nextRoundGameData;
+        }
+      });
+      return;
+    }
+    
+    // Handle single player case
+    if (!roundEndData) {
+      console.log('No roundEndData for single player continue');
+      return;
+    }
+    
+    console.log('Processing single player continue to next round');
     
     const eliminatedPlayer = roundEndData.eliminatedPlayer;
     const remainingPlayers = gameData.players.filter(p => !p.eliminated);
@@ -3182,7 +3053,7 @@ const App = () => {
               xpNeededForNext: levelData.xpNeededForNext,
               currentWinStreak: isWinner ? (currentUser.currentWinStreak || 0) + 1 : 0,
               bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : currentUser.bestWinStreak || 0,
-              totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + (gameData?.totalCardsPlayed || 0),
+              totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + 5,
               perfectWins: isWinner && (gameData?.roundsPlayed || 1) === 1 ? (currentUser.perfectWins || 0) + 1 : currentUser.perfectWins || 0
           });
           
@@ -3190,7 +3061,7 @@ const App = () => {
           if (publicKey && wallet) {
             const gameStats = {
               xp: isWinner ? 150 : 50,
-              cardsPlayed: gameData?.totalCardsPlayed || 0,
+              cardsPlayed: 5,
               perfectWin: isWinner && (gameData?.roundsPlayed || 1) === 1 // Perfect win if won in first round
             };
             
@@ -3267,6 +3138,9 @@ const App = () => {
 
   const handleMultiplayerRoundEnd = async (gameData) => {
     try {
+      // Play end sound when round ends
+      playSoundEffect.end();
+      
       console.log('=== handleMultiplayerRoundEnd called ===');
       console.log('Game data:', gameData);
       
@@ -3282,16 +3156,32 @@ const App = () => {
       const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
       const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
       
-      // Check if this round ends the game (only one player left)
+      // Check if this round ends the game (only one player left after elimination)
       const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
-      const isGameEnd = remainingPlayers.length <= 1;
+      const isGameEnd = remainingPlayers.length === 1; // Exactly 1 player left = final winner
       
       // Determine if current user is the winner of this round
       const isWinner = currentUser && roundWinner.id === currentUser.id;
       
-      // Update game statistics for this round (count as a game)
-      if (currentUser) {
-        await updateGameStatistics(gameData, isWinner, 'multiplayer');
+      // Update game statistics for this round (count as a game) for ALL players
+      const allPlayers = ensurePlayersArray(gameData.players);
+      for (const player of allPlayers) {
+        if (player.id) { // Only update for real players, not AI
+          const isPlayerWinner = roundWinner.id === player.id;
+          console.log('📊 Updating game statistics for player:', player.id, {
+            isWinner: isPlayerWinner,
+            gameMode: 'multiplayer',
+            roundNumber: gameData.roundNumber
+          });
+          
+          // Update Firebase stats for each player
+          await update(ref(db, `users/${player.id}`), {
+            gamesPlayed: (player.gamesPlayed || 0) + 1,
+            gamesWon: isPlayerWinner ? (player.gamesWon || 0) + 1 : (player.gamesWon || 0),
+            xp: (player.xp || 0) + (isPlayerWinner ? 150 : 50),
+            lastActive: Date.now()
+          });
+        }
       }
       
       const roundEndInfo = {
@@ -3304,7 +3194,8 @@ const App = () => {
         })),
         eliminatedPlayer,
         maxCards: maxTotal,
-        roundNumber: gameData.roundNumber
+        roundNumber: gameData.roundNumber,
+        isGameEnd: isGameEnd
       };
       
       const newGameData = {
@@ -3323,38 +3214,169 @@ const App = () => {
       newGameData.gameLog[newGameData.roundNumber] = [...currentRoundLog, `Round ${newGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${maxTotal} total card points`];
       
       // Update Firebase with round end data
-        await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
+      await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
       
-      // Show round end popup for display purposes
+      // Show round end popup for display purposes (same as AI mode)
       setRoundEndData(roundEndInfo);
       setTimeout(() => {
         setShowRoundEndPopup(true);
         setTimeout(() => startConfetti(), 200);
       }, 2500);
       
+      // Auto-continue after 15 seconds
+      setTimeout(() => {
+        if (isGameEnd) {
+          // Game is over - redirect to room leader's room
+          returnToMenu();
+        } else {
+          // Continue to next round
+          handleContinueToNextRound();
+        }
+      }, 15000);
+      
     } catch (error) {
       console.error('Error handling multiplayer round end:', error);
     }
   };
 
-  // Function to handle continuing to next round in multiplayer (called when button is clicked)
+
+
+
+
+  // Function to handle continuing to next round (called when button is clicked)
   const handleContinueToNextRound = () => {
-    if (!roundEndData || !currentRoom) return;
+    console.log('🎮 handleContinueToNextRound called:', { currentRoom: !!currentRoom, roundEndData: !!roundEndData });
+    
+    // Handle multiplayer case
+    if (currentRoom) {
+      if (!roundEndData || !currentRoom) return;
+      
+      const eliminatedPlayer = roundEndData.eliminatedPlayer;
+      const players = ensurePlayersArray(gameData.players);
+      const remainingPlayers = players.filter(p => !p.eliminated && p.id !== eliminatedPlayer.id);
+      
+      setGameData(prevData => {
+        if (!prevData) return prevData;
+        
+        const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
+        const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
+        const eliminatedPlayerInNewData = nextPlayers.find(p => p.id === eliminatedPlayer.id);
+        if (eliminatedPlayerInNewData) {
+          eliminatedPlayerInNewData.eliminated = true;
+        }
+        
+        nextRoundGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
+        nextRoundGameData.gameLog = {
+          ...nextRoundGameData.gameLog,
+          [nextRoundGameData.roundNumber]: [
+            ...(nextRoundGameData.gameLog[nextRoundGameData.roundNumber] || []),
+            `Round ${nextRoundGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${roundEndData.maxCards} total card points`
+          ]
+        };
+        
+        if (eliminatedPlayer.id === currentUser?.id) {
+          setShowEliminatedPopup(true);
+        }
+        
+        nextRoundGameData.roundNumber++;
+        
+        if (remainingPlayers.length <= 1) {
+          // Game ends - only one player left
+          nextRoundGameData.gamePhase = 'gameEnd';
+          const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundEndData.winner;
+          nextRoundGameData.winner = winner;
+          nextRoundGameData.lastAction = `${winner.name.split(' ')[0]} wins!`;
+          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`GAME OVER: ${winner.name} wins the game!`];
+          
+          // Update Firebase with game end
+          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
+          
+          // Reset room after delay
+          setTimeout(() => {
+            update(ref(db, `rooms/${currentRoom.id}`), {
+              status: 'waiting',
+              gameData: null,
+              countdown: null
+            });
+          }, 10000);
+          
+          setShowRoundEndPopup(false);
+          return nextRoundGameData;
+        } else {
+          // Continue to next round
+          const newDeck = createDeck();
+          const shuffledNewDeck = shuffleDeck(newDeck);
+          
+          // Reset all players' cards
+          nextRoundGameData.players.forEach(player => {
+            player.cards = [];
+          });
+          
+          // Reset game state
+          nextRoundGameData.playPile = [];
+          nextRoundGameData.drawPile = shuffledNewDeck;
+          nextRoundGameData.pendingPickCount = 0;
+          nextRoundGameData.generalMarketActive = false;
+          nextRoundGameData.generalMarketOriginatorId = null;
+          nextRoundGameData.skipNextPlayer = false;
+          nextRoundGameData.gamePhase = 'dealingCards';
+          nextRoundGameData.lastAction = 'Dealing cards...';
+          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [
+            `Round ${nextRoundGameData.roundNumber} begins with remaining players.`,
+            `New deck created and shuffled.`
+          ];
+          
+          // Set current player to first non-eliminated player
+          const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
+          nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
+          
+          // Update Firebase with next round data
+          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
+          
+          // Reset UI state
+          setAnimatingCards([]);
+          setPlayerScrollIndex(0);
+          setNeedNewMarketPositions(true);
+          playPilePositionsRef.current = [];
+          setPlayPileCardPositions({});
+          setIsAITurnInProgress(false);
+          setIsPlayerActionInProgress(false);
+          setIsAnyAnimationInProgress(false);
+          setSelectedLogRound(nextRoundGameData.roundNumber);
+          setShowRoundEndPopup(false);
+          setRoundEndData(null);
+          setConfettiActive(false);
+          
+          // Start dealing animation
+          setTimeout(() => {
+            const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
+            startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
+          }, 100);
+          
+          return nextRoundGameData;
+        }
+      });
+      return;
+    }
+    
+    // Handle single player case
+    if (!roundEndData) {
+      console.log('No roundEndData for single player continue');
+      return;
+    }
+    
+    console.log('Processing single player continue to next round');
     
     const eliminatedPlayer = roundEndData.eliminatedPlayer;
-    const players = ensurePlayersArray(gameData.players);
-    const remainingPlayers = players.filter(p => !p.eliminated && p.id !== eliminatedPlayer.id);
+    const remainingPlayers = gameData.players.filter(p => !p.eliminated);
     
     setGameData(prevData => {
       if (!prevData) return prevData;
-      
-      const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
-      const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
-      const eliminatedPlayerInNewData = nextPlayers.find(p => p.id === eliminatedPlayer.id);
+      const nextRoundGameData = { ...prevData };
+      const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
       if (eliminatedPlayerInNewData) {
         eliminatedPlayerInNewData.eliminated = true;
       }
-      
       nextRoundGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
       nextRoundGameData.gameLog = {
         ...nextRoundGameData.gameLog,
@@ -3363,67 +3385,52 @@ const App = () => {
           `Round ${nextRoundGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${roundEndData.maxCards} total card points`
         ]
       };
-      
-      if (eliminatedPlayer.id === currentUser?.id) {
-        setShowEliminatedPopup(true);
-      }
-      
       nextRoundGameData.roundNumber++;
       
       if (remainingPlayers.length <= 1) {
-        // Game ends - only one player left
         nextRoundGameData.gamePhase = 'gameEnd';
         const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundEndData.winner;
         nextRoundGameData.winner = winner;
         nextRoundGameData.lastAction = `${winner.name.split(' ')[0]} wins!`;
         nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`GAME OVER: ${winner.name} wins the game!`];
-        
-        // Update Firebase with game end
-        update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
-        
-        // Reset room after delay
-        setTimeout(() => {
-          update(ref(db, `rooms/${currentRoom.id}`), {
-            status: 'waiting',
-            gameData: null,
-            countdown: null
-          });
-        }, 10000);
-        
         setShowRoundEndPopup(false);
+        if (currentUser) {
+          const isWinner = winner.id === currentUser.id;
+          const newXP = (currentUser.xp || 0) + (isWinner ? 150 : 50);
+          const levelData = calculateLevel(newXP);
+          
+          // Update Firebase stats
+          update(ref(db, `users/${currentUser.id}`), {
+              gamesPlayed: (currentUser.gamesPlayed || 0) + 1,
+              gamesWon: isWinner ? (currentUser.gamesWon || 0) + 1 : currentUser.gamesWon || 0,
+              xp: newXP,
+              level: levelData.level,
+              currentLevelXP: levelData.currentLevelXP,
+              xpNeededForNext: levelData.xpNeededForNext,
+              currentWinStreak: isWinner ? (currentUser.currentWinStreak || 0) + 1 : 0,
+              bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : currentUser.bestWinStreak || 0,
+              totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + 5,
+              perfectWins: isWinner && (gameData?.roundsPlayed || 1) === 1 ? (currentUser.perfectWins || 0) + 1 : currentUser.perfectWins || 0
+          });
+        }
         return nextRoundGameData;
       } else {
-        // Continue to next round
         const newDeck = createDeck();
         const shuffledNewDeck = shuffleDeck(newDeck);
-        
-        // Reset all players' cards
         nextRoundGameData.players.forEach(player => {
           player.cards = [];
         });
-        
-        // Reset game state
         nextRoundGameData.playPile = [];
         nextRoundGameData.drawPile = shuffledNewDeck;
+        const firstPlayerIndex = nextRoundGameData.players.findIndex(p => !p.eliminated);
+        nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
         nextRoundGameData.pendingPickCount = 0;
         nextRoundGameData.generalMarketActive = false;
         nextRoundGameData.generalMarketOriginatorId = null;
         nextRoundGameData.skipNextPlayer = false;
         nextRoundGameData.gamePhase = 'dealingCards';
         nextRoundGameData.lastAction = 'Dealing cards...';
-        nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [
-          `Round ${nextRoundGameData.roundNumber} begins with remaining players.`,
-          `New deck created and shuffled.`
-        ];
-        
-        // Set current player to first non-eliminated player
-        const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
-        nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
-        
-        // Update Firebase with next round data
-        update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
-        
-        // Reset UI state
+        nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`Round ${nextRoundGameData.roundNumber} begins with remaining players.`, `New deck created and shuffled.`];
         setAnimatingCards([]);
         setPlayerScrollIndex(0);
         setNeedNewMarketPositions(true);
@@ -3436,23 +3443,14 @@ const App = () => {
         setShowRoundEndPopup(false);
         setRoundEndData(null);
         setConfettiActive(false);
-        
-        // Start dealing animation
         setTimeout(() => {
           const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
-          console.log(`Round end - remaining players: ${remainingPlayers.length}, cards per player: ${cardsPerPlayer}, total cards to deal: ${remainingPlayers.length * cardsPerPlayer}`);
-          console.log('About to call startDealingAnimation, isAnyAnimationInProgress should be false');
-          console.log('Shuffled deck length:', shuffledNewDeck.length);
-          console.log('Remaining players:', remainingPlayers);
           startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
         }, 100);
-        
         return nextRoundGameData;
       }
     });
   };
-
-
 
   const handleAutoPlay = async () => {
     if (!gameData || !currentRoom || !currentUser) return;
@@ -3476,61 +3474,7 @@ const App = () => {
     }
   };
 
-  const chooseWhotShape = async shape => {
-    if (!pendingWhotCard || isPlayerActionInProgress || isAnyAnimationInProgress) return;
-    setIsPlayerActionInProgress(true);
-    const newGameData = { ...gameData };
-    const whotCard = { ...pendingWhotCard, chosenShape: shape };
-    newGameData.playPile[newGameData.playPile.length - 1] = whotCard;
-    if (currentRoom) {
-      const players = ensurePlayersArray(gameData.players);
-      const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
-      const currentPlayer = newGameData.players[currentUserActualIndex];
-      newGameData.lastAction = `${currentPlayer.name} - WHOT → ${shape}`;
-      newGameData.gameLog = {
-        ...newGameData.gameLog,
-        [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played WHOT and chose ${shape} as the active shape`]
-      };
-      setShowWhotChoice(false);
-      setPendingWhotCard(null);
-      if (currentPlayer.cards.length === 0) {
-        await handleMultiplayerRoundEnd(newGameData);
-      } else {
-        const nextPlayerIndex = getNextPlayer(newGameData);
-        newGameData.currentPlayer = nextPlayerIndex;
-        newGameData.skipNextPlayer = false;
-        if (newGameData.generalMarketActive && nextPlayerIndex === newGameData.generalMarketOriginatorId) {
-          newGameData.generalMarketActive = false;
-          newGameData.generalMarketOriginatorId = null;
-          newGameData.lastAction += ' General Market effect ends.';
-          newGameData.gameLog = {
-            ...newGameData.gameLog,
-            [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
-          };
-        }
-        // Update local state immediately for better responsiveness
-        setGameData(newGameData);
-        await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
-      }
-      setIsPlayerActionInProgress(false);
-    } else {
-      newGameData.lastAction = `You - WHOT → ${shape}`;
-      newGameData.gameLog = {
-        ...newGameData.gameLog,
-        [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `You played WHOT and chose ${shape} as the active shape`]
-      };
-      setShowWhotChoice(false);
-      setPendingWhotCard(null);
-      if (newGameData.players[0].cards.length === 0) {
-        await handleRoundEnd(newGameData);
-      } else {
-        nextTurn(newGameData);
-      }
-      setGameData(newGameData);
-      setIsPlayerActionInProgress(false);
-      setIsAnyAnimationInProgress(false);
-    }
-  };
+
 
   const createRoom = async () => {
     if (!currentUser) return;
@@ -3699,16 +3643,16 @@ const App = () => {
         playPile: initialPlayCard ? [initialPlayCard] : [],
         drawPile: remainingDrawPile,
         currentPlayer: 0,
-        gamePhase: 'dealingCards',
+        gamePhase: 'playing',
         roundNumber: 1,
-        lastAction: 'Dealing cards...',
+        lastAction: `Game started - ${initialPlayCard ? `${initialPlayCard.number}${initialPlayCard.shape}` : 'Initial card'} played`,
         pendingPickCount: 0,
         generalMarketActive: false,
         generalMarketOriginatorId: null,
-        dealingStartAt: serverTimestamp(),
         cardsPerPlayer,
+
         gameLog: {
-          1: [`Game started with ${players.length} players: ${players.map(p => p.name).join(', ')}`, 'Cards dealt to all players', 'The shadow realm awaits your first move...']
+          1: [`Game started with ${players.length} players: ${players.map(p => p.name).join(', ')}`, 'Cards dealt to all players', `Initial card: ${initialPlayCard ? `${initialPlayCard.number}${initialPlayCard.shape}` : 'None'} placed on table`]
         }
       });
 
@@ -3727,11 +3671,11 @@ const App = () => {
       if (currentRoom.ownerId) updateData.ownerId = currentRoom.ownerId;
       if (currentRoom.createdAt) updateData.createdAt = currentRoom.createdAt;
       
-      console.log('🔥 Sending Firebase update with gameData:', updateData);
+      console.log('Sending Firebase update with gameData:', updateData);
       // Ensure we don't send undefined arrays/fields
       const safeUpdate = removeUndefinedValues(updateData);
       await update(ref(db, `rooms/${currentRoom.id}`), safeUpdate);
-      console.log('✅ Firebase update completed successfully');
+      console.log('Firebase update completed successfully');
       
       // Reset UI states before setting game state
       setAnimatingCards([]);
@@ -3811,14 +3755,13 @@ const App = () => {
     };
     
     setAnimatingCards(prev => {
-      console.log('🎴 Adding play card animation:', animatingCard.id, 'Total animating cards:', prev.length + 1);
+      console.log('Adding play card animation:', animatingCard.id, 'Total animating cards:', prev.length + 1);
       return [...prev, animatingCard];
     });
     player.cards = player.cards.filter((_, idx) => idx !== actualCardIndex);
     newGameData.playPile = [...newGameData.playPile, card];
     
-    // Track card play for statistics
-    Object.assign(newGameData, trackCardPlay(newGameData));
+
     const newCardsLength = player.cards.length;
     const maxScroll = Math.max(0, newCardsLength - maxVisiblePlayerCards);
     if (newCardsLength <= maxVisiblePlayerCards) {
@@ -3840,7 +3783,6 @@ const App = () => {
         };
       } else if (card.special === 'whot') {
         setPendingWhotCard(card);
-        setShowWhotChoice(true);
         setGameData(newGameData);
         setIsPlayerActionInProgress(false);
         isAnimationInProgressRef.current = false;
@@ -3893,7 +3835,7 @@ const App = () => {
     const currentUserActualIndex = players.findIndex(p => p.id === currentUser.id);
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) {
-      console.log('🎴 Not your turn! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
+      console.log('Not your turn! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
       return;
     }
     
@@ -3909,6 +3851,15 @@ const App = () => {
     }
     
     try {
+      // Handle WHOT cards differently - show popup immediately without animation
+      if (card.special === 'whot') {
+        setIsPlayerActionInProgress(true);
+        setPendingWhotCard(card);
+        setIsPlayerActionInProgress(false);
+        return;
+      }
+      
+      // For all other cards, proceed with normal animation
       setIsPlayerActionInProgress(true);
       setIsAnyAnimationInProgress(true);
       
@@ -3946,10 +3897,10 @@ const App = () => {
       currentPlayer.cards = currentPlayer.cards.filter((_, idx) => idx !== actualCardIndex);
       newPlayers[currentUserActualIndex] = currentPlayer;
       newGameData.players = newPlayers;
-      newGameData.playPile = [...newGameData.playPile, card];
       
-      // Track card play for statistics
-      Object.assign(newGameData, trackCardPlay(newGameData));
+      // Add card to play pile for all other card types
+      newGameData.playPile = [...newGameData.playPile, card];
+      newGameData.playPile = [...newGameData.playPile, card];
       
       const newCardsLength = currentPlayer.cards.length;
       const maxScroll = Math.max(0, newCardsLength - maxVisiblePlayerCards);
@@ -3968,13 +3919,6 @@ const App = () => {
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${card.number}${card.shape} (Pick 2) - Next player must draw 2 cards`]
         };
-      } else if (card.special === 'whot') {
-        setPendingWhotCard(card);
-        setShowWhotChoice(true);
-        setGameData(newGameData);
-        setIsPlayerActionInProgress(false);
-        setIsAnyAnimationInProgress(false);
-        return;
       } else if (card.special === 'holdon') {
         newGameData.lastAction = `${currentPlayer.name} - ${card.number}${card.shape} hold`;
         newGameData.skipNextPlayer = true;
@@ -3990,6 +3934,7 @@ const App = () => {
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${card.number}${card.shape} (General Market) - All other players must draw from market`]
         };
+        console.log('General Market effect started by:', currentPlayer.name);
       } else {
         newGameData.lastAction = `${currentPlayer.name} - ${card.number}${card.shape}`;
         newGameData.gameLog = {
@@ -4049,7 +3994,7 @@ const App = () => {
     const players = ensurePlayersArray(gameData.players);
     const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (gameData.currentPlayer !== currentUserActualIndex) {
-      console.log('🎴 Not your turn to draw! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
+      console.log('Not your turn to draw! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
       return;
     }
     
@@ -4072,22 +4017,56 @@ const App = () => {
       const cardsToDraw = newGameData.pendingPickCount > 0 ? newGameData.pendingPickCount : 1;
       const isPending = newGameData.pendingPickCount > 0;
       const isGeneral = newGameData.generalMarketActive && newGameData.currentPlayer !== newGameData.generalMarketOriginatorId && !isPending;
+      console.log('Starting draw process:', {
+        cardsToDraw,
+        isPending,
+        isGeneral,
+        drawPileLength: newGameData.drawPile.length
+      });
       
       // Use the same animation function as AI game
-      await animateDrawCards(newGameData, player, cardsToDraw, isPending, isGeneral);
+      // animateDrawCards modifies the gameDataToUse object, so we need to use the returned data
+      const updatedGameData = await animateDrawCards(newGameData, player, cardsToDraw, isPending, isGeneral);
+      console.log('animateDrawCards returned:', updatedGameData ? 'updated data' : 'null');
+      if (updatedGameData) {
+        // Copy all the updated data to ensure everything is properly updated
+        Object.assign(newGameData, updatedGameData);
+        console.log('Game data after animateDrawCards:', {
+          playerCards: player.cards.length,
+          drawPileLength: newGameData.drawPile.length
+        });
+      }
       
-      // Clear pending pick count after drawing
+      // Clear pending pick count after drawing and set appropriate log messages
       if (newGameData.pendingPickCount > 0) {
         newGameData.pendingPickCount = 0;
         newGameData.lastAction = `${player.name} picked ${cardsToDraw} cards`;
+        const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, `${player.name} drew ${cardsToDraw} card${cardsToDraw > 1 ? 's' : ''} (penalty)`]
+        };
+        console.log('Multiplayer draw logged (penalty):', `${player.name} drew ${cardsToDraw} card${cardsToDraw > 1 ? 's' : ''} (penalty)`);
+        console.log('Current round log after penalty draw:', newGameData.gameLog[newGameData.roundNumber]);
+      } else if (isGeneral) {
+        newGameData.lastAction = `${player.name} drew a card`;
+        const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, `${player.name} drew 1 card (general market)`]
+        };
+        console.log('Multiplayer draw logged (general market):', `${player.name} drew 1 card (general market)`);
+        console.log('Current round log after general market draw:', newGameData.gameLog[newGameData.roundNumber]);
       } else {
         newGameData.lastAction = `${player.name} drew a card`;
+        const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, `${player.name} drew 1 card from market`]
+        };
+        console.log('Multiplayer draw logged (normal):', `${player.name} drew 1 card from market`);
+        console.log('Current round log after normal draw:', newGameData.gameLog[newGameData.roundNumber]);
       }
-      
-      newGameData.gameLog = {
-        ...newGameData.gameLog,
-        [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), newGameData.lastAction]
-      };
     }
     
     // Move to next player like AI game
@@ -4095,9 +4074,28 @@ const App = () => {
     newGameData.currentPlayer = nextPlayerIndex;
     newGameData.skipNextPlayer = false;
     
+    // Check if General Market effect should end (when turn comes back to originator)
+    if (newGameData.generalMarketActive && nextPlayerIndex === newGameData.generalMarketOriginatorId) {
+      newGameData.generalMarketActive = false;
+      newGameData.generalMarketOriginatorId = null;
+      newGameData.lastAction += ' General Market effect ends.';
+      newGameData.gameLog = {
+        ...newGameData.gameLog,
+        [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
+      };
+              console.log('General Market effect ended in drawMultiplayerCard - turn back to originator');
+    }
+    
     // Update local state immediately for better responsiveness
     setGameData(newGameData);
     // Update Firebase with complete state
+          console.log('Updating Firebase with game data:', {
+      lastAction: newGameData.lastAction,
+      gameLog: newGameData.gameLog[newGameData.roundNumber],
+      roundNumber: newGameData.roundNumber,
+      generalMarketActive: newGameData.generalMarketActive,
+      generalMarketOriginatorId: newGameData.generalMarketOriginatorId
+    });
     await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
     setIsPlayerActionInProgress(false);
     isAnimationInProgressRef.current = false;
@@ -4182,6 +4180,7 @@ const App = () => {
       pendingPickCount: 0,
       generalMarketActive: false,
       generalMarketOriginatorId: null,
+
       gameLog: {
         1: [`Game started with ${players.length} players: ${players.map(p => p.name).join(', ')}`, 'Cards dealt to all players', 'The shadow realm awaits your first move...']
       }
@@ -4217,7 +4216,7 @@ const App = () => {
       setIsAITurnInProgress(false);
       
       // Clear other game-related state
-    setShowWhotChoice(false);
+
     setPendingWhotCard(null);
     setPlayerScrollIndex(0);
     setShowDeckView(false);
@@ -4254,7 +4253,7 @@ const App = () => {
     // Clear localStorage when explicitly returning to menu
     clearGameState();
       
-      console.log('✅ Successfully returned to menu');
+      console.log('Successfully returned to menu');
     } catch (error) {
       console.error('❌ Error in returnToMenu:', error);
       // Force reset to menu state even if there's an error
@@ -4292,14 +4291,14 @@ const App = () => {
     }
   }, []);
 
-  // Removed aggressive game state validation that was causing premature resets
+
 
   const renderContent = () => {
     if (gameState === 'landing') {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.landing}>
-          <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="relative w-80 h-32">
+          <div className="absolute top-[5%] left-1/2 transform -translate-x-1/2 z-10">
+            <div className="relative w-80 h-32" style={{ transform: 'scale(1.3)', transformOrigin: 'center' }}>
               {cards.map((card, index) => (
                 <div
                   key={index}
@@ -4320,7 +4319,7 @@ const App = () => {
               ))}
             </div>
           </div>
-          <div className="flex-1 flex flex-col justify-center items-center px-6 pt-32">
+          <div className="flex-1 flex flex-col justify-center items-center px-6 pt-16">
             <div className={`text-center transform transition-all duration-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'} max-w-6xl`}>
               <div className="mb-8">
                 <h1 className="text-7xl md:text-8xl font-bold mb-4 text-white relative border-4 border-black bg-[#80142C] p-4 uppercase" style={{
@@ -4371,22 +4370,19 @@ const App = () => {
                   </button>
                 </div>
                 <button
-                  disabled={!connected || isCreatingProfile}
+                  disabled={!connected || isCreatingProfile || isCheckingProfile}
                   onClick={async () => {
                     playSoundEffect.click();
                     console.log('🎮 Start Playing button clicked');
                     console.log('🎮 Button state debug:', { connected, currentUser: !!currentUser, honeycombProfileExists });
                     if (connected && honeycombProfileExists) {
                       // Profile exists, initialize sounds and start music
-                      // console.log('🎵 Initializing sounds and starting background music...');
-                      try {
-                        await soundEffects.initializeAfterUserInteraction();
-                                                  // console.log('🎵 Sounds initialized, starting background music...');
+                              try {
+          await soundEffects.initializeAfterUserInteraction();
                         startBackgroundMusic();
                         setGameState('menu');
-                      } catch (error) {
-                        // console.warn('🎵 Failed to initialize sounds:', error);
-                        // Still proceed to menu even if sounds fail
+                              } catch (error) {
+          // Still proceed to menu even if sounds fail
                         startBackgroundMusic();
                       setGameState('menu');
                       }
@@ -4403,7 +4399,7 @@ const App = () => {
                             `Player${Math.floor(Math.random() * 10000)}`
                           );
                           if (result.success) {
-                            console.log('✅ Profile created successfully');
+                            console.log('Profile created successfully');
                             setHoneycombProfileExists(true);
                             // Initialize sounds and start music
                             try {
@@ -4426,22 +4422,22 @@ const App = () => {
                       }
                     }
                   }}
-                  className={`group relative px-12 py-4 font-bold text-xl transform transition-all duration-300 overflow-hidden border-4 border-black uppercase ${connected ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                  className={`group relative px-12 py-4 font-bold text-xl transform transition-all duration-300 overflow-hidden border-4 border-black uppercase ${connected && !isCheckingProfile && !isCreatingProfile ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                   style={{
-                    background: connected ? '#80142C' : '#4a4a4a',
+                    background: connected && !isCheckingProfile ? '#80142C' : '#4a4a4a',
                     color: '#ffffff',
-                    boxShadow: connected ? '6px 6px 0 rgba(0,0,0,0.8)' : '6px 6px 0 rgba(74, 74, 74, 0.4)',
+                    boxShadow: connected && !isCheckingProfile ? '6px 6px 0 rgba(0,0,0,0.8)' : '6px 6px 0 rgba(74, 74, 74, 0.4)',
                     fontFamily: 'Courier New, Liberation Mono, monospace'
                   }}
                   onMouseEnter={e => {
-                    if (connected) {
+                    if (connected && !isCheckingProfile && !isCreatingProfile) {
                       e.target.style.background = '#a01d39';
                       e.target.style.transform = 'translateY(-2px) translateX(-2px)';
                       e.target.style.boxShadow = '8px 8px 0 rgba(0,0,0,0.8)';
                     }
                   }}
                   onMouseLeave={e => {
-                    if (connected) {
+                    if (connected && !isCheckingProfile && !isCreatingProfile) {
                       e.target.style.background = '#80142C';
                       e.target.style.transform = 'translateY(0) translateX(0)';
                       e.target.style.boxShadow = '6px 6px 0 rgba(0,0,0,0.8)';
@@ -4452,10 +4448,11 @@ const App = () => {
                     {connected ? (
                       <>
                         <span>
-                          {isCreatingProfile ? 'Creating Profile...' : 
+                          {isCheckingProfile ? 'Connecting...' :
+                           isCreatingProfile ? 'Creating Profile...' : 
                            honeycombProfileExists ? 'Start Playing' : 'Setup Profile'}
                         </span>
-                        {!isCreatingProfile && (
+                        {!isCheckingProfile && !isCreatingProfile && (
                         <ChevronRight className="ml-3 group-hover:translate-x-1 transition-transform duration-200" size={24} />
                         )}
                       </>
@@ -5005,9 +5002,10 @@ const App = () => {
         }
         /* Card Game Animations */
         .card-animation {
-          transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+          transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
           will-change: transform, opacity;
           backface-visibility: hidden;
+          transform-style: preserve-3d;
         }
         @keyframes cardDeal {
           from {
@@ -5308,16 +5306,15 @@ const App = () => {
       `}</style>
       {renderContent()}
       {showGameLog && gameData && <GameLogPopup gameData={gameData} selectedLogRound={selectedLogRound} setSelectedLogRound={setSelectedLogRound} closePopup={() => setShowGameLog(false)} />}
-      {showRoundEndPopup && roundEndData && <RoundEndPopup 
-        roundEndData={roundEndData} 
-        onContinue={currentRoom ? () => {} : handleContinueToNextRound}
-        isMultiplayer={!!currentRoom}
-
-        currentUser={currentUser}
-        remainingPlayers={gameData?.players?.filter(p => !p.eliminated) || []}
-      />}
+              {showRoundEndPopup && roundEndData && <RoundEndPopup 
+          roundEndData={roundEndData} 
+          onContinue={handleContinueToNextRound}
+          isMultiplayer={!!currentRoom}
+          currentUser={currentUser}
+          remainingPlayers={gameData?.players?.filter(p => !p.eliminated) || []}
+        />}
       {showEliminatedPopup && <EliminatedPopup setShowEliminatedPopup={setShowEliminatedPopup} returnToMenu={returnToMenu} />}
-      {showWhotChoice && <WhotShapePopup selectShape={chooseWhotShape} closePopup={() => setShowWhotChoice(false)} />}
+
       {showHelp && <HelpPopup closePopup={() => setShowHelp(false)} />}
       {confettiActive && <canvas ref={confettiCanvasRef} className="fixed inset-0 pointer-events-none z-[110]" style={{ width: '100vw', height: '100vh' }} />}
       

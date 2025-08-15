@@ -201,7 +201,7 @@ const Game = ({
   handleMultiplayerRoundEnd,
   handleRoundEnd
 }) => {
-  // Early safety check - if gameData is missing or invalid, show loading
+  // Safety check - if gameData is missing or invalid, show loading
   if (!gameData || !Array.isArray(gameData.players) || gameData.players.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-white">
@@ -249,7 +249,7 @@ const Game = ({
   const [selectedLogRound, setSelectedLogRound] = React.useState(1);
   const [playPilePositions, setPlayPilePositions] = React.useState([]);
   const dealtCountsByPlayer = React.useMemo(() => {
-    // Read from parent via props if passed in future; fallback to zero reveal (handled in App for now)
+    // Read from parent via props if passed in future; fallback to zero reveal
     return [];
   }, []);
   const [showWhotChoice, setShowWhotChoice] = React.useState(false);
@@ -402,7 +402,7 @@ const Game = ({
 
 
 
-  // shuffleDeck now imported from utils/deck
+  // shuffleDeck imported from utils/deck
 
   const getXPFromGame = (won, roundsPlayed, cardsPlayed) => {
     let baseXP = 50;
@@ -459,7 +459,7 @@ const Game = ({
     }
   };
 
-  // createDeck now imported from utils/deck
+  // createDeck imported from utils/deck
 
 
 
@@ -570,10 +570,16 @@ const Game = ({
       const animatingCard = {
         ...drawnCard,
         id: `draw-${Date.now()}-${i}`,
-        startPos: getTopMarketCardPosition(),
+        startPos: {
+          ...getTopMarketCardPosition(),
+          position: 'fixed',
+          zIndex: 1000
+        },
         endPos: {
           ...animationPositions.drawEnds[visualPlayerIndex],
-          opacity: 0
+          opacity: 0,
+          position: 'fixed',
+          zIndex: 1000
         },
         isPlayerCard: false
       };
@@ -668,13 +674,18 @@ const Game = ({
       const animatingCard = {
         ...cardToPlay,
         id: `animating-${Date.now()}-${randomCard.index}`,
-        startPos: animationPositions.animationStarts[currentPlayer.id],
+        startPos: {
+          ...animationPositions.animationStarts[currentPlayer.id],
+          opacity: 1,
+          position: 'fixed',
+          zIndex: 1000
+        },
         endPos: endPosition,
         isPlayerCard: true
       };
       setAnimatingCards(prev => [...prev, animatingCard]);
       
-      // Play sound effect immediately based on card type
+      // Play sound effect based on card type
       if (cardToPlay.special === 'whot' || cardToPlay.special === 'pick2' || cardToPlay.special === 'holdon' || cardToPlay.special === 'generalmarket') {
         playSoundEffect.specialPlay();
       } else {
@@ -723,8 +734,8 @@ const Game = ({
         };
       }
       if ((currentPlayer.cards || []).length === 0) {
-        // Play end sound immediately when game ends
-        playSoundEffect.end();
+          // Play end sound when game ends
+  playSoundEffect.end();
         // Use appropriate round end handler based on game mode
         if (currentRoom) {
           await handleMultiplayerRoundEnd(newGameData);
@@ -818,8 +829,24 @@ const Game = ({
 
 
   const chooseWhotShape = async shape => {
-    if (!pendingWhotCard || isPlayerActionInProgress || isAnyAnimationInProgress) return;
+    console.log('🎯 chooseWhotShape called', {
+      shape,
+      hasPendingWhotCard: !!pendingWhotCard,
+      isPlayerActionInProgress,
+      isAnyAnimationInProgress,
+      showWhotChoice
+    });
+    
+    if (!pendingWhotCard || isPlayerActionInProgress || isAnyAnimationInProgress) {
+      console.log('chooseWhotShape blocked by guard clause');
+      return;
+    }
+    
     setIsPlayerActionInProgress(true);
+    setIsAnyAnimationInProgress(true);
+    
+    try {
+    
     const newGameData = {
       ...gameData
     };
@@ -827,7 +854,47 @@ const Game = ({
       ...pendingWhotCard,
       chosenShape: shape
     };
-    newGameData.playPile[(newGameData.playPile || []).length - 1] = whotCard;
+    
+    // Remove the card from player's hand first
+    const players = ensurePlayersArray(newGameData.players);
+    const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
+    const currentPlayer = newGameData.players[currentUserActualIndex];
+    
+    // Find and remove the WHOT card from player's hand
+    const cardIndex = currentPlayer.cards.findIndex(c => c.id === pendingWhotCard.id);
+    if (cardIndex !== -1) {
+      currentPlayer.cards = currentPlayer.cards.filter((_, idx) => idx !== cardIndex);
+    }
+    
+    // Create animation for the WHOT card
+    const newCardRelativeStyle = getPlayPilePosition((newGameData.playPile || []).length, false);
+    const endPosition = {
+      ...animationPositions.playPile,
+      transform: `${animationPositions.playPile.transform} ${newCardRelativeStyle.transform}`,
+      zIndex: newCardRelativeStyle.zIndex
+    };
+    
+    const animatingCard = {
+      ...whotCard,
+      id: `whot-play-${Date.now()}`,
+      startPos: getExactCardPosition(currentUserActualIndex, cardIndex, currentPlayer.cards.length + 1, true),
+      endPos: endPosition,
+      isPlayerCard: true,
+      type: 'whot-play'
+    };
+    
+    // Start animation
+    setAnimatingCards(prev => [...(prev || []), animatingCard]);
+    
+    // Wait for animation to complete
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Remove animation and add card to play pile
+    setAnimatingCards(prev => (prev || []).filter(c => c.id !== animatingCard.id));
+    getPlayPilePosition((newGameData.playPile || []).length, true);
+    
+    // Add the WHOT card to the play pile with the chosen shape
+    newGameData.playPile = [...(newGameData.playPile || []), whotCard];
     if (currentRoom) {
       const players = ensurePlayersArray(gameData.players);
       const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
@@ -840,7 +907,7 @@ const Game = ({
       setShowWhotChoice(false);
       setPendingWhotCard(null);
       if (currentPlayer.cards.length === 0) {
-        // Play end sound immediately when game ends
+        // Play end sound when game ends
         playSoundEffect.end();
         // Use appropriate round end handler based on game mode
         if (currentRoom) {
@@ -861,9 +928,12 @@ const Game = ({
             [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
           };
         }
+        // Update local state for better responsiveness
+        setGameData(newGameData);
         await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
       }
       setIsPlayerActionInProgress(false);
+      setIsAnyAnimationInProgress(false);
     } else {
       newGameData.lastAction = `You - WHOT → ${shape}`;
       newGameData.gameLog = {
@@ -873,7 +943,7 @@ const Game = ({
       setShowWhotChoice(false);
       setPendingWhotCard(null);
       if (newGameData.players[0].cards.length === 0) {
-        // Play end sound immediately when game ends
+        // Play end sound when game ends
         playSoundEffect.end();
         handleRoundEnd(newGameData);
       } else {
@@ -881,6 +951,14 @@ const Game = ({
       }
       setGameData(newGameData);
       setIsPlayerActionInProgress(false);
+      setIsAnyAnimationInProgress(false);
+    }
+    } catch (error) {
+      console.error('Error in chooseWhotShape:', error);
+      setIsPlayerActionInProgress(false);
+      setIsAnyAnimationInProgress(false);
+      setShowWhotChoice(false);
+      setPendingWhotCard(null);
     }
   };
 
@@ -940,7 +1018,7 @@ const Game = ({
     };
     setAnimatingCards(prev => [...(prev || []), animatingCard]);
     
-    // Play sound effect immediately based on card type
+    // Play sound effect based on card type
     if (card.special === 'whot' || card.special === 'pick2' || card.special === 'holdon' || card.special === 'generalmarket') {
       playSoundEffect.specialPlay();
     } else {
@@ -1028,25 +1106,35 @@ const Game = ({
   };
 
   const handlePlayMultiplayerCard = async (cardIndex, clickPosition) => {
-    if (!gameData || gameData.gamePhase !== 'playing' || !currentRoom || !currentUser || isPlayerActionInProgress) return;
+    if (!gameData || !currentRoom || !currentUser || isPlayerActionInProgress) return;
     const players = ensurePlayersArray(gameData.players);
     const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) return;
     const currentPlayerData = players[currentUserActualIndex];
-    if (!currentPlayerData) return;
     const actualCardIndex = cardIndex + playerScrollIndex;
     const card = currentPlayerData.cards[actualCardIndex];
     const topCard = (gameData.playPile || []).length > 0 ? gameData.playPile[gameData.playPile.length - 1] : null;
-    const newCardRelativeStyle = getPlayPilePosition((gameData.playPile || []).length, false);
     if (topCard && topCard.chosenShape) {
       if (card.special !== 'whot' && card.shape !== topCard.chosenShape) return;
     } else if (!canPlayCard(card, topCard)) {
       return;
     }
     try {
+      // Handle WHOT cards differently - show popup without animation
+      if (card.special === 'whot') {
+        console.log('WHOT card clicked, showing popup');
+        setIsPlayerActionInProgress(true);
+        setPendingWhotCard(card);
+        setShowWhotChoice(true);
+        setIsPlayerActionInProgress(false);
+        return;
+      }
+      
+      // For all other cards, proceed with normal animation
       setIsPlayerActionInProgress(true);
       setIsAnyAnimationInProgress(true);
+      const newCardRelativeStyle = getPlayPilePosition((gameData.playPile || []).length, false);
       const endPosition = {
         ...animationPositions.playPile,
         transform: `${animationPositions.playPile.transform} ${newCardRelativeStyle.transform}`,
@@ -1062,13 +1150,13 @@ const Game = ({
           position: 'fixed',
           zIndex: 1000
         } : getExactCardPosition(currentUserActualIndex, actualCardIndex, (currentPlayerData.cards || []).length, true),
-        endPos: { ...endPosition },
+        endPos: endPosition,
         isPlayerCard: true
       };
       setAnimatingCards(prev => [...(prev || []), animatingCard]);
       
-      // Play sound based on card type immediately
-      if (card.special === 'whot' || card.special === 'pick2' || card.special === 'holdon' || card.special === 'generalmarket') {
+      // Play sound based on card type
+      if (card.special === 'pick2' || card.special === 'holdon' || card.special === 'generalmarket') {
         playSoundEffect.specialPlay();
       } else {
         playSoundEffect.normalPlay();
@@ -1104,12 +1192,7 @@ const Game = ({
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${card.number}${card.shape} (Pick 2) - Next player must draw 2 cards`]
         };
-      } else if (card.special === 'whot') {
-        setPendingWhotCard(card);
-        setShowWhotChoice(true);
-        setGameData(newGameData);
-        setIsPlayerActionInProgress(false);
-        return;
+
       } else if (card.special === 'holdon') {
         newGameData.lastAction = `${currentPlayer.name} - ${card.number}${card.shape} hold`;
         newGameData.skipNextPlayer = true;
@@ -1133,7 +1216,7 @@ const Game = ({
         };
       }
       if ((currentPlayer.cards || []).length === 0) {
-        // Play end sound immediately when game ends
+        // Play end sound when game ends
         playSoundEffect.end();
         await handleMultiplayerRoundEnd(newGameData);
       } else {
@@ -1163,7 +1246,20 @@ const Game = ({
   };
 
   const handleDrawMultiplayerCard = async () => {
-    if (!gameData || gameData.gamePhase !== 'playing' || !currentRoom || !currentUser || isPlayerActionInProgress) return;
+    console.log('🔍 handleDrawMultiplayerCard called', {
+      hasGameData: !!gameData,
+      hasCurrentRoom: !!currentRoom,
+      hasCurrentUser: !!currentUser,
+      isPlayerActionInProgress,
+      isAnyAnimationInProgress,
+      showWhotChoice,
+      pendingWhotCard: !!pendingWhotCard
+    });
+    
+    if (!gameData || !currentRoom || !currentUser || isPlayerActionInProgress) {
+      console.log('handleDrawMultiplayerCard blocked by guard clause');
+      return;
+    }
     const players = ensurePlayersArray(gameData.players);
     const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (currentUserActualIndex === -1) return;
@@ -1175,6 +1271,8 @@ const Game = ({
         ...gameData
       };
       const count = newGameData.pendingPickCount > 0 ? newGameData.pendingPickCount : 1;
+      const isPending = newGameData.pendingPickCount > 0;
+      const isGeneral = newGameData.generalMarketActive && newGameData.currentPlayer !== newGameData.generalMarketOriginatorId && !isPending;
       const currentPlayer = {
         ...newGameData.players[currentUserActualIndex]
       };
@@ -1191,16 +1289,22 @@ const Game = ({
         const animatingCard = {
           ...drawnCard,
           id: `draw-${Date.now()}-${i}`,
-          startPos: getTopMarketCardPosition(),
+          startPos: {
+            ...getTopMarketCardPosition(),
+            position: 'fixed',
+            zIndex: 1000
+          },
           endPos: {
             ...animationPositions.drawEnds[visualPlayerIndex],
-            opacity: 0
+            opacity: 0,
+            position: 'fixed',
+            zIndex: 1000
           },
           isPlayerCard: false
         };
         setAnimatingCards(prev => [...prev, animatingCard]);
         
-        // Play market sound immediately when card starts drawing
+        // Play market sound when card starts drawing
         playSoundEffect.market();
         
         await new Promise(resolve => {
@@ -1216,12 +1320,44 @@ const Game = ({
       newGameData.players = newPlayers;
       newGameData.pendingPickCount = 0;
       newGameData.lastAction = `${currentPlayer.name} - drew ${count} card${count > 1 ? 's' : ''}`;
+      
+      // Add draw action to game log
+      const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
+      
+      if (isPending) {
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, `${currentPlayer.name} drew ${count} card${count > 1 ? 's' : ''} (penalty)`]
+        };
+      } else if (isGeneral) {
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, `${currentPlayer.name} drew ${count} card${count > 1 ? 's' : ''} (general market)`]
+        };
+      } else {
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, `${currentPlayer.name} drew ${count} card${count > 1 ? 's' : ''} from market`]
+        };
+      }
       const newTotal = currentPlayer.cards.length;
       if (newTotal > maxVisiblePlayerCards) {
         setPlayerScrollIndex(newTotal - maxVisiblePlayerCards);
       }
       const nextPlayerIndex = getNextPlayer(newGameData);
       newGameData.currentPlayer = nextPlayerIndex;
+      
+      // Check if General Market effect should end when turn comes back to originator
+      if (newGameData.generalMarketActive && nextPlayerIndex === newGameData.generalMarketOriginatorId) {
+        newGameData.generalMarketActive = false;
+        newGameData.generalMarketOriginatorId = null;
+        newGameData.lastAction += ' General Market effect ends.';
+        const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
+        newGameData.gameLog = {
+          ...newGameData.gameLog,
+          [newGameData.roundNumber]: [...currentRoundLog, 'General Market effect ended - all players have drawn']
+        };
+      }
       await update(ref(db, `rooms/${currentRoom.id}`), {
         gameData: newGameData,
         lastActivity: Date.now()
@@ -1266,7 +1402,7 @@ const Game = ({
           </button>
         </div>
       )}
-      <div className={`fixed top-4 right-4 z-30 text-white flex ${window.innerWidth < 768 ? 'gap-2' : 'gap-3'}`}>
+      <div className={`fixed top-4 right-4 z-30 text-white flex ${window.innerWidth < 768 ? 'gap-2' : 'gap-3'}`} style={{ transform: 'scale(0.75)', transformOrigin: 'top right' }}>
         <div className={`bg-gray-900 bg-opacity-60 ${window.innerWidth < 768 ? 'p-2' : 'p-3'} border border-gray-600 flex items-center justify-center ${window.innerWidth < 768 ? 'min-w-[40px]' : 'min-w-[60px]'}`}>
           <div className={`${window.innerWidth < 768 ? 'text-lg' : 'text-2xl'} font-bold`}>
             {(() => {
@@ -1365,6 +1501,15 @@ const Game = ({
               className={`absolute ${window.innerWidth < 768 ? 'w-[72px] h-[100px]' : window.innerWidth < 1024 ? 'w-[100px] h-36' : 'w-[130px] h-[172px]'} shadow-2xl ${index === Math.min((gameData.drawPile || []).length, 8) - 1 && (animatingCards || []).length === 0 && !isPlayerActionInProgress ? 'hover:scale-105 cursor-pointer' : ''}`}
               style={{ ...getMarketCardPosition(index) }}
               onClick={() => {
+                console.log('🎯 Market card clicked', {
+                  isTopCard: index === Math.min((gameData.drawPile || []).length, 8) - 1,
+                  noAnimatingCards: (animatingCards || []).length === 0,
+                  notPlayerActionInProgress: !isPlayerActionInProgress,
+                  notAnyAnimationInProgress: !isAnyAnimationInProgress,
+                  showWhotChoice,
+                  pendingWhotCard: !!pendingWhotCard
+                });
+                
                 if (index === Math.min((gameData.drawPile || []).length, 8) - 1 && (animatingCards || []).length === 0 && !isPlayerActionInProgress && !isAnyAnimationInProgress) {
                   if (currentRoom) {
                     handleDrawMultiplayerCard();
@@ -1428,14 +1573,15 @@ const Game = ({
             style={initialStyle}
             ref={el => {
               if (el) {
-                requestAnimationFrame(() => {
+                // Small delay to ensure initial position is rendered
+                setTimeout(() => {
                   el.style.transform = endPos.transform || 'translateZ(0)';
                   el.style.opacity = endPos.opacity !== undefined ? endPos.opacity : 1;
                   el.style.top = endPos.top || '';
                   el.style.bottom = endPos.bottom || '';
                   el.style.left = endPos.left || '';
                   el.style.right = endPos.right || '';
-                });
+                }, 10);
               }
             }}
           >
@@ -1459,8 +1605,8 @@ const Game = ({
          // During dealing, progressively reveal cards: own cards face-up, opponent cards as backs
          let baseVisible = isCurrentUserPlayer ? (player.cards || []).slice(playerScrollIndex, playerScrollIndex + maxVisibleCards) : (player.cards || []).slice(0, maxVisibleCards);
          if (isDealingPhase) {
-           // During dealing phase, show cards that have already been dealt (they're in the player's hand)
-           // The animation system handles the flying cards, but we should show the cards that have arrived
+             // During dealing phase, show cards that have already been dealt
+  // The animation system handles the flying cards, but we should show the cards that have arrived
            baseVisible = isCurrentUserPlayer ? (player.cards || []).slice(playerScrollIndex, playerScrollIndex + maxVisibleCards) : (player.cards || []).slice(0, maxVisibleCards);
          }
          const visibleCards = baseVisible;
@@ -1666,7 +1812,7 @@ const Game = ({
         </div>
       )}
       {showWhotChoice && <WhotShapePopup selectShape={chooseWhotShape} closePopup={() => setShowWhotChoice(false)} />}
-      {showRoundEndPopup && roundEndData && <RoundEndPopup roundEndData={roundEndData} />}
+      {showRoundEndPopup && roundEndData && <RoundEndPopup roundEndData={roundEndData} isMultiplayer={!!currentRoom} currentUser={currentUser} />}
       {showEliminatedPopup && <EliminatedPopup setShowEliminatedPopup={setShowEliminatedPopup} returnToMenu={returnToMenu} />}
       {showAdminDeckOverview && isAdmin && (
         <div className="absolute inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] fade-in">

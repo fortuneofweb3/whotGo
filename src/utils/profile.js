@@ -3,10 +3,10 @@ import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/w
 import bs58 from 'bs58';
 import { Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, Keypair } from '@solana/web3.js';
 
-// Real Honeycomb Protocol Configuration for "Whot Go!" Project
-// Project was created on Honeynet (Solana test network)
+// Honeycomb Protocol Configuration for Whot Go Project
+// Project created on Honeynet (Solana test network)
 const API_URLS = [
-  "https://edge.test.honeycombprotocol.com/", // Primary: Test network where project was created
+  "https://edge.test.honeycombprotocol.com/", // Primary: Test network
   "https://edge.main.honeycombprotocol.com/", // Fallback: Mainnet
   "https://edge.dev.honeycombprotocol.com/"   // Fallback: Devnet
 ];
@@ -18,23 +18,23 @@ const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 const NETWORK_CONFIG = {
   rpcUrl: "https://rpc.test.honeycombprotocol.com", // Honeynet RPC endpoint
   apiUrl: "https://edge.test.honeycombprotocol.com/", // Honeynet API endpoint
-  network: "honeynet" // Solana test network provided by Honeycomb Protocol
+  network: "honeynet" // Solana test network
 };
 
 // Badge criteria indices mapping to achievements
 const BADGE_CRITERIA = {
-  FIRST_VICTORY: 0,        // "Win your first game"
-  CARD_MASTER: 1,          // "Master all card types"
-  SHADOW_WARRIOR: 2,       // "Win a game without losing a life"
-  STRATEGIC_MIND: 3,       // "Win 10 games with strategic plays"
-  CENTURY_CLUB: 4,         // "Play 100 games"
-  ULTIMATE_CHAMPION: 5,    // "Win 50 games"
-  LEGENDARY_PLAYER: 6,     // "Reach level 50"
-  WHOT_GRANDMASTER: 7      // "Achieve all other badges"
+  FIRST_VICTORY: 0,        // Win your first game
+  CARD_MASTER: 1,          // Master all card types
+  SHADOW_WARRIOR: 2,       // Win a game without losing a life
+  STRATEGIC_MIND: 3,       // Win 10 games with strategic plays
+  CENTURY_CLUB: 4,         // Play 100 games
+  ULTIMATE_CHAMPION: 5,    // Win 50 games
+  LEGENDARY_PLAYER: 6,     // Reach level 50
+  WHOT_GRANDMASTER: 7      // Achieve all other badges
 };
 
 let client;
-let currentApiUrl = API_URLS[0]; // Start with test network (where project was created)
+let currentApiUrl = API_URLS[0]; // Start with test network
 
 // Initialize client with fallback
 const initializeClient = () => {
@@ -78,10 +78,10 @@ export const checkProjectExists = async () => {
     console.log('Project address:', PROJECT_ADDRESS);
     console.log('Current API endpoint:', currentApiUrl);
     
-    // Try to find the project (this is a simple way to check if it exists)
-    // Note: This might not be the exact API call, but it helps with debugging
+      // Try to find the project (simple way to check if it exists)
+  // Debug API call for troubleshooting
     const result = await client.findUsers({
-      wallets: ['dummy'] // Use a dummy wallet to test connection
+      wallets: ['dummy'] // Use dummy wallet to test connection
     });
     
     console.log('Project check result:', result);
@@ -110,7 +110,9 @@ const getWalletAdapter = (wallet) => {
   return wallet.adapter || wallet;
 };
 
-// Enhanced profile creation following official docs
+/**
+ * Create a new user profile following Honeycomb Protocol documentation
+ */
 export const createUserProfile = async ({ publicKey, wallet, signMessage, username = null }) => {
   try {
     // Validate required wallet methods
@@ -193,10 +195,8 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       customData: {
         add: {
           xp: ["0"],
-          level: ["1"],
           gamesPlayed: ["0"],
           gamesWon: ["0"],
-          createdAt: [Date.now().toString()],
           lastActive: [Date.now().toString()],
           totalCardsPlayed: ["0"],
           perfectWins: ["0"],
@@ -397,7 +397,9 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
   }
 };
 
-// Enhanced profile login/authentication
+/**
+ * Authenticate user with Honeycomb Protocol
+ */
 export const loginUserProfile = async (publicKey) => {
   try {
     const walletAddress = publicKey.toBase58();
@@ -460,11 +462,10 @@ export const loginUserProfile = async (publicKey) => {
       username: profile.info?.name || 'Unknown Player',
       bio: profile.info?.bio || '',
       pfp: profile.info?.pfp || '',
+      // Only sync fields that both Firebase and Honeycomb have
       xp: parseInt(customData.xp || '0'),
-      level: parseInt(customData.level || '1'),
       gamesPlayed: parseInt(customData.gamesPlayed || '0'),
       gamesWon: parseInt(customData.gamesWon || '0'),
-      createdAt: parseInt(customData.createdAt || '0'),
       lastActive: parseInt(customData.lastActive || '0'),
       totalCardsPlayed: parseInt(customData.totalCardsPlayed || '0'),
       perfectWins: parseInt(customData.perfectWins || '0'),
@@ -519,22 +520,18 @@ const checkProfileDataConsistency = async (honeycombProfile, firebaseUserData) =
       honeycombData.username = honeycombProfile.info.name;
     }
     
-    console.log('🔍 Parsed Honeycomb data:', honeycombData);
-    console.log('🔍 Key values extracted:', {
-      xp: honeycombData.xp,
-      level: honeycombData.level,
-      gamesPlayed: honeycombData.gamesPlayed,
-      gamesWon: honeycombData.gamesWon,
-      username: honeycombData.username
-    });
+
     
-    // Check key fields that should be synced - only check for significant mismatches
+    // Check key fields that should be synced - only check fields that both Firebase and Honeycomb have
     const fieldsToCheck = [
       'username',
       'xp',
-      'level',
       'gamesPlayed',
-      'gamesWon'
+      'gamesWon',
+      'totalCardsPlayed',
+      'perfectWins',
+      'currentWinStreak',
+      'bestWinStreak'
     ];
     
     let needsUpdate = false;
@@ -554,36 +551,34 @@ const checkProfileDataConsistency = async (honeycombProfile, firebaseUserData) =
         // Missing field in Honeycomb - this is a real mismatch
         needsUpdate = true;
         missingFields.push(field);
-        console.log(`⚠️ Field '${field}' missing in Honeycomb: Firebase=${firebaseValue}`);
+
       } else if (firebaseValue !== undefined && honeycombValue !== undefined) {
         // Both have values, check for significant differences
         const firebaseNum = parseFloat(firebaseString) || 0;
         const honeycombNum = parseFloat(honeycombString) || 0;
         
         // For numeric fields, only flag if difference is significant (>5% or >10 points)
-        if (field === 'xp' || field === 'gamesPlayed' || field === 'gamesWon') {
+        if (field === 'xp' || field === 'gamesPlayed' || field === 'gamesWon' || 
+            field === 'totalCardsPlayed' || field === 'perfectWins' || 
+            field === 'currentWinStreak' || field === 'bestWinStreak') {
           const difference = Math.abs(firebaseNum - honeycombNum);
           const percentDifference = firebaseNum > 0 ? (difference / firebaseNum) * 100 : 0;
           
           if (difference > 10 || percentDifference > 5) {
             needsUpdate = true;
             missingFields.push(field);
-            console.log(`⚠️ Significant difference in '${field}': Firebase=${firebaseValue}, Honeycomb=${honeycombValue} (diff: ${difference}, ${percentDifference.toFixed(1)}%)`);
+
           }
         } else if (firebaseString !== honeycombString) {
           // For non-numeric fields, any difference is significant
           needsUpdate = true;
           missingFields.push(field);
-          console.log(`⚠️ Field '${field}' mismatch: Firebase=${firebaseValue}, Honeycomb=${honeycombValue}`);
+
         }
       }
     }
     
-    if (needsUpdate) {
-      console.log('🔄 Data inconsistency detected in fields:', missingFields);
-    } else {
-      console.log('✅ Data is consistent between Firebase and Honeycomb');
-    }
+
     
     return needsUpdate;
   } catch (error) {
@@ -619,11 +614,10 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
       return { success: false, error: 'No wallet or signMessage provided' };
     }
     
-    // Prepare update data
+    // Prepare update data - only sync fields that both Firebase and Honeycomb have
     const updateData = {
       username: firebaseUserData.username || '',
       xp: firebaseUserData.xp || 0,
-      level: firebaseUserData.level || 1,
       gamesPlayed: firebaseUserData.gamesPlayed || 0,
       gamesWon: firebaseUserData.gamesWon || 0,
       totalCardsPlayed: firebaseUserData.totalCardsPlayed || 0,
@@ -655,61 +649,41 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
   }
 };
 
-// Enhanced profile existence check with data sync
+/**
+ * Check if user profile exists and sync data if needed
+ */
 export const checkUserProfileExists = async (publicKey, firebaseUserData = null) => {
   try {
     const walletAddress = publicKey.toBase58();
     
-    // console.log('🔍 Checking Honeycomb user profile...');
-    // console.log('🔍 Using configured project and API endpoint');
-    
     // Find the user by wallet address
-    // console.log('🔍 Calling findUsers...');
     const users = await client.findUsers({
       wallets: [walletAddress]
     });
     
-    // console.log('🔍 findUsers response:', {
-    //   userCount: users?.user?.length || 0,
-    //   responseType: typeof users,
-    //   responseKeys: users ? Object.keys(users) : null
-    // });
-    
     if (users.user.length === 0) {
-      // console.log('❌ No user found for wallet - user needs to be created');
       return { exists: false, needsSync: false, profile: null, needsCreation: true };
     }
     
     const userId = users.user[0].id;
-    // console.log('🔍 Found user with ID');
     
     // Check if user has a profile in our project
-    // console.log('🔍 Calling findProfiles...');
     const profiles = await client.findProfiles({
       userIds: [userId],
       projects: [PROJECT_ADDRESS],
       identities: ["main"]
     });
     
-    // console.log('🔍 findProfiles response:', {
-    //   profileCount: profiles?.profile?.length || 0,
-    //   responseType: typeof profiles,
-    //   responseKeys: profiles ? Object.keys(profiles) : null
-    // });
-    
     const exists = profiles.profile.length > 0;
-    // console.log('✅ User profile exists:', exists);
     
     // If profile exists and we have Firebase data, check for data consistency
     if (exists && firebaseUserData) {
-      // console.log('🔄 Checking data consistency between Firebase and Honeycomb...');
       const profile = profiles.profile[0];
       
       // Check if Honeycomb profile has all the data from Firebase
       const needsUpdate = await checkProfileDataConsistency(profile, firebaseUserData);
       
       if (needsUpdate) {
-        // console.log('⚠️ Data inconsistency detected, prompting user to sync...');
         return { exists: true, needsSync: true, profile };
       }
     }
@@ -734,11 +708,11 @@ const APP_WALLET_CONFIG = {
   privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY
 };
 
-// Enhanced SOL management with automatic airdrops and app wallet fallback
+/**
+ * Ensure wallet has sufficient SOL balance with automatic airdrop
+ */
 export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
   try {
-    // console.log('💰 Enhanced SOL management: Checking wallet balance...');
-    
     // Connect to Honeynet RPC
     const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
     
@@ -746,15 +720,9 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.005) => {
     const balance = await connection.getBalance(publicKey);
     const solBalance = balance / LAMPORTS_PER_SOL;
     
-    // console.log('💰 Current SOL balance:', solBalance.toFixed(4), 'SOL');
-    // console.log('💰 Minimum required:', minSOL, 'SOL');
-    
     if (solBalance >= minSOL) {
-      // console.log('✅ Wallet has sufficient SOL balance');
       return { success: true, method: 'none', balance: solBalance };
     }
-    
-    // console.log('💰 Balance too low, attempting airdrop...');
     
     // Step 1: Try web3.js airdrop
     try {
@@ -911,7 +879,9 @@ export const executeTransactionWithSOLRetry = async (transactionFunction, public
   throw lastError;
 };
 
-// Enhanced profile creation with automatic SOL management
+/**
+ * Create user profile with automatic SOL management
+ */
 export const createUserProfileWithSOLManagement = async (publicKey, wallet, signMessage, displayName) => {
   console.log('🚀 Enhanced profile creation with SOL management...');
   
@@ -932,9 +902,11 @@ export const createUserProfileWithSOLManagement = async (publicKey, wallet, sign
   );
 };
 
-// Enhanced profile update with automatic SOL management
+/**
+ * Update user profile with automatic SOL management
+ */
 export const updateUserProfileWithSOLManagement = async (publicKey, wallet, signMessage, updates) => {
-  // console.log('🚀 Enhanced profile update with SOL management...');
+  
   
   // Validate parameters
   if (!publicKey) {
@@ -954,7 +926,9 @@ export const updateUserProfileWithSOLManagement = async (publicKey, wallet, sign
   );
 };
 
-// Enhanced badge claiming with automatic SOL management
+/**
+ * Claim badge with automatic SOL management
+ */
 export const claimBadgeWithSOLManagement = async (publicKey, wallet, signMessage, badgeIndex) => {
   console.log('🚀 Enhanced badge claiming with SOL management...');
   
@@ -976,18 +950,20 @@ export const claimBadgeWithSOLManagement = async (publicKey, wallet, signMessage
   );
 };
 
-// Test Honeycomb API connection and configuration
+/**
+ * Test Honeycomb API connection and configuration
+ */
 export const testHoneycombConnection = async () => {
   try {
     console.log('🔧 Testing Honeycomb API connection...');
     console.log('🔧 Project address:', PROJECT_ADDRESS);
     console.log('🔧 API endpoint:', 'https://edge.test.honeycombprotocol.com/');
     
-    // Test basic API connectivity
+    // Verify basic API connectivity
     const global = await client.findGlobal();
     console.log('🔧 Global data:', global);
     
-    // Test project existence
+    // Verify project existence
     const projects = await client.findProjects({ projects: [PROJECT_ADDRESS] });
     console.log('🔧 Project data:', {
       projectCount: projects?.project?.length || 0,
@@ -1001,17 +977,19 @@ export const testHoneycombConnection = async () => {
   }
 };
 
-// Test RPC connection and airdrop functionality
+/**
+ * Test RPC connection and airdrop functionality
+ */
 export const testRPCConnection = async () => {
   try {
     console.log('🔧 Testing RPC connection...');
     const connection = new Connection('https://rpc.test.honeycombprotocol.com', 'confirmed');
     
-    // Test basic RPC connectivity
+    // Verify basic RPC connectivity
     const slot = await connection.getSlot();
     console.log('🔧 Current slot:', slot);
     
-    // Test airdrop endpoint availability
+    // Verify airdrop endpoint availability
     try {
       // Create a test public key
       const testKey = new PublicKey('11111111111111111111111111111111');
@@ -1028,29 +1006,27 @@ export const testRPCConnection = async () => {
   }
 };
 
-// Enhanced profile check with retry mechanism for newly created profiles
+/**
+ * Check profile existence with retry mechanism for newly created profiles
+ */
 export const checkUserProfileExistsWithRetry = async (publicKey, firebaseUserData = null, maxRetries = 5, delayMs = 3000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    // console.log(`🔍 Profile check attempt ${attempt}/${maxRetries}`);
-    
     const result = await checkUserProfileExists(publicKey, firebaseUserData);
     
     if (result.exists) {
-      // console.log(`✅ Profile found on attempt ${attempt}`);
       return result;
     }
     
     if (attempt < maxRetries) {
-      // console.log(`⏳ Profile not found, waiting ${delayMs}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
-  
-  // console.log(`❌ Profile not found after ${maxRetries} attempts`);
   return { exists: false, needsSync: false, profile: null };
 };
 
-// Enhanced profile update following official docs
+/**
+ * Update user profile following Honeycomb Protocol documentation
+ */
 export const updateUserProfile = async ({ publicKey, wallet, signMessage, profileData }) => {
   try {
     if (!publicKey) {
@@ -1058,26 +1034,20 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
     }
     const walletAddress = publicKey.toBase58();
     
-    // console.log('Updating Honeycomb user profile for:', walletAddress);
-    
     // Authenticate with Honeycomb first
-    // console.log('🔐 Authenticating with Honeycomb...');
     let accessToken = null;
     try {
       const { authRequest: { message: authRequest } } = await client.authRequest({
         wallet: walletAddress
       });
-      // console.log('📝 Auth request received, signing message...');
       const encodedMessage = new TextEncoder().encode(authRequest);
       const signedMessage = await signMessage(encodedMessage);
       const signature = bs58.encode(signedMessage);
       
-      // console.log('✅ Message signed, confirming authentication...');
       const { authConfirm } = await client.authConfirm({
         wallet: walletAddress,
         signature
       });
-      // console.log('✅ Authentication confirmed');
       accessToken = authConfirm.accessToken;
     } catch (authError) {
       console.error('❌ Authentication failed:', authError);
@@ -1120,15 +1090,16 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
       };
     }
     
-    // Update custom data if provided
-    if (profileData.xp !== undefined || profileData.level !== undefined || 
-        profileData.gamesPlayed !== undefined || profileData.gamesWon !== undefined) {
+    // Update custom data if provided - only sync fields that both Firebase and Honeycomb have
+    if (profileData.xp !== undefined || profileData.gamesPlayed !== undefined || 
+        profileData.gamesWon !== undefined || profileData.totalCardsPlayed !== undefined ||
+        profileData.perfectWins !== undefined || profileData.currentWinStreak !== undefined ||
+        profileData.bestWinStreak !== undefined) {
       updateData.customData = {
         add: []
       };
       
       if (profileData.xp !== undefined) updateData.customData.add.push(["xp", profileData.xp.toString()]);
-      if (profileData.level !== undefined) updateData.customData.add.push(["level", profileData.level.toString()]);
       if (profileData.gamesPlayed !== undefined) updateData.customData.add.push(["gamesPlayed", profileData.gamesPlayed.toString()]);
       if (profileData.gamesWon !== undefined) updateData.customData.add.push(["gamesWon", profileData.gamesWon.toString()]);
       if (profileData.totalCardsPlayed !== undefined) updateData.customData.add.push(["totalCardsPlayed", profileData.totalCardsPlayed.toString()]);
@@ -1203,7 +1174,9 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
   }
 };
 
-// Enhanced profile retrieval
+/**
+ * Retrieve user profile data
+ */
 export const getUserProfile = async publicKey => {
   try {
     const walletAddress = publicKey.toBase58();

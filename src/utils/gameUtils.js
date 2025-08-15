@@ -1,4 +1,4 @@
-// Game utility functions for Whot game
+// Game utility functions
 
 // Helper function to ensure players data is always an array
 export const ensurePlayersArray = (players) => {
@@ -10,7 +10,7 @@ export const ensurePlayersArray = (players) => {
 
 // Get play pile position for a card
 export const getPlayPilePosition = (index, updatePositions = false) => {
-  // This function should be implemented based on your existing logic
+  // This function should be implemented based on existing logic
   // For now, returning a basic position
   return {
     transform: `translate(-50%, -50%) rotate(${index * 2}deg)`,
@@ -30,7 +30,7 @@ export const getTopMarketCardPosition = () => {
 
 // Get exact card position for player cards
 export const getExactCardPosition = (playerIndex, cardIndex, totalCards, isPlayer = false) => {
-  // This function should be implemented based on your existing logic
+  // This function should be implemented based on existing logic
   // For now, returning a basic position
   return {
     top: '50%',

@@ -1,12 +1,12 @@
-// Sound Effects Manager for Whot Game
+// Sound Effects Manager
 class SoundEffectsManager {
   constructor() {
     this.sounds = {};
     this.isEnabled = true;
-    this.volume = 0.49; // Reduced by 30% from 0.7 to 0.49
+    this.volume = 0.49; // Reduced volume for better balance
     this.isInitialized = false;
-    this.playPitchVariations = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]; // 6 different pitch variations
-    this.gameMusicVolume = 0.3; // Lower volume for game music
+    this.playPitchVariations = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]; // Pitch variations for variety
+    this.gameMusicVolume = 0.3; // Lower volume for background music
     this.fadeInterval = null;
     // Load sounds asynchronously
     this.loadSounds().catch(error => {
@@ -27,19 +27,15 @@ class SoundEffectsManager {
       end: '/assets/sounds/effects/End.mp3'
     };
 
-    // console.log('🎵 Sound file paths:', soundFiles);
-
-    // console.log('🎵 Loading sound files...');
-    
-    // Test if files are accessible
+    // Verify sound files are accessible
     for (const [name, path] of Object.entries(soundFiles)) {
       fetch(path, { method: 'HEAD' })
         .then(response => {
-          // console.log(`🎵 File ${name} accessible: ${response.ok} (${response.status})`);
+          // File accessible
         })
-                  .catch(error => {
-            // console.error(`🎵 File ${name} not accessible:`, error);
-          });
+        .catch(error => {
+          // File not accessible
+        });
     }
     
     const loadPromises = [];
@@ -54,7 +50,6 @@ class SoundEffectsManager {
           // Handle successful load
           audio.addEventListener('canplaythrough', () => {
             this.sounds[name] = audio;
-            // console.log(`🎵 Loaded sound: ${name}`);
             resolve();
           }, { once: true });
           
@@ -80,7 +75,6 @@ class SoundEffectsManager {
     
     // Wait for all sounds to load (or fail gracefully)
     await Promise.all(loadPromises);
-    // console.log('🎵 Sound loading complete. Loaded sounds:', Object.keys(this.sounds));
   }
 
   async loadSoundOnDemand(soundName) {
@@ -109,7 +103,6 @@ class SoundEffectsManager {
         
         audio.addEventListener('canplaythrough', () => {
           this.sounds[soundName] = audio;
-          // console.log(`🎵 Loaded sound on demand: ${soundName}`);
           resolve();
         }, { once: true });
         
@@ -126,14 +119,14 @@ class SoundEffectsManager {
   }
 
   play(soundName, options = {}) {
-    // console.log(`🎵 Attempting to play sound: ${soundName}, enabled: ${this.isEnabled}, loaded: ${!!this.sounds[soundName]}, initialized: ${this.isInitialized}`);
+
     if (!this.isEnabled) {
-      console.log(`Sound ${soundName} not enabled`);
+
       return;
     }
     
     if (!this.sounds[soundName]) {
-      console.log(`Sound ${soundName} not loaded, attempting to load on demand...`);
+
       // Try to load the sound on demand
       this.loadSoundOnDemand(soundName).then(() => {
         this.play(soundName, options);
@@ -145,7 +138,7 @@ class SoundEffectsManager {
 
     // If not initialized yet, try to initialize on first play
     if (!this.isInitialized) {
-      console.log(`Sound ${soundName} not initialized yet, attempting to initialize...`);
+
       this.initializeAfterUserInteraction().then(() => {
         // Retry playing the sound after initialization
         this.play(soundName, options);
@@ -172,7 +165,7 @@ class SoundEffectsManager {
         clonedAudio.playbackRate = options.pitch;
       }
       
-      console.log(`Attempting to play sound: ${soundName}${options.pitch ? ` with pitch ${options.pitch}` : ''}`);
+  
       clonedAudio.play().catch(error => {
         console.warn(`Failed to play cloned sound: ${soundName}`, error);
         // Try to play the original audio as fallback
@@ -298,7 +291,7 @@ class SoundEffectsManager {
       return; // Already initialized
     }
     
-    console.log('Initializing sounds after user interaction...');
+
     
     try {
       // Preload all audio files to ensure they're downloaded and ready
@@ -337,7 +330,7 @@ class SoundEffectsManager {
       }
       
       this.isInitialized = true;
-      console.log('Sounds preloaded successfully (all audio files downloaded and ready)');
+  
     } catch (error) {
       console.warn('Failed to preload some sounds:', error);
       // Still mark as initialized so we can try to play sounds
@@ -365,7 +358,7 @@ class SoundEffectsManager {
     gameAudio.loop = true;
     
     gameAudio.play().then(() => {
-      // console.log('🎵 Game music started, beginning fade in...');
+  
       
       // Fade in the music over 2 seconds
       let volume = 0;
@@ -384,7 +377,7 @@ class SoundEffectsManager {
         if (volume >= targetVolume) {
           clearInterval(this.fadeInterval);
           this.fadeInterval = null;
-          // console.log('🎵 Game music fade in complete');
+  
         }
       }, stepInterval);
     }).catch(error => {
@@ -423,7 +416,7 @@ class SoundEffectsManager {
         gameAudio.currentTime = 0;
         clearInterval(this.fadeInterval);
         this.fadeInterval = null;
-        // console.log('🎵 Game music stopped');
+    
       }
     }, stepInterval);
   }

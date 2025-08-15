@@ -1,17 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getCardSVGContent } from '../../utils/cardSVG';
 
 const RoundEndPopup = ({ roundEndData, onContinue, isMultiplayer = false, currentUser, remainingPlayers = [] }) => {
+  const [countdown, setCountdown] = useState(15);
+  
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
   return (
     <div className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-[100] opacity-0 p-8" style={{ animation: 'fadeIn 0.6s ease-out forwards' }}>
       <div className="bg-gray-900 p-6 border-2 border-[#80142C] max-w-4xl max-h-[80vh] opacity-0 transform scale-95" style={{ animation: 'scaleInCard 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards' }}>
         <div className="bg-[#80142C] p-4">
           {/* Header */}
           <div className="text-center mb-4 opacity-0 transform translateY-8" style={{ animation: 'fadeInUp 0.8s ease-out 1s forwards' }}>
-            <h1 className="text-2xl font-bold text-white mb-1">Round {roundEndData.roundNumber} Complete!</h1>
-            <div className="text-lg text-gray-200">
-              🏆 {roundEndData.winner.name} wins the round!
-            </div>
+            {roundEndData.isGameEnd ? (
+              <>
+                <h1 className="text-3xl font-bold text-white mb-1">🎉 GAME COMPLETE! 🎉</h1>
+                <div className="text-2xl text-yellow-400 font-bold">
+                  🏆 {roundEndData.winner.name} is the WINNER! 🏆
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-white mb-1">Round {roundEndData.roundNumber} Complete!</h1>
+                <div className="text-lg text-gray-200">
+                  🏆 {roundEndData.winner.name} wins the round!
+                </div>
+              </>
+            )}
           </div>
 
           {/* Player Results */}
@@ -86,26 +112,16 @@ const RoundEndPopup = ({ roundEndData, onContinue, isMultiplayer = false, curren
             </div>
           </div>
 
-          {/* Continue Button - Only for single player */}
-          {!isMultiplayer && (
-            <div className="text-center mt-6 opacity-0" style={{ animation: `fadeIn 0.5s ease-out ${2.8 + roundEndData.players.length * 0.4}s forwards` }}>
-              <button
-                onClick={onContinue}
-                className="bg-gradient-to-r from-[#80142C] to-[#4a0c1a] hover:from-[#4a0c1a] hover:to-[#80142C] text-white font-bold py-3 px-8 border-2 border-[#80142C] transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                Continue to Next Round
-              </button>
+          {/* Auto-continue countdown */}
+          <div className="text-center mt-6 opacity-0" style={{ animation: `fadeIn 0.5s ease-out ${2.8 + roundEndData.players.length * 0.4}s forwards` }}>
+            <div className="text-lg text-gray-300 mb-2">
+              {roundEndData.isGameEnd ? (
+                <span>Returning to menu in <span className="text-yellow-400 font-bold">{countdown}</span> seconds...</span>
+              ) : (
+                <span>Continuing to next round in <span className="text-yellow-400 font-bold">{countdown}</span> seconds...</span>
+              )}
             </div>
-          )}
-          
-          {/* Multiplayer Auto-Continue Message */}
-          {isMultiplayer && (
-            <div className="text-center mt-6 opacity-0" style={{ animation: `fadeIn 0.5s ease-out ${2.8 + roundEndData.players.length * 0.4}s forwards` }}>
-              <div className="text-sm text-gray-300">
-                Next round will start automatically in 10 seconds...
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

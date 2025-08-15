@@ -1,4 +1,4 @@
-// Centralized deck utilities used by both App and Game
+// Centralized deck utilities
 
 export const shuffleDeck = (deck) => {
   const shuffled = [...deck];
@@ -50,14 +50,14 @@ export const createDeck = () => {
     if (import.meta && import.meta.env && import.meta.env.DEV) {
       // Lightweight diagnostics in dev builds
       // eslint-disable-next-line no-console
-      console.error('CRITICAL: Duplicate cards found in deck after creation!');
+      console.error('Duplicate cards found in deck after creation!');
     }
     throw new Error('Deck creation failed - duplicate cards detected');
   }
 
   if (import.meta && import.meta.env && import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log(`✓ Deck created successfully: ${deck.length} total cards`);
+    console.log(`Deck created successfully: ${deck.length} total cards`);
   }
 
   return deck;

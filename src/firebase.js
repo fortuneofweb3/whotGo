@@ -3,14 +3,14 @@ import { getDatabase } from 'firebase/database';
 import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCdEsxnNGXVb0UOY1gdTElzJTtxZag-Q2w",
-  authDomain: "xashmarkets-1.firebaseapp.com",
-  databaseURL: "https://xashmarkets-1-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "xashmarkets-1",
-  storageBucket: "xashmarkets-1.firebasestorage.app",
-  messagingSenderId: "166775884916",
-  appId: "1:166775884916:web:20453106dfe337739e5521",
-  measurementId: "G-VRMQS3FBV1"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);

@@ -1,6 +1,6 @@
 import { claimBadge, getUserProfile, hasBadge, getBadgeName, BADGE_CRITERIA, executeTransactionWithSOLRetry } from './profile';
 
-// Badge achievement conditions and tracking
+// Badge achievement conditions and tracking system
 export const BADGE_CONDITIONS = {
   [BADGE_CRITERIA.FIRST_VICTORY]: {
     name: "First Victory",
@@ -11,7 +11,7 @@ export const BADGE_CONDITIONS = {
   [BADGE_CRITERIA.CARD_MASTER]: {
     name: "Card Master", 
     description: "Master all card types",
-    condition: (stats) => stats.cardsPlayed >= 100, // Simplified condition
+    condition: (stats) => stats.cardsPlayed >= 100, // Cards played milestone
     checkOnGameEnd: true
   },
   [BADGE_CRITERIA.SHADOW_WARRIOR]: {
@@ -42,7 +42,7 @@ export const BADGE_CONDITIONS = {
     name: "Legendary Player",
     description: "Reach level 50",
     condition: (stats) => stats.level >= 50,
-    checkOnGameEnd: false // Check on level up
+    checkOnGameEnd: false // Check on level up instead of game end
   },
   [BADGE_CRITERIA.WHOT_GRANDMASTER]: {
     name: "Whot Grandmaster",
@@ -50,7 +50,7 @@ export const BADGE_CONDITIONS = {
     condition: (stats, profile) => {
       if (!profile || !profile.badges) return false;
       const earnedBadges = profile.badges.length;
-      return earnedBadges >= 7; // All badges except this one
+      return earnedBadges >= 7; // All badges except this one must be earned
     },
     checkOnGameEnd: true
   }
@@ -153,7 +153,9 @@ export const claimSpecificBadge = async ({ publicKey, wallet, signMessage, badge
   }
 };
 
-// Enhanced badge claiming with SOL management
+/**
+ * Claim badge with SOL management
+ */
 export const claimSpecificBadgeWithSOLManagement = async ({ publicKey, wallet, signMessage, badgeIndex, currentUser = null }) => {
   console.log('🚀 Enhanced badge claiming with SOL management...');
   

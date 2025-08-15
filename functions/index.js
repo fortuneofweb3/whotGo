@@ -5,7 +5,7 @@ const REGION = 'europe-west1';
 
 try {
   admin.initializeApp({
-    databaseURL: 'https://xashmarkets-1-default-rtdb.europe-west1.firebasedatabase.app'
+    databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://xashmarkets-1-default-rtdb.europe-west1.firebasedatabase.app'
   });
 } catch (e) {}
 const db = admin.database();
@@ -87,7 +87,7 @@ exports.purgeInactiveRooms = functions
 exports.markRoomActivity = functions
   .region(REGION)
   .database
-  .instance('xashmarkets-1-default-rtdb')
+  .instance(process.env.FIREBASE_DATABASE_INSTANCE || 'xashmarkets-1-default-rtdb')
   .ref('rooms/{roomId}/{rest=**}')
   .onWrite(async (change, context) => {
   const rest = context.params.rest || '';
