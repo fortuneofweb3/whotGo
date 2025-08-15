@@ -22,7 +22,11 @@ const Lobby = ({ rooms, setRooms, createRoom, joinRoom, setGameState, currentUse
   }, [setRooms]);
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#1a1a1a] to-[#000000] p-4 fade-in">
+    <div className="h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#1a1a1a] to-[#000000] p-4 fade-in overflow-y-auto" style={{
+      height: '100vh',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }}>
       <div className="absolute top-4 left-4 z-30">
         <button onClick={() => setGameState('menu')} className="text-white hover:text-red-300 transition-colors duration-200">
           <ArrowLeft size={window.innerWidth < 768 ? 18 : 24} />
