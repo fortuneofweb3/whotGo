@@ -4253,7 +4253,7 @@ const App = () => {
     if (gameState === 'landing') {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.landing}>
-          <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-screen px-4 py-0 sm:py-4 -mt-4 sm:-mt-6">
             <div className="relative w-40 h-20 xs:w-48 xs:h-24 sm:w-64 sm:h-28 md:w-80 md:h-32 lg:w-96 lg:h-36 mb-6 sm:mb-8" style={{ transform: 'scale(1.1)', transformOrigin: 'center' }}>
               {cards.map((card, index) => (
                 <div
@@ -4284,7 +4284,7 @@ const App = () => {
               ))}
             </div>
             <div className={`text-center transform transition-all duration-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'} max-w-6xl`}>
-              <div className="mb-8 sm:mb-12">
+              <div className="mb-6 sm:mb-8 md:mb-12">
                 <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 text-white relative border-4 border-black bg-[#80142C] p-2 sm:p-4 uppercase" style={{
                   fontFamily: 'Courier New, Liberation Mono, monospace',
                   textShadow: '4px 4px 0 #000000',
@@ -4300,7 +4300,7 @@ const App = () => {
                   ◆ THE CLASSIC 4-PLAYER CARD GAME ◆
                 </div>
               </div>
-              <div className="mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto">
+              <div className="mb-4 sm:mb-6 md:mb-8 max-w-2xl mx-auto">
                 <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-2 sm:mb-3 leading-relaxed text-gray-200">
                   Experience the <span className="text-[#80142C] font-bold">beloved classic</span> card game for everyone
                 </p>
@@ -4308,7 +4308,7 @@ const App = () => {
                   Strategic thinking meets fun gameplay in exciting 4-player matches with friends or AI opponents.
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-3 sm:gap-4">
+              <div className="flex flex-col items-center gap-2 sm:gap-3 md:gap-4">
                 <div className="flex items-center gap-1">
                   <div className="h-12 flex items-center border-3 border-black" style={{
                     boxShadow: '4px 4px 0 rgba(0,0,0,0.8)'
