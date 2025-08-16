@@ -1994,8 +1994,6 @@ const App = () => {
       return;
     }
     
-
-    
     setIsAnyAnimationInProgress(true);
     const totalCardsToDistribute = players.length * cardsPerPlayer;
     
@@ -2030,7 +2028,7 @@ const App = () => {
       
       setAnimatingCards(prev => [...prev, animatingCard]);
       
-            // Play the 'deal' sound effect immediately
+      // Play the 'deal' sound effect immediately
       playSoundEffect.deal();
       
       // Start animation with staggered timing
@@ -2047,10 +2045,13 @@ const App = () => {
           
           const newData = { ...prevData };
           const updatedPlayers = newData.players.map(p => ({ ...p, cards: [...p.cards] }));
+          
+          // Find the actual player in the game data and ensure they're not eliminated
           const actualPlayerIndex = updatedPlayers.findIndex(p => p.id === currentPlayer.id);
           if (actualPlayerIndex !== -1 && !updatedPlayers[actualPlayerIndex].eliminated) {
             updatedPlayers[actualPlayerIndex].cards.push(cardToDeal);
           }
+          
           return {
             ...newData,
             players: updatedPlayers,
@@ -2782,7 +2783,7 @@ const App = () => {
 
   // Function to handle continuing to next round (called when button is clicked)
   const handleContinueToNextRound = () => {
-    console.log('🎮 handleContinueToNextRound called:', { currentRoom: !!currentRoom, roundEndData: !!roundEndData });
+
     
     // Handle multiplayer case
     if (currentRoom) {
@@ -2884,10 +2885,12 @@ const App = () => {
           setRoundEndData(null);
           setConfettiActive(false);
           
-          // Start dealing animation
+          // Start dealing animation - only deal to non-eliminated players
           setTimeout(() => {
             const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
-            startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
+            // Filter out eliminated players from the game data for dealing
+            const activePlayersForDealing = nextRoundGameData.players.filter(p => !p.eliminated);
+            startDealingAnimation([...shuffledNewDeck], activePlayersForDealing, cardsPerPlayer);
           }, 100);
           
           return nextRoundGameData;
@@ -2897,12 +2900,9 @@ const App = () => {
     }
     
     // Handle single player case
-    if (!roundEndData) {
-      console.log('No roundEndData for single player continue');
-      return;
-    }
-    
-    console.log('Processing single player continue to next round');
+            if (!roundEndData) {
+          return;
+        }
     
     const eliminatedPlayer = roundEndData.eliminatedPlayer;
     const remainingPlayers = gameData.players.filter(p => !p.eliminated);
@@ -3017,8 +3017,9 @@ const App = () => {
         
         setTimeout(() => {
           const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
-          
-          startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
+          // Filter out eliminated players from the game data for dealing
+          const activePlayersForDealing = nextRoundGameData.players.filter(p => !p.eliminated);
+          startDealingAnimation([...shuffledNewDeck], activePlayersForDealing, cardsPerPlayer);
         }, 100);
         return nextRoundGameData;
       }
@@ -3131,214 +3132,7 @@ const App = () => {
 
 
 
-  // Function to handle continuing to next round (called when button is clicked)
-  const handleContinueToNextRound = () => {
-    console.log('🎮 handleContinueToNextRound called:', { currentRoom: !!currentRoom, roundEndData: !!roundEndData });
-    
-    // Handle multiplayer case
-    if (currentRoom) {
-      if (!roundEndData || !currentRoom) return;
-      
-      const eliminatedPlayer = roundEndData.eliminatedPlayer;
-      const players = ensurePlayersArray(gameData.players);
-      const remainingPlayers = players.filter(p => !p.eliminated && p.id !== eliminatedPlayer.id);
-      
-      setGameData(prevData => {
-        if (!prevData) return prevData;
-        
-        const nextRoundGameData = JSON.parse(JSON.stringify(prevData));
-        const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
-        const eliminatedPlayerInNewData = nextPlayers.find(p => p.id === eliminatedPlayer.id);
-        if (eliminatedPlayerInNewData) {
-          eliminatedPlayerInNewData.eliminated = true;
-        }
-        
-        nextRoundGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
-        nextRoundGameData.gameLog = {
-          ...nextRoundGameData.gameLog,
-          [nextRoundGameData.roundNumber]: [
-            ...(nextRoundGameData.gameLog[nextRoundGameData.roundNumber] || []),
-            `Round ${nextRoundGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${roundEndData.maxCards} total card points`
-          ]
-        };
-        
-        if (eliminatedPlayer.id === currentUser?.id) {
-          setShowEliminatedPopup(true);
-        }
-        
-        nextRoundGameData.roundNumber++;
-        
-        if (remainingPlayers.length <= 1) {
-          // Game ends - only one player left
-          nextRoundGameData.gamePhase = 'gameEnd';
-          const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundEndData.winner;
-          nextRoundGameData.winner = winner;
-          nextRoundGameData.lastAction = `${winner.name.split(' ')[0]} wins!`;
-          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`GAME OVER: ${winner.name} wins the game!`];
-          
-          // Update Firebase with game end
-          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
-          
-          // Reset room after delay
-          setTimeout(() => {
-            update(ref(db, `rooms/${currentRoom.id}`), {
-              status: 'waiting',
-              gameData: null,
-              countdown: null
-            });
-          }, 10000);
-          
-          setShowRoundEndPopup(false);
-          return nextRoundGameData;
-        } else {
-          // Continue to next round
-          const newDeck = createDeck();
-          const shuffledNewDeck = shuffleDeck(newDeck);
-          
-          // Reset all players' cards
-          nextRoundGameData.players.forEach(player => {
-            player.cards = [];
-          });
-          
-          // Reset game state
-          nextRoundGameData.playPile = [];
-          nextRoundGameData.drawPile = shuffledNewDeck;
-          nextRoundGameData.pendingPickCount = 0;
-          nextRoundGameData.generalMarketActive = false;
-          nextRoundGameData.generalMarketOriginatorId = null;
-          nextRoundGameData.skipNextPlayer = false;
-          nextRoundGameData.gamePhase = 'dealingCards';
-          nextRoundGameData.lastAction = 'Dealing cards...';
-          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [
-            `Round ${nextRoundGameData.roundNumber} begins with remaining players.`,
-            `New deck created and shuffled.`
-          ];
-          
-          // Set current player to first non-eliminated player
-          const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
-          nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
-          
-          // Update Firebase with next round data
-          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
-          
-          // Reset UI state
-          setAnimatingCards([]);
-          setPlayerScrollIndex(0);
-          setNeedNewMarketPositions(true);
-          playPilePositionsRef.current = [];
-          setPlayPileCardPositions({});
-          setIsAITurnInProgress(false);
-          setIsPlayerActionInProgress(false);
-          setIsAnyAnimationInProgress(false);
-          setSelectedLogRound(nextRoundGameData.roundNumber);
-          setShowRoundEndPopup(false);
-          setRoundEndData(null);
-          setConfettiActive(false);
-          
-          // Start dealing animation
-          setTimeout(() => {
-            const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
-            startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
-          }, 100);
-          
-          return nextRoundGameData;
-        }
-      });
-      return;
-    }
-    
-    // Handle single player case
-    if (!roundEndData) {
-      console.log('No roundEndData for single player continue');
-      return;
-    }
-    
-    console.log('Processing single player continue to next round');
-    
-    const eliminatedPlayer = roundEndData.eliminatedPlayer;
-    const remainingPlayers = gameData.players.filter(p => !p.eliminated);
-    
-    setGameData(prevData => {
-      if (!prevData) return prevData;
-      const nextRoundGameData = { ...prevData };
-      const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
-      if (eliminatedPlayerInNewData) {
-        eliminatedPlayerInNewData.eliminated = true;
-      }
-      nextRoundGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
-      nextRoundGameData.gameLog = {
-        ...nextRoundGameData.gameLog,
-        [nextRoundGameData.roundNumber]: [
-          ...(nextRoundGameData.gameLog[nextRoundGameData.roundNumber] || []),
-          `Round ${nextRoundGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${roundEndData.maxCards} total card points`
-        ]
-      };
-      nextRoundGameData.roundNumber++;
-      
-      if (remainingPlayers.length <= 1) {
-        nextRoundGameData.gamePhase = 'gameEnd';
-        const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundEndData.winner;
-        nextRoundGameData.winner = winner;
-        nextRoundGameData.lastAction = `${winner.name.split(' ')[0]} wins!`;
-        nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`GAME OVER: ${winner.name} wins the game!`];
-        setShowRoundEndPopup(false);
-        if (currentUser) {
-          const isWinner = winner.id === currentUser.id;
-          const newXP = (currentUser.xp || 0) + (isWinner ? 150 : 50);
-          const levelData = calculateLevel(newXP);
-          
-          // Update Firebase stats
-          update(ref(db, `users/${currentUser.id}`), {
-              gamesPlayed: (currentUser.gamesPlayed || 0) + 1,
-              gamesWon: isWinner ? (currentUser.gamesWon || 0) + 1 : currentUser.gamesWon || 0,
-              xp: newXP,
-              level: levelData.level,
-              currentLevelXP: levelData.currentLevelXP,
-              xpNeededForNext: levelData.xpNeededForNext,
-              currentWinStreak: isWinner ? (currentUser.currentWinStreak || 0) + 1 : 0,
-              bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : currentUser.bestWinStreak || 0,
-              totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + 5,
-              perfectWins: isWinner && (gameData?.roundsPlayed || 1) === 1 ? (currentUser.perfectWins || 0) + 1 : currentUser.perfectWins || 0
-          });
-        }
-        return nextRoundGameData;
-      } else {
-        const newDeck = createDeck();
-        const shuffledNewDeck = shuffleDeck(newDeck);
-        nextRoundGameData.players.forEach(player => {
-          player.cards = [];
-        });
-        nextRoundGameData.playPile = [];
-        nextRoundGameData.drawPile = shuffledNewDeck;
-        const firstPlayerIndex = nextRoundGameData.players.findIndex(p => !p.eliminated);
-        nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
-        nextRoundGameData.pendingPickCount = 0;
-        nextRoundGameData.generalMarketActive = false;
-        nextRoundGameData.generalMarketOriginatorId = null;
-        nextRoundGameData.skipNextPlayer = false;
-        nextRoundGameData.gamePhase = 'dealingCards';
-        nextRoundGameData.lastAction = 'Dealing cards...';
-        nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`Round ${nextRoundGameData.roundNumber} begins with remaining players.`, `New deck created and shuffled.`];
-        setAnimatingCards([]);
-        setPlayerScrollIndex(0);
-        setNeedNewMarketPositions(true);
-        playPilePositionsRef.current = [];
-        setPlayPileCardPositions({});
-        setIsAITurnInProgress(false);
-        setIsPlayerActionInProgress(false);
-        setIsAnyAnimationInProgress(false);
-        setSelectedLogRound(nextRoundGameData.roundNumber);
-        setShowRoundEndPopup(false);
-        setRoundEndData(null);
-        setConfettiActive(false);
-        setTimeout(() => {
-          const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
-          startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
-        }, 100);
-        return nextRoundGameData;
-      }
-    });
-  };
+
 
   const handleAutoPlay = async () => {
     if (!gameData || !currentRoom || !currentUser) return;
