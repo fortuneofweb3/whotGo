@@ -29,9 +29,12 @@ const RoundEndPopup = ({ roundEndData, onContinue, isMultiplayer = false, curren
           <div className="text-center mb-4 opacity-0 transform translateY-8" style={{ animation: 'fadeInUp 0.8s ease-out 1s forwards' }}>
             {roundEndData.isGameEnd ? (
               <>
-                <h1 className="text-3xl font-bold text-white mb-1">🎉 GAME COMPLETE! 🎉</h1>
-                <div className="text-2xl text-yellow-400 font-bold">
+                <h1 className="text-4xl font-bold text-white mb-2">🎉 GAME COMPLETE! 🎉</h1>
+                <div className="text-3xl text-yellow-400 font-bold mb-2">
                   🏆 {roundEndData.winner.name} is the WINNER! 🏆
+                </div>
+                <div className="text-lg text-green-400 font-bold">
+                  Congratulations! You've won the entire game!
                 </div>
               </>
             ) : (

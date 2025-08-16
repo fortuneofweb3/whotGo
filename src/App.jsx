@@ -2034,6 +2034,13 @@ const App = () => {
       return;
     }
     
+    console.log('🎯 Starting dealing animation:', { 
+      playersCount: players.length, 
+      cardsPerPlayer, 
+      totalCards: players.length * cardsPerPlayer,
+      playerIds: players.map(p => p.id)
+    });
+    
     setIsAnyAnimationInProgress(true);
     const totalCardsToDistribute = players.length * cardsPerPlayer;
     
@@ -2779,9 +2786,9 @@ const App = () => {
     const eliminatedPlayer = playersWithMaxTotal[Math.floor(Math.random() * playersWithMaxTotal.length)];
     const roundWinner = (playersWithTotals || []).find(p => p.cardTotal === Math.min(...(playersWithTotals || []).map(p => p.cardTotal)));
     
-    // Check if this round ends the game (only one player left after elimination)
-    const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
-    const isGameEnd = remainingPlayers.length === 1; // Exactly 1 player left = final winner
+          // Check if this round ends the game (only one player left after elimination)
+      const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
+      const isGameEnd = remainingPlayers.length <= 1; // 1 or fewer players left = final winner
     
     // Determine if current user is the winner of this round
     const isWinner = currentUser && roundWinner.id === currentUser.id;
@@ -2822,8 +2829,11 @@ const App = () => {
     // Auto-continue after 15 seconds
     setTimeout(() => {
       if (isGameEnd) {
-        // Game is over - redirect to main menu
-        returnToMenu();
+        // Game is over - show winner and redirect to main menu
+        console.log('🏆 Game ended! Winner:', roundWinner.name);
+        setTimeout(() => {
+          returnToMenu();
+        }, 3000); // Give time for winner announcement
       } else {
         // Continue to next round
         handleContinueToNextRound();
@@ -3101,7 +3111,7 @@ const App = () => {
       
       // Check if this round ends the game (only one player left after elimination)
       const remainingPlayers = activePlayers.filter(p => p.id !== eliminatedPlayer.id);
-      const isGameEnd = remainingPlayers.length === 1; // Exactly 1 player left = final winner
+      const isGameEnd = remainingPlayers.length <= 1; // 1 or fewer players left = final winner
       
       // Determine if current user is the winner of this round
       const isWinner = currentUser && roundWinner.id === currentUser.id;
@@ -3169,8 +3179,11 @@ const App = () => {
       // Auto-continue after 15 seconds
       setTimeout(() => {
         if (isGameEnd) {
-          // Game is over - redirect to room leader's room
-          returnToMenu();
+          // Game is over - show winner and redirect to menu
+          console.log('🏆 Multiplayer game ended! Winner:', roundWinner.name);
+          setTimeout(() => {
+            returnToMenu();
+          }, 3000); // Give time for winner announcement
         } else {
           // Continue to next round
           handleContinueToNextRound();
