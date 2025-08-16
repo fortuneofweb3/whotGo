@@ -4441,7 +4441,7 @@ const App = () => {
     } else if (gameState === 'rooms') {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
-          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8">
+          <div className="flex-1 flex flex-col justify-start items-center px-4 py-6 sm:py-8">
             <div className="w-full max-w-lg md:max-w-2xl lg:max-w-4xl relative">
               <button onClick={() => {
                 playSoundEffect.back();
@@ -4449,69 +4449,69 @@ const App = () => {
               }} className="absolute -top-2 left-0 text-white hover:text-gray-300 transition-all duration-300 flex items-center group">
                 <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform duration-200" />
               </button>
-              <div className="text-center mb-12 mt-16">
+              <div className="text-center mb-8 sm:mb-12 mt-12 sm:mt-16">
               </div>
               
-              <div className="mb-8">
+              <div className="mb-6 sm:mb-8">
                 <button 
                   onClick={() => {
                     playSoundEffect.click();
                     createRoom();
                   }} 
                   disabled={!currentUser} 
-                  className="group w-full p-6 bg-[#80142C] transition-all duration-200 hover:bg-[#4a0c1a] disabled:opacity-50 disabled:cursor-not-allowed border-3 border-black font-bold uppercase" 
+                  className="group w-full p-4 sm:p-6 bg-[#80142C] transition-all duration-200 hover:bg-[#4a0c1a] disabled:opacity-50 disabled:cursor-not-allowed border-3 border-black font-bold uppercase" 
                   style={{
                     boxShadow: '6px 6px 0 rgba(0,0,0,0.8)',
                     fontFamily: 'Courier New, Liberation Mono, monospace'
                   }}
                 >
                   <div className="flex items-center justify-center">
-                    <div className="w-12 h-12 bg-[#80142C] flex items-center justify-center border-2 border-white mr-4" style={{
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#80142C] flex items-center justify-center border-2 border-white mr-3 sm:mr-4" style={{
                       boxShadow: '3px 3px 0 rgba(0,0,0,0.8)'
                     }}>
-                      <Plus className="text-white" size={24} />
+                      <Plus className="text-white" size={20} />
                     </div>
                     <div className="text-center">
-                      <h2 className="text-2xl font-bold text-white mb-1">Create New Room</h2>
-                      <p className="text-gray-200">Start your own game room</p>
+                      <h2 className="text-lg sm:text-2xl font-bold text-white mb-1">Create New Room</h2>
+                      <p className="text-gray-200 text-sm sm:text-base">Start your own game room</p>
                     </div>
                   </div>
                 </button>
               </div>
               
-              <div className="p-6 border-3 border-white bg-gray-900 bg-opacity-50" style={{
+              <div className="p-4 sm:p-6 border-3 border-white bg-gray-900 bg-opacity-50" style={{
                 boxShadow: '6px 6px 0 rgba(0,0,0,0.8)'
               }}>
-                <h3 className="text-2xl font-bold text-white mb-6 flex items-center uppercase" style={{
+                <h3 className="text-lg sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center uppercase" style={{
                   fontFamily: 'Courier New, Liberation Mono, monospace',
                   textShadow: '2px 2px 0 #000000'
                 }}>
-                  <Users className="mr-3" size={24} />
+                  <Users className="mr-2 sm:mr-3" size={20} />
                   Available Rooms ({rooms.length})
                 </h3>
                 {rooms.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <Users size={48} className="mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">No rooms available</p>
-                    <p className="text-sm">Create a new room to get started!</p>
+                  <div className="text-center py-6 sm:py-8 text-gray-400">
+                    <Users size={40} className="mx-auto mb-3 sm:mb-4 opacity-50" />
+                    <p className="text-base sm:text-lg">No rooms available</p>
+                    <p className="text-xs sm:text-sm">Create a new room to get started!</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-3 sm:space-y-4 max-h-80 sm:max-h-96 overflow-y-auto">
                     {rooms.map(room => {
                       const playerCount = Object.keys(room.players || {}).length;
                       const canJoin = playerCount < room.maxPlayers && room.status === 'waiting';
                       return (
-                        <div key={room.id} className="bg-gray-800 p-4 border-2 border-black flex items-center justify-between" style={{
+                        <div key={room.id} className="bg-gray-800 p-3 sm:p-4 border-2 border-black flex items-center justify-between" style={{
                           boxShadow: '4px 4px 0 rgba(0,0,0,0.8)',
                           fontFamily: 'Courier New, Liberation Mono, monospace'
                         }}>
                           <div className="flex items-center">
-                            <div className="w-12 h-12 bg-[#80142C] flex items-center justify-center mr-4">
-                              <Crown className="text-white" size={20} />
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#80142C] flex items-center justify-center mr-3 sm:mr-4">
+                              <Crown className="text-white" size={16} />
                             </div>
                             <div>
-                              <h4 className="text-white font-bold">{room.ownerUsername}'s Room</h4>
-                              <p className="text-gray-300 text-sm">
+                              <h4 className="text-white font-bold text-sm sm:text-base">{room.ownerUsername}'s Room</h4>
+                              <p className="text-gray-300 text-xs sm:text-sm">
                                 {playerCount}/{room.maxPlayers} players
                                 {room.status === 'countdown' && ` • Starting in ${room.countdown}s`}
                               </p>
@@ -4684,7 +4684,7 @@ const App = () => {
     } else if (gameState === 'menu') {
         return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.menu}>
-          <div className="flex-1 flex flex-col justify-start items-center px-4 py-8">
+          <div className="flex-1 flex flex-col justify-start items-center px-4 py-6 sm:py-8">
             <div className="w-full max-w-6xl relative">
               <button onClick={() => {
                 playSoundEffect.back();
@@ -4692,15 +4692,15 @@ const App = () => {
               }} className="absolute -top-2 left-0 text-white hover:text-gray-300 transition-all duration-300 flex items-center group">
                 <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform duration-200" />
               </button>
-              <div className="text-center mb-12 mt-16">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white border-4 border-black bg-[#80142C] p-4 inline-block uppercase" style={{
+              <div className="text-center mb-8 sm:mb-12 mt-12 sm:mt-16">
+                <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-3 sm:mb-4 text-white border-4 border-black bg-[#80142C] p-2 sm:p-4 inline-block uppercase" style={{
                   fontFamily: 'Courier New, Liberation Mono, monospace',
                   textShadow: '4px 4px 0 #000000',
                   boxShadow: '8px 8px 0 rgba(0,0,0,0.8)'
                 }}>
                   Main Menu
                 </h1>
-                <div className="text-white text-lg tracking-wider font-bold uppercase" style={{
+                <div className="text-white text-sm sm:text-lg tracking-wider font-bold uppercase" style={{
                   fontFamily: 'Courier New, Liberation Mono, monospace',
                   textShadow: '2px 2px 0 #000000'
                 }}>
@@ -4710,12 +4710,12 @@ const App = () => {
               <div className="w-full flex justify-center items-center">
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 380px))',
-                  gap: '24px',
-                  marginBottom: '32px',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 380px))',
+                  gap: '16px',
+                  marginBottom: '24px',
                   maxWidth: '800px',
                   width: '100%',
-                  minHeight: '300px',
+                  minHeight: '250px',
                   justifyContent: 'center'
                 }}>
                   <button 
@@ -4731,16 +4731,16 @@ const App = () => {
                     }}
                   >
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
                         boxShadow: '2px 2px 0 rgba(0,0,0,0.8)'
                       }}>
-                        <Play className="text-white" size={20} />
+                        <Play className="text-white" size={16} />
                       </div>
-                      <div className="ml-4 text-left">
-                        <h2 className="text-xl font-bold text-white mb-1">Play Game</h2>
-                        <p className="text-gray-200 text-sm">Start a new Whot game</p>
+                      <div className="ml-3 sm:ml-4 text-left">
+                        <h2 className="text-lg sm:text-xl font-bold text-white mb-1">Play Game</h2>
+                        <p className="text-gray-200 text-xs sm:text-sm">Start a new Whot game</p>
                       </div>
-                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={20} />
+                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={16} />
                     </div>
                   </button>
                   <button 
@@ -4756,16 +4756,16 @@ const App = () => {
                     }}
                   >
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
                         boxShadow: '2px 2px 0 rgba(0,0,0,0.8)'
                       }}>
-                        <Shield className="text-white" size={20} />
+                        <Shield className="text-white" size={16} />
                       </div>
-                      <div className="ml-4 text-left">
-                        <h2 className="text-xl font-bold text-white mb-1">Profile</h2>
-                        <p className="text-gray-200 text-sm">View your player profile</p>
+                      <div className="ml-3 sm:ml-4 text-left">
+                        <h2 className="text-lg sm:text-xl font-bold text-white mb-1">Profile</h2>
+                        <p className="text-gray-200 text-xs sm:text-sm">View your player profile</p>
                       </div>
-                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={20} />
+                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={16} />
                     </div>
                   </button>
                   <button 
@@ -4781,16 +4781,16 @@ const App = () => {
                     }}
                   >
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
                         boxShadow: '2px 2px 0 rgba(0,0,0,0.8)'
                       }}>
-                        <Award className="text-white" size={20} />
+                        <Award className="text-white" size={16} />
                       </div>
-                      <div className="ml-4 text-left">
-                        <h2 className="text-xl font-bold text-white mb-1">Achievements</h2>
-                        <p className="text-gray-200 text-sm">Track your progress</p>
+                      <div className="ml-3 sm:ml-4 text-left">
+                        <h2 className="text-lg sm:text-xl font-bold text-white mb-1">Achievements</h2>
+                        <p className="text-gray-200 text-xs sm:text-sm">Track your progress</p>
                       </div>
-                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={20} />
+                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={16} />
                     </div>
                   </button>
                   <button 
@@ -4805,33 +4805,33 @@ const App = () => {
                     }}
                   >
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#80142C] flex items-center justify-center border-2 border-white" style={{
                         boxShadow: '2px 2px 0 rgba(0,0,0,0.8)'
                       }}>
-                        <Settings className="text-white" size={20} />
+                        <Settings className="text-white" size={16} />
                       </div>
-                      <div className="ml-4 text-left">
-                        <h2 className="text-xl font-bold text-white mb-1">Settings</h2>
-                        <p className="text-gray-200 text-sm">Adjust game preferences</p>
+                      <div className="ml-3 sm:ml-4 text-left">
+                        <h2 className="text-lg sm:text-xl font-bold text-white mb-1">Settings</h2>
+                        <p className="text-gray-200 text-xs sm:text-sm">Adjust game preferences</p>
                       </div>
-                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={20} />
+                      <ChevronRight className="ml-auto text-gray-200 group-hover:translate-x-1 transition-transform duration-200" size={16} />
                     </div>
                   </button>
                 </div>
               </div>
-              <div className="text-center mt-8">
-                <p className="text-gray-400 italic uppercase text-sm">
+              <div className="text-center mt-6 sm:mt-8">
+                <p className="text-gray-400 italic uppercase text-xs sm:text-sm">
                     Choose an option above to get started with Whot Go!
                   </p>
               </div>
             </div>
           </div>
           {activePopup && (
-            <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4" onClick={() => {
+            <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => {
               playSoundEffect.back();
               setActivePopup(null);
             }}>
-              <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="relative w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 {activePopup === 'battle' && <GameModePopup 
                   onClose={() => {
                     playSoundEffect.back();
