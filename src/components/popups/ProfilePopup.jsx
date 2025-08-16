@@ -53,7 +53,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
               username: newUsername.trim(),
               bio: newBio.trim() || userProfile?.bio || ''
             });
-            console.log('Profile updated on Honeycomb');
+      
           } catch (honeycombError) {
             console.error('Failed to update Honeycomb profile:', honeycombError);
           }

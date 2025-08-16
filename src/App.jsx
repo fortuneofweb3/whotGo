@@ -149,7 +149,7 @@ const App = () => {
     localStorage.removeItem('whotgo_isAITurnInProgress');
     localStorage.removeItem('whotgo_isAnyAnimationInProgress');
     
-    console.log('All game states cleared from localStorage');
+
   };
 
   // Handle page visibility changes
@@ -158,8 +158,7 @@ const App = () => {
       if (document.visibilityState === 'visible') {
         // Page became visible again - check if we need to restore state
         if (gameState === 'game' && gameData) {
-          // We're in a game, make sure the state is properly restored
-          console.log('Page became visible, restoring game state');
+                  // We're in a game, make sure the state is properly restored
         }
       }
     };
@@ -176,25 +175,22 @@ const App = () => {
       const roomRef = ref(db, `rooms/${roomId}`);
       const roomSnapshot = await get(roomRef);
       
-      if (roomSnapshot.exists()) {
-        const roomData = roomSnapshot.val();
-        // Check if current user is still in the room
-        if (roomData.players && roomData.players[currentUser?.id]) {
-          console.log('Successfully reconnected to room');
-          setCurrentRoom({ ...roomData, id: roomId });
-          return true;
+              if (roomSnapshot.exists()) {
+          const roomData = roomSnapshot.val();
+          // Check if current user is still in the room
+          if (roomData.players && roomData.players[currentUser?.id]) {
+            setCurrentRoom({ ...roomData, id: roomId });
+            return true;
+          } else {
+            clearGameState();
+            setGameState('menu');
+            return false;
+          }
         } else {
-          console.log('User no longer in room, clearing state');
           clearGameState();
           setGameState('menu');
           return false;
         }
-      } else {
-        console.log('Room no longer exists, clearing state');
-        clearGameState();
-        setGameState('menu');
-        return false;
-      }
     } catch (error) {
       console.error('Error checking room status:', error);
       clearGameState();
@@ -830,15 +826,6 @@ const App = () => {
             const newGameData = roomData.gameData;
             
             // Update gameData immediately - animations will be handled separately
-            console.log('Firebase listener updating gameData:', {
-              lastAction: newGameData.lastAction,
-              gameLog: newGameData.gameLog[newGameData.roundNumber],
-              currentPlayer: newGameData.currentPlayer,
-              roundNumber: newGameData.roundNumber,
-              fullGameLog: newGameData.gameLog,
-              generalMarketActive: newGameData.generalMarketActive,
-              generalMarketOriginatorId: newGameData.generalMarketOriginatorId
-            });
             setGameData(newGameData);
             stopBackgroundMusic();
             setGameState('game');
@@ -864,7 +851,6 @@ const App = () => {
             
             // Handle round end data for all players
             if (newGameData.gamePhase === 'roundEnd' && newGameData.roundEndData && !roundEndData) {
-              console.log('🎉 Round end detected in Firebase, showing popup for all players');
               setRoundEndData(newGameData.roundEndData);
               setTimeout(() => {
                 setShowRoundEndPopup(true);
@@ -969,21 +955,20 @@ const App = () => {
         // Deferred Honeycomb syncing - sync any pending game stats
         if (publicKey && wallet && signMessage && completeUserData) {
           try {
-            // Check if there are any pending stats to sync
-            const pendingStats = completeUserData.pendingHoneycombSync;
-            if (pendingStats) {
-              console.log('🔄 Syncing pending game stats to Honeycomb...');
-              await updateGameStats({
-                publicKey,
-                wallet,
-                signMessage,
-                gameResult: pendingStats.gameResult,
-                gameStats: pendingStats.gameStats,
-                currentUser: completeUserData
-              });
-              // Clear pending sync
-              update(ref(db, `users/${walletAddress}`), { pendingHoneycombSync: null });
-            }
+                    // Check if there are any pending stats to sync
+        const pendingStats = completeUserData.pendingHoneycombSync;
+        if (pendingStats) {
+          await updateGameStats({
+            publicKey,
+            wallet,
+            signMessage,
+            gameResult: pendingStats.gameResult,
+            gameStats: pendingStats.gameStats,
+            currentUser: completeUserData
+          });
+          // Clear pending sync
+          update(ref(db, `users/${walletAddress}`), { pendingHoneycombSync: null });
+        }
           } catch (error) {
             console.error('❌ Error syncing pending stats to Honeycomb:', error);
           }
@@ -1176,16 +1161,8 @@ const App = () => {
     try {
   
       
-      // Check if wallet is connected for Honeycomb integration
-      if (publicKey && wallet) {
-        console.log('🔍 Wallet validation:', {
-          hasPublicKey: !!publicKey,
-          hasWallet: !!wallet,
-          walletConnected: wallet?.connected,
-          hasSignAllTransactions: !!wallet?.signAllTransactions,
-          hasSignMessage: !!signMessage,
-          walletType: wallet?.constructor?.name
-        });
+              // Check if wallet is connected for Honeycomb integration
+        if (publicKey && wallet) {
         
         // Ensure wallet is properly connected and has required methods
         if (!wallet?.connected || !wallet?.signAllTransactions || !signMessage) {
@@ -1474,12 +1451,7 @@ const App = () => {
 
   // Sync Firebase data to Honeycomb
   const handleSyncToHoneycomb = async () => {
-    console.log('🔄 handleSyncToHoneycomb called with:', {
-      syncPopupData: syncPopupData ? 'present' : 'missing',
-      publicKey: publicKey ? 'present' : 'missing',
-      wallet: wallet ? 'present' : 'missing',
-      signMessage: signMessage ? 'present' : 'missing'
-    });
+
     
     if (!syncPopupData || !publicKey || !wallet || !signMessage) {
       console.error('❌ Missing required data for sync');
@@ -1816,18 +1788,8 @@ const App = () => {
     // Comprehensive game tracking and statistics update with bidirectional sync
   const updateGameStatistics = async (gameData, isWinner, gameMode = 'ai') => {
     if (!currentUser) {
-      console.log('No currentUser for updateGameStatistics');
       return null;
     }
-    
-    console.log('📊 updateGameStatistics called with:', {
-      isWinner,
-      gameMode,
-      currentUser: currentUser.id,
-      gameData: {
-        roundNumber: gameData?.roundNumber
-      }
-    });
 
 
 
@@ -1875,9 +1837,7 @@ const App = () => {
         xpNeededForNext: levelData.xpNeededForNext
       };
       
-      console.log('📊 Updating Firebase with data:', firebaseUpdateData);
       await update(userRef, firebaseUpdateData);
-      console.log('Firebase stats updated successfully');
   
     } catch (error) {
       console.error('❌ Error updating Firebase stats:', error);
@@ -1906,7 +1866,7 @@ const App = () => {
           pendingHoneycombSync: pendingSyncData
         });
         
-        console.log('📊 Game stats updated in Firebase, Honeycomb sync data stored for later');
+
       } catch (error) {
         console.error('❌ Error in deferred Honeycomb sync:', error);
       }
@@ -2034,12 +1994,7 @@ const App = () => {
       return;
     }
     
-    console.log('🎯 Starting dealing animation:', { 
-      playersCount: players.length, 
-      cardsPerPlayer, 
-      totalCards: players.length * cardsPerPlayer,
-      playerIds: players.map(p => p.id)
-    });
+
     
     setIsAnyAnimationInProgress(true);
     const totalCardsToDistribute = players.length * cardsPerPlayer;
@@ -2112,7 +2067,7 @@ const App = () => {
     const remainingDeck = deckToDeal.slice(totalCardsToDistribute);
     if (remainingDeck.length > 0) {
       const playCard = remainingDeck[0];
-      console.log("Dealing initial play card:", playCard);
+
       const endPosition = getPlayPilePosition(0, false);
       setPlayPileCardPositions(prev => ({
         ...prev,
@@ -2345,20 +2300,15 @@ const App = () => {
   };
 
   const getCardsPerPlayer = playerCount => {
-    console.log(`getCardsPerPlayer called with ${playerCount} players`);
     if (playerCount === 4) {
-      console.log(`Returning 6 cards for 4 players`);
       return 6;
     }
     if (playerCount === 3) {
-      console.log(`Returning 9 cards for 3 players`);
       return 9;
     }
     if (playerCount === 2) {
-      console.log(`Returning 12 cards for 2 players`);
       return 12;
     }
-    console.log(`Returning 6 cards for ${playerCount} players (default)`);
     return 6;
   };
 
@@ -2770,10 +2720,7 @@ const App = () => {
     // Play end sound when round ends
     playSoundEffect.end();
     
-    console.log('=== handleRoundEnd called ===');
-    console.log('Game data:', gameData);
-    console.log('Current gameData state:', gameData);
-    console.log('Current isAnyAnimationInProgress:', isAnyAnimationInProgress);
+
     
     const activePlayers = gameData.players.filter(p => !p.eliminated);
     const playersWithTotals = activePlayers.map(p => ({
@@ -2795,14 +2742,7 @@ const App = () => {
     
     // Update game statistics for this round (count as a game)
     if (currentUser) {
-      console.log('📊 Updating game statistics for round end:', {
-        isWinner,
-        gameMode: 'ai',
-        currentUser: currentUser.id,
-        gameData: {
-          roundNumber: gameData.roundNumber
-        }
-      });
+
       await updateGameStatistics(gameData, isWinner, 'ai');
     }
     
@@ -2830,7 +2770,7 @@ const App = () => {
     setTimeout(() => {
       if (isGameEnd) {
         // Game is over - show winner and redirect to main menu
-        console.log('🏆 Game ended! Winner:', roundWinner.name);
+
         setTimeout(() => {
           returnToMenu();
         }, 3000); // Give time for winner announcement
@@ -3029,7 +2969,7 @@ const App = () => {
             }).then(result => {
                       if (result.success && result.unlockableBadges.length > 0) {
           setUnlockableBadges(result.unlockableBadges);
-          console.log('Unlockable badges:', result.unlockableBadges);
+  
               }
             }).catch(error => {
               console.error('Error updating Honeycomb stats:', error);
@@ -3042,7 +2982,7 @@ const App = () => {
         }, 10000);
         return nextRoundGameData;
       } else {
-        console.log('Setting up new round with dealing animation...');
+
         const newDeck = createDeck();
         const shuffledNewDeck = shuffleDeck(newDeck);
         nextRoundGameData.players.forEach(player => {
@@ -3077,10 +3017,7 @@ const App = () => {
         
         setTimeout(() => {
           const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
-          console.log(`Round end - remaining players: ${remainingPlayers.length}, cards per player: ${cardsPerPlayer}, total cards to deal: ${remainingPlayers.length * cardsPerPlayer}`);
-          console.log('About to call startDealingAnimation, isAnyAnimationInProgress should be false');
-          console.log('Shuffled deck length:', shuffledNewDeck.length);
-          console.log('Remaining players:', remainingPlayers);
+          
           startDealingAnimation([...shuffledNewDeck], remainingPlayers, cardsPerPlayer);
         }, 100);
         return nextRoundGameData;
@@ -3094,8 +3031,7 @@ const App = () => {
       // Play end sound when round ends
       playSoundEffect.end();
       
-      console.log('=== handleMultiplayerRoundEnd called ===');
-      console.log('Game data:', gameData);
+      
       
       const players = ensurePlayersArray(gameData.players);
       const activePlayers = players.filter(p => !p.eliminated);
@@ -3121,11 +3057,7 @@ const App = () => {
       for (const player of allPlayers) {
         if (player.id) { // Only update for real players, not AI
           const isPlayerWinner = roundWinner.id === player.id;
-          console.log('📊 Updating game statistics for player:', player.id, {
-            isWinner: isPlayerWinner,
-            gameMode: 'multiplayer',
-            roundNumber: gameData.roundNumber
-          });
+
           
           // Update Firebase stats for each player
           await update(ref(db, `users/${player.id}`), {
@@ -3180,7 +3112,7 @@ const App = () => {
       setTimeout(() => {
         if (isGameEnd) {
           // Game is over - show winner and redirect to menu
-          console.log('🏆 Multiplayer game ended! Winner:', roundWinner.name);
+
           setTimeout(() => {
             returnToMenu();
           }, 3000); // Give time for winner announcement
@@ -3627,11 +3559,9 @@ const App = () => {
       if (currentRoom.ownerId) updateData.ownerId = currentRoom.ownerId;
       if (currentRoom.createdAt) updateData.createdAt = currentRoom.createdAt;
       
-      console.log('Sending Firebase update with gameData:', updateData);
       // Ensure we don't send undefined arrays/fields
       const safeUpdate = removeUndefinedValues(updateData);
       await update(ref(db, `rooms/${currentRoom.id}`), safeUpdate);
-      console.log('Firebase update completed successfully');
       
       // Reset UI states before setting game state
       setAnimatingCards([]);
@@ -3656,7 +3586,7 @@ const App = () => {
       // Move to game state; listener will animate locally from Firebase snapshot
       setGameState('game');
 
-      console.log(`Multiplayer game started with ${players.length} players, ${cardsPerPlayer} cards each`);
+
 
     } catch (error) {
       console.error('❌ Error starting multiplayer game:', error);
@@ -3711,7 +3641,7 @@ const App = () => {
     };
     
     setAnimatingCards(prev => {
-      console.log('Adding play card animation:', animatingCard.id, 'Total animating cards:', prev.length + 1);
+
       return [...prev, animatingCard];
     });
     player.cards = player.cards.filter((_, idx) => idx !== actualCardIndex);
@@ -3791,7 +3721,7 @@ const App = () => {
     const currentUserActualIndex = players.findIndex(p => p.id === currentUser.id);
     if (currentUserActualIndex === -1) return;
     if (gameData.currentPlayer !== currentUserActualIndex) {
-      console.log('Not your turn! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
+
       return;
     }
     
@@ -3890,7 +3820,7 @@ const App = () => {
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), `${currentPlayer.name} played ${card.number}${card.shape} (General Market) - All other players must draw from market`]
         };
-        console.log('General Market effect started by:', currentPlayer.name);
+  
       } else {
         newGameData.lastAction = `${currentPlayer.name} - ${card.number}${card.shape}`;
         newGameData.gameLog = {
@@ -3950,7 +3880,7 @@ const App = () => {
     const players = ensurePlayersArray(gameData.players);
     const currentUserActualIndex = players.findIndex(p => p.id === (currentUser?.id));
     if (gameData.currentPlayer !== currentUserActualIndex) {
-      console.log('Not your turn to draw! Current player:', gameData.currentPlayer, 'Your index:', currentUserActualIndex);
+
       return;
     }
     
@@ -3973,24 +3903,14 @@ const App = () => {
       const cardsToDraw = newGameData.pendingPickCount > 0 ? newGameData.pendingPickCount : 1;
       const isPending = newGameData.pendingPickCount > 0;
       const isGeneral = newGameData.generalMarketActive && newGameData.currentPlayer !== newGameData.generalMarketOriginatorId && !isPending;
-      console.log('Starting draw process:', {
-        cardsToDraw,
-        isPending,
-        isGeneral,
-        drawPileLength: newGameData.drawPile.length
-      });
+
       
       // Use the same animation function as AI game
       // animateDrawCards modifies the gameDataToUse object, so we need to use the returned data
       const updatedGameData = await animateDrawCards(newGameData, player, cardsToDraw, isPending, isGeneral);
-      console.log('animateDrawCards returned:', updatedGameData ? 'updated data' : 'null');
       if (updatedGameData) {
         // Copy all the updated data to ensure everything is properly updated
         Object.assign(newGameData, updatedGameData);
-        console.log('Game data after animateDrawCards:', {
-          playerCards: player.cards.length,
-          drawPileLength: newGameData.drawPile.length
-        });
       }
       
       // Clear pending pick count after drawing and set appropriate log messages
@@ -4002,8 +3922,7 @@ const App = () => {
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...currentRoundLog, `${player.name} drew ${cardsToDraw} card${cardsToDraw > 1 ? 's' : ''} (penalty)`]
         };
-        console.log('Multiplayer draw logged (penalty):', `${player.name} drew ${cardsToDraw} card${cardsToDraw > 1 ? 's' : ''} (penalty)`);
-        console.log('Current round log after penalty draw:', newGameData.gameLog[newGameData.roundNumber]);
+
       } else if (isGeneral) {
         newGameData.lastAction = `${player.name} drew a card`;
         const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
@@ -4011,8 +3930,7 @@ const App = () => {
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...currentRoundLog, `${player.name} drew 1 card (general market)`]
         };
-        console.log('Multiplayer draw logged (general market):', `${player.name} drew 1 card (general market)`);
-        console.log('Current round log after general market draw:', newGameData.gameLog[newGameData.roundNumber]);
+
       } else {
         newGameData.lastAction = `${player.name} drew a card`;
         const currentRoundLog = newGameData.gameLog[newGameData.roundNumber] || [];
@@ -4020,8 +3938,7 @@ const App = () => {
           ...newGameData.gameLog,
           [newGameData.roundNumber]: [...currentRoundLog, `${player.name} drew 1 card from market`]
         };
-        console.log('Multiplayer draw logged (normal):', `${player.name} drew 1 card from market`);
-        console.log('Current round log after normal draw:', newGameData.gameLog[newGameData.roundNumber]);
+
       }
     }
     
@@ -4039,19 +3956,13 @@ const App = () => {
         ...newGameData.gameLog,
         [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
       };
-              console.log('General Market effect ended in drawMultiplayerCard - turn back to originator');
+
     }
     
     // Update local state immediately for better responsiveness
     setGameData(newGameData);
     // Update Firebase with complete state
-          console.log('Updating Firebase with game data:', {
-      lastAction: newGameData.lastAction,
-      gameLog: newGameData.gameLog[newGameData.roundNumber],
-      roundNumber: newGameData.roundNumber,
-      generalMarketActive: newGameData.generalMarketActive,
-      generalMarketOriginatorId: newGameData.generalMarketOriginatorId
-    });
+
     await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
     setIsPlayerActionInProgress(false);
     isAnimationInProgressRef.current = false;
@@ -4122,7 +4033,7 @@ const App = () => {
       eliminated: false
     }];
     const cardsPerPlayer = getCardsPerPlayer(players.length);
-    console.log(`Initializing game: ${players.length} total players (1 human + ${players.length - 1} AI), ${cardsPerPlayer} cards each`);
+
     playPilePositionsRef.current = [];
     setPlayPilePositions([]);
     setGameData({
@@ -4150,7 +4061,7 @@ const App = () => {
 
   const returnToMenu = () => {
     try {
-      console.log('🔄 Returning to menu...');
+  
       
     // Clear game timeout
     if (gameTimeoutRef.current) {
@@ -4209,7 +4120,7 @@ const App = () => {
     // Clear localStorage when explicitly returning to menu
     clearGameState();
       
-      console.log('Successfully returned to menu');
+
     } catch (error) {
       console.error('❌ Error in returnToMenu:', error);
       // Force reset to menu state even if there's an error
@@ -4336,8 +4247,7 @@ const App = () => {
                   disabled={!connected || isCreatingProfile || isCheckingProfile}
                   onClick={async () => {
                     playSoundEffect.click();
-                    console.log('🎮 Start Playing button clicked');
-                    console.log('🎮 Button state debug:', { connected, currentUser: !!currentUser, honeycombProfileExists });
+                    
                     if (connected && honeycombProfileExists) {
                       // Profile exists, preload all sounds and start music
                       try {
@@ -4353,7 +4263,7 @@ const App = () => {
                       }
                     } else if (connected && !honeycombProfileExists) {
                       // Profile doesn't exist, create it
-                      console.log('📝 Profile not found, creating...');
+              
                       if (publicKey && wallet && signMessage) {
                         setIsCreatingProfile(true);
                         try {
@@ -4364,7 +4274,7 @@ const App = () => {
                             `Player${Math.floor(Math.random() * 10000)}`
                           );
                           if (result.success) {
-                            console.log('Profile created successfully');
+                    
                             setHoneycombProfileExists(true);
                             // Initialize sounds and start music
                             try {

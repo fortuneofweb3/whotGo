@@ -679,16 +679,7 @@ const Game = ({
 
 
   const chooseWhotShape = async shape => {
-    console.log('🎯 chooseWhotShape called', {
-      shape,
-      hasPendingWhotCard: !!pendingWhotCard,
-      isPlayerActionInProgress,
-      isAnyAnimationInProgress,
-      showWhotChoice
-    });
-    
     if (!pendingWhotCard || isPlayerActionInProgress || isAnyAnimationInProgress) {
-      console.log('chooseWhotShape blocked by guard clause');
       return;
     }
     
@@ -973,7 +964,7 @@ const Game = ({
     try {
       // Handle WHOT cards differently - show popup without animation
       if (card.special === 'whot') {
-        console.log('WHOT card clicked, showing popup');
+    
         setIsPlayerActionInProgress(true);
         setPendingWhotCard(card);
         setShowWhotChoice(true);
@@ -1096,18 +1087,7 @@ const Game = ({
   };
 
   const handleDrawMultiplayerCard = async () => {
-    console.log('🔍 handleDrawMultiplayerCard called', {
-      hasGameData: !!gameData,
-      hasCurrentRoom: !!currentRoom,
-      hasCurrentUser: !!currentUser,
-      isPlayerActionInProgress,
-      isAnyAnimationInProgress,
-      showWhotChoice,
-      pendingWhotCard: !!pendingWhotCard
-    });
-    
     if (!gameData || !currentRoom || !currentUser || isPlayerActionInProgress) {
-      console.log('handleDrawMultiplayerCard blocked by guard clause');
       return;
     }
     const players = ensurePlayersArray(gameData.players);
@@ -1351,14 +1331,7 @@ const Game = ({
               className={`absolute ${window.innerWidth < 768 ? 'w-[72px] h-[100px]' : window.innerWidth < 1024 ? 'w-[100px] h-36' : 'w-[130px] h-[172px]'} shadow-2xl ${index === Math.min((gameData.drawPile || []).length, 8) - 1 && (animatingCards || []).length === 0 && !isPlayerActionInProgress ? 'hover:scale-105 cursor-pointer' : ''}`}
               style={{ ...getMarketCardPosition(index) }}
               onClick={() => {
-                console.log('🎯 Market card clicked', {
-                  isTopCard: index === Math.min((gameData.drawPile || []).length, 8) - 1,
-                  noAnimatingCards: (animatingCards || []).length === 0,
-                  notPlayerActionInProgress: !isPlayerActionInProgress,
-                  notAnyAnimationInProgress: !isAnyAnimationInProgress,
-                  showWhotChoice,
-                  pendingWhotCard: !!pendingWhotCard
-                });
+
                 
                 if (index === Math.min((gameData.drawPile || []).length, 8) - 1 && (animatingCards || []).length === 0 && !isPlayerActionInProgress && !isAnyAnimationInProgress) {
                   if (currentRoom) {
@@ -1494,20 +1467,7 @@ const Game = ({
                     const canPlayAnyCard = isCurrentUserPlayer && isCurrentUserTurn && canPlayerPlay && gameData.pendingPickCount === 0 && !(gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId) && !isAnyAnimationInProgress;
                     const isThisCardPlayable = canPlayAnyCard && isCardPlayable(card, topCard);
                     
-                    // Debug logging
-                    if (cardIndex === 0) {
-                      console.log('🔍 Card Debug:', {
-                        playerName: player.name,
-                        isCurrentUserPlayer,
-                        visibleCardsLength: visibleCards.length,
-                        card: card,
-                        cardShape: card?.shape,
-                        cardNumber: card?.number,
-                        isDealingPhase,
-                        adminCardsRevealed,
-                        cardBackSVG: !isCurrentUserPlayer ? getCardBackSVG().substring(0, 100) + '...' : 'N/A'
-                      });
-                    }
+
                     
                     return (
                       <div

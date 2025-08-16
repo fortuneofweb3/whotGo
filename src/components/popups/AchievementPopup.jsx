@@ -150,7 +150,7 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
     setClaimingBadge(badgeIndex);
     
     try {
-      console.log(`Claiming badge ${badgeIndex}...`);
+
       
       const result = await claimSpecificBadgeWithSOLManagement({
         publicKey,
@@ -161,7 +161,7 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
       });
       
       if (result.success) {
-        console.log(`Successfully claimed badge ${badgeIndex}`);
+
         
         // Refresh the achievements list
         const updatedAchievements = unifiedAchievements.map(achievement => 
