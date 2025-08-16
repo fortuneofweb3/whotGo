@@ -3059,7 +3059,6 @@ const App = () => {
         if (player.id) { // Only update for real players, not AI
           const isPlayerWinner = roundWinner.id === player.id;
 
-          
           // Update Firebase stats for each player
           await update(ref(db, `users/${player.id}`), {
             gamesPlayed: (player.gamesPlayed || 0) + 1,
@@ -3067,6 +3066,33 @@ const App = () => {
             xp: (player.xp || 0) + (isPlayerWinner ? 150 : 50),
             lastActive: Date.now()
           });
+
+          // Also sync to Honeycomb for the current user if they have a wallet connected
+          if (player.id === currentUser?.id && publicKey && wallet && signMessage) {
+            try {
+              const honeycombGameStats = {
+                xp: isPlayerWinner ? 150 : 50,
+                cardsPlayed: 5,
+                perfectWin: false, // Multiplayer doesn't have perfect wins in the same way
+                gameMode: 'multiplayer',
+                roundsPlayed: gameData.roundNumber || 1
+              };
+
+              // Store pending Honeycomb sync data for later
+              const pendingSyncData = {
+                gameResult: isPlayerWinner ? 'win' : 'loss',
+                gameStats: honeycombGameStats,
+                timestamp: Date.now()
+              };
+              
+              // Update Firebase with pending sync data
+              await update(ref(db, `users/${player.id}`), {
+                pendingHoneycombSync: pendingSyncData
+              });
+            } catch (error) {
+              console.error('❌ Error in multiplayer Honeycomb sync:', error);
+            }
+          }
         }
       }
       
