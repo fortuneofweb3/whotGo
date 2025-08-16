@@ -4253,8 +4253,8 @@ const App = () => {
     if (gameState === 'landing') {
       return (
         <div className="min-h-screen flex flex-col relative overflow-y-auto" style={pageStyles.landing}>
-          <div className="absolute top-[5%] left-1/2 transform -translate-x-1/2 z-10">
-            <div className="relative w-72 h-36 sm:w-64 sm:h-28 md:w-80 md:h-32 lg:w-96 lg:h-36" style={{ transform: 'scale(1.1)', transformOrigin: 'center' }}>
+          <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
+            <div className="relative w-40 h-20 xs:w-48 xs:h-24 sm:w-64 sm:h-28 md:w-80 md:h-32 lg:w-96 lg:h-36 mb-6 sm:mb-8" style={{ transform: 'scale(1.1)', transformOrigin: 'center' }}>
               {cards.map((card, index) => (
                 <div
                   key={index}
@@ -4264,7 +4264,7 @@ const App = () => {
                     width: '72px', // 50% bigger than 48px (w-12)
                     height: '96px', // 50% bigger than 64px (h-16)
                     left: `calc(50% - 36px + ${(index * 12) + Math.sin(Date.now() * 0.001 + index) * 3}px)`,
-                    top: `${Math.cos(Date.now() * 0.001 + index) * 2}px`,
+                    bottom: '0px',
                     zIndex: index === currentCard ? 20 : 10 - index,
                     opacity: index === currentCard ? 1 : 0.7,
                     transform: `scale(${index === currentCard ? 1.1 : 0.95}) rotate(${index === currentCard ? 0 : (index - 2) * 6}deg) translateY(${Math.sin(Date.now() * 0.002 + index) * 1}px)`,
@@ -4283,34 +4283,32 @@ const App = () => {
                 </div>
               ))}
             </div>
-          </div>
-          <div className="flex-1 flex flex-col justify-center items-center px-6 pt-16">
             <div className={`text-center transform transition-all duration-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'} max-w-6xl`}>
-              <div className="mb-8">
-                <h1 className="text-7xl md:text-8xl font-bold mb-4 text-white relative border-4 border-black bg-[#80142C] p-4 uppercase" style={{
+              <div className="mb-8 sm:mb-12">
+                <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 text-white relative border-4 border-black bg-[#80142C] p-2 sm:p-4 uppercase" style={{
                   fontFamily: 'Courier New, Liberation Mono, monospace',
                   textShadow: '4px 4px 0 #000000',
                   boxShadow: '8px 8px 0 rgba(0,0,0,0.8)'
                 }}>
                   <span className="text-white">whot</span>
-                  <span className="text-yellow-400 ml-4">Go!</span>
+                  <span className="text-yellow-400 ml-1 sm:ml-2 md:ml-4">Go!</span>
                 </h1>
-                <div className="text-white text-xl md:text-2xl font-bold tracking-wider uppercase" style={{
+                <div className="text-white text-sm sm:text-lg md:text-xl lg:text-2xl font-bold tracking-wider uppercase" style={{
                   fontFamily: 'Courier New, Liberation Mono, monospace',
                   textShadow: '2px 2px 0 #000000'
                 }}>
                   ◆ THE CLASSIC 4-PLAYER CARD GAME ◆
+                </div>
               </div>
-              </div>
-              <div className="mb-6 max-w-2xl mx-auto">
-                <p className="text-xl md:text-2xl mb-2 leading-relaxed text-gray-200">
+              <div className="mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto">
+                <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-2 sm:mb-3 leading-relaxed text-gray-200">
                   Experience the <span className="text-[#80142C] font-bold">beloved classic</span> card game for everyone
                 </p>
-                <p className="text-base text-gray-300 leading-relaxed">
+                <p className="text-xs sm:text-sm md:text-base text-gray-300 leading-relaxed">
                   Strategic thinking meets fun gameplay in exciting 4-player matches with friends or AI opponents.
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-3 sm:gap-4">
                 <div className="flex items-center gap-1">
                   <div className="h-12 flex items-center border-3 border-black" style={{
                     boxShadow: '4px 4px 0 rgba(0,0,0,0.8)'
@@ -4327,7 +4325,7 @@ const App = () => {
                   <button onClick={() => {
                     playSoundEffect.click();
                     setShowHelp(true);
-                  }} className="bg-[#80142C] hover:bg-[#4a0c1a] text-white w-12 h-12 transition-all duration-200 border-3 border-black flex items-center justify-center font-bold text-lg uppercase" title="Game Help & Guide" style={{
+                  }} className="bg-[#80142C] hover:bg-[#4a0c1a] text-white w-10 h-10 sm:w-12 sm:h-12 transition-all duration-200 border-3 border-black flex items-center justify-center font-bold text-base sm:text-lg uppercase" title="Game Help & Guide" style={{
                     boxShadow: '4px 4px 0 rgba(0,0,0,0.8)',
                     fontFamily: 'Courier New, Liberation Mono, monospace'
                   }}>
@@ -4432,7 +4430,7 @@ const App = () => {
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   )}
                 </button>
-                <p className="text-sm text-gray-400 italic max-w-md text-center mt-2">
+                <p className="text-xs sm:text-sm text-gray-400 italic max-w-sm sm:max-w-md text-center mt-3 sm:mt-4 px-2">
                   Connect your wallet and start playing the classic African card game that brings families together.
                 </p>
               </div>
