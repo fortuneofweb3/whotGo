@@ -1942,8 +1942,15 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
       }
     };
     
+    // Wrap transaction in object format expected by sendClientTransactions
+    const transactionObject = {
+      transaction: txResponse.transaction,
+      blockhash: txResponse.blockhash,
+      lastValidBlockHeight: txResponse.lastValidBlockHeight
+    };
+    
     // Use sendClientTransactions with the admin keypair
-    const response = await sendClientTransactions(client, adminWalletAdapter, txResponse);
+    const response = await sendClientTransactions(client, adminWalletAdapter, transactionObject);
     
     console.log('✅ Transaction sent via Honeycomb client:', response);
     

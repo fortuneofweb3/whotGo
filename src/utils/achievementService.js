@@ -63,7 +63,15 @@ export const ACHIEVEMENT_DEFINITIONS = [
 
 // Calculate level from XP
 export const calculateLevel = (xp) => {
-  return Math.floor(xp / 100) + 1;
+  const level = Math.floor(xp / 100) + 1;
+  const currentLevelXP = xp % 100;
+  const xpNeededForNext = 100 - currentLevelXP;
+  
+  return {
+    level,
+    currentLevelXP,
+    xpNeededForNext
+  };
 };
 
 // Get XP reward for game completion
@@ -123,7 +131,8 @@ export const updateUserStatsAndAchievements = async (user, gameData, isWinner) =
     
     // Calculate new XP and level
     const newXP = (user.xp || 0) + xpEarned;
-    const newLevel = calculateLevel(newXP);
+    const newLevelData = calculateLevel(newXP);
+    const newLevel = newLevelData.level;
     
     // Prepare stats for achievement checking
     const statsForAchievements = {
@@ -144,7 +153,8 @@ export const updateUserStatsAndAchievements = async (user, gameData, isWinner) =
     
     // Add achievement XP to total
     const finalXP = newXP + achievementXP;
-    const finalLevel = calculateLevel(finalXP);
+    const finalLevelData = calculateLevel(finalXP);
+    const finalLevel = finalLevelData.level;
     
     // Prepare custom data for Honeycomb
     const customData = {

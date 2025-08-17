@@ -1590,21 +1590,29 @@ const App = () => {
   // Update leaderboard entry
   const updateLeaderboardEntry = async (userData) => {
     try {
+      if (!userData || !userData.id) {
+        console.warn('⚠️ Cannot update leaderboard: missing user data or ID');
+        return;
+      }
+
       const leaderboardRef = ref(db, `leaderboard/users/${userData.id}`);
+      
+      // Ensure all required fields have fallback values
       const leaderboardData = {
         id: userData.id,
-        username: userData.username,
-        xp: userData.xp,
-        level: userData.level,
-        gamesPlayed: userData.gamesPlayed,
-        gamesWon: userData.gamesWon,
-        winRate: userData.gamesPlayed > 0 ? (userData.gamesWon / userData.gamesPlayed * 100) : 0,
-        totalCardsPlayed: userData.totalCardsPlayed,
-        perfectWins: userData.perfectWins,
-        currentWinStreak: userData.currentWinStreak,
-        bestWinStreak: userData.bestWinStreak,
+        username: userData.username || 'Anonymous',
+        xp: userData.xp || 0,
+        level: userData.level || 1,
+        gamesPlayed: userData.gamesPlayed || 0,
+        gamesWon: userData.gamesWon || 0,
+        winRate: (userData.gamesPlayed || 0) > 0 ? ((userData.gamesWon || 0) / (userData.gamesPlayed || 1) * 100) : 0,
+        totalCardsPlayed: userData.totalCardsPlayed || 0,
+        perfectWins: userData.perfectWins || 0,
+        currentWinStreak: userData.currentWinStreak || 0,
+        bestWinStreak: userData.bestWinStreak || 0,
         lastActive: serverTimestamp()
       };
+      
       await set(leaderboardRef, leaderboardData);
 
     } catch (error) {
@@ -1654,11 +1662,20 @@ const App = () => {
         ...(newBioValue !== null && { bio: newBioValue.trim() })
       }));
       
-      // Update leaderboard
+      // Update leaderboard with complete user data
       await updateLeaderboardEntry({
         ...currentUser,
         username: newUsernameValue.trim(),
-        ...(newBioValue !== null && { bio: newBioValue.trim() })
+        ...(newBioValue !== null && { bio: newBioValue.trim() }),
+        // Ensure required fields have fallback values
+        xp: currentUser.xp || 0,
+        level: currentUser.level || 1,
+        gamesPlayed: currentUser.gamesPlayed || 0,
+        gamesWon: currentUser.gamesWon || 0,
+        totalCardsPlayed: currentUser.totalCardsPlayed || 0,
+        perfectWins: currentUser.perfectWins || 0,
+        currentWinStreak: currentUser.currentWinStreak || 0,
+        bestWinStreak: currentUser.bestWinStreak || 0
       });
       
       setIsEditingUsername(false);
