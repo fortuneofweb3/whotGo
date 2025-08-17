@@ -1849,12 +1849,8 @@ export const getAchievementName = (achievementIndex) => {
 export { BADGE_CRITERIA };
 
 // Platform data update function using project authority (server-side)
-export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0, customData = {} }) => {
+export const updatePlatformData = async ({ publicKey, profileAddress, achievements = [], xp = 0, customData = {} }) => {
   try {
-    const walletAddress = publicKey.toBase58();
-    
-
-    
     // Check if admin keypair is configured
     if (!APP_WALLET_CONFIG.publicKey || !APP_WALLET_CONFIG.privateKey) {
       throw new Error('Admin keypair not configured. Please set VITE_FEE_PAYER_PUBLIC_KEY and VITE_FEE_PAYER_PRIVATE_KEY environment variables.');
@@ -1865,31 +1861,10 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
     const adminPrivateKey = bs58.decode(APP_WALLET_CONFIG.privateKey);
     const adminKeypair = Keypair.fromSecretKey(adminPrivateKey);
     
-    // First find the user by wallet address
-    const users = await client.findUsers({
-      wallets: [walletAddress]
-    });
-    
-    if (users.user.length === 0) {
-      throw new Error('User not found for wallet address');
+    // Use the provided profile address directly
+    if (!profileAddress) {
+      throw new Error('Profile address is required');
     }
-    
-    const user = users.user[0];
-
-    
-    // Then find the user's profile
-    const profiles = await client.findProfiles({
-      userIds: [user.id],
-      projects: [PROJECT_ADDRESS],
-      identities: ["main"]
-    });
-    
-    if (profiles.profile.length === 0) {
-      throw new Error('Profile not found for user');
-    }
-    
-    const profile = profiles.profile[0];
-    const profileAddress = profile.address;
 
     
     // Prepare platform data update using the correct structure from Honeycomb docs

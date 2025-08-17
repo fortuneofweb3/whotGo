@@ -2661,7 +2661,7 @@ const App = () => {
     }, 15000);
 
   // Function to handle continuing to next round (called when button is clicked)
-  const handleContinueToNextRound = () => {
+  const handleContinueToNextRound = async () => {
 
     
     // Handle multiplayer case
@@ -2718,6 +2718,65 @@ const App = () => {
           }, 10000);
           
           setShowRoundEndPopup(false);
+          
+          // Handle achievement system for multiplayer game end (outside setState)
+          if (winner && currentUser && publicKey) {
+            setTimeout(async () => {
+              try {
+                const isWinner = winner.id === currentUser.id;
+                
+                // Use the achievement service to handle XP and achievements from Honeycomb
+                const { updateUserStatsAndAchievements } = await import('./utils/achievementService.js');
+                
+                // Prepare game data for the service
+                const gameDataForService = {
+                  roundsPlayed: nextRoundGameData.roundNumber || 1,
+                  totalCardsPlayed: 5 // Each game gives 5 "cards" for achievement tracking
+                };
+
+                // Update user stats and achievements using Honeycomb
+                const updatedUserData = await updateUserStatsAndAchievements(
+                  { ...currentUser, publicKey: publicKey },
+                  gameDataForService,
+                  isWinner
+                );
+
+                // Update Firebase with the data returned from Honeycomb
+                const userRef = ref(db, `users/${currentUser.id}`);
+                const firebaseUpdateData = {
+                  gamesPlayed: updatedUserData.gamesPlayed,
+                  gamesWon: updatedUserData.gamesWon,
+                  totalCardsPlayed: updatedUserData.totalCardsPlayed,
+                  perfectWins: updatedUserData.perfectWins,
+                  currentWinStreak: updatedUserData.currentWinStreak,
+                  bestWinStreak: updatedUserData.bestWinStreak,
+                  xp: updatedUserData.xp, // XP from Honeycomb
+                  level: updatedUserData.level, // Level calculated from Honeycomb XP
+                  achievements: updatedUserData.achievements, // Achievements from Honeycomb
+                  lastActive: serverTimestamp(),
+                  honeycombSynced: true
+                };
+                
+                await update(userRef, firebaseUpdateData);
+                
+                // Update leaderboard
+                await updateLeaderboardEntry(updatedUserData);
+                
+                // Update local state
+                setCurrentUser(updatedUserData);
+                
+                // Check for newly unlocked achievements to show popup
+                if (updatedUserData.newlyUnlockedAchievements && updatedUserData.newlyUnlockedAchievements.length > 0) {
+                  setNewlyUnlockedAchievements(updatedUserData.newlyUnlockedAchievements);
+                  setShowAchievementPopup(true);
+                }
+                
+              } catch (error) {
+                console.error('❌ Error updating multiplayer achievements:', error);
+              }
+            }, 1000); // Small delay to ensure state updates are complete
+          }
+          
           return nextRoundGameData;
         } else {
           // Continue to next round

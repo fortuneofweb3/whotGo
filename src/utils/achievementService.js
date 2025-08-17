@@ -168,9 +168,10 @@ export const updateUserStatsAndAchievements = async (user, gameData, isWinner) =
     };
     
     // Update Honeycomb platform data
-    if (user.publicKey) {
+    if (user.publicKey && user.address) {
       await updatePlatformData({
         publicKey: user.publicKey,
+        profileAddress: user.address, // Use the profile address directly
         achievements: newAchievements,
         xp: finalXP,
         customData
