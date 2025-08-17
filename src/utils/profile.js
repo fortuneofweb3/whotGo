@@ -1914,89 +1914,23 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
     
 
     
-    // Create transaction using project authority (admin keypair) - FIXED: Use profile address directly
-    const apiResponse = await client.createUpdatePlatformDataTransaction({
-      profile: profileAddress, // Use the profile address directly, not wallet address
-      authority: adminKeypair.publicKey.toString(), // Use project authority
-      platformData
+    // Create transaction using project authority (admin keypair) - Use direct approach from Honeycomb docs
+    const { createUpdatePlatformDataTransaction: txResponse } = await client.createUpdatePlatformDataTransaction({
+      profile: profileAddress.toString(), // The profile's public key
+      authority: adminKeypair.publicKey.toString(), // The public key of the project authority
+      platformData: {
+        addXp: xp || 0, // Optional, how much XP to award to the player
+        addAchievements: achievements || [], // Optional, an array containing indexes of the achievements to add
+        custom: { // Optional, add/remove any custom data to the profile
+          add: Object.entries(customData).map(([key, value]) => [key, value.toString()]),
+        }
+      },
     });
     
-    if (!apiResponse || !apiResponse.createUpdatePlatformDataTransaction) {
-      throw new Error('Invalid response from Honeycomb API: missing createUpdatePlatformDataTransaction');
-    }
+    console.log('✅ Platform data transaction created successfully');
+    console.log('📋 Transaction response:', txResponse);
     
-    const txResponse = apiResponse.createUpdatePlatformDataTransaction;
-    
-    if (!txResponse) {
-      throw new Error('Invalid response from Honeycomb API: missing transaction data');
-    }
-    
-
-    
-    // Create a proper wallet adapter for Honeycomb that handles VersionedTransaction
-    const adminWalletAdapter = {
-      publicKey: adminKeypair.publicKey,
-      connected: true,
-      signAllTransactions: async (transactions) => {
-        console.log('🔐 Signing transactions:', transactions.length);
-        
-        // Sign each transaction with the admin keypair
-        for (let i = 0; i < transactions.length; i++) {
-          const transaction = transactions[i];
-          console.log(`📝 Signing transaction ${i + 1}/${transactions.length}`);
-          
-          // Check if it's a VersionedTransaction (which is what Honeycomb uses)
-          if (transaction.constructor.name === 'VersionedTransaction') {
-            console.log('✅ Transaction is a VersionedTransaction');
-            transaction.sign([adminKeypair]);
-          } else if (transaction.partialSign) {
-            console.log('✅ Transaction has partialSign method');
-            transaction.partialSign(adminKeypair);
-          } else if (transaction.sign) {
-            console.log('✅ Transaction has sign method');
-            transaction.sign(adminKeypair);
-          } else {
-            console.log('⚠️ Unknown transaction type, trying to sign anyway...');
-            // Try to add the keypair as a signer
-            if (transaction.signatures) {
-              transaction.signatures.push(adminKeypair.publicKey.toBytes());
-            }
-          }
-        }
-        
-        return transactions;
-      }
-    };
-    
-    // Wrap transaction in object format expected by sendClientTransactions
-    const transactionObject = {
-      transaction: txResponse.transaction,
-      blockhash: txResponse.blockhash,
-      lastValidBlockHeight: txResponse.lastValidBlockHeight
-    };
-    
-    // Use sendClientTransactions with the admin keypair
-    const response = await sendClientTransactions(client, adminWalletAdapter, transactionObject);
-    
-    console.log('✅ Transaction sent via Honeycomb client:', response);
-    
-    // Check for success
-    if (response && response.length > 0) {
-      const bundle = response[0];
-      if (bundle.responses && bundle.responses.length > 0) {
-        const txResponse = bundle.responses[0];
-        
-        if (txResponse.error) {
-          throw new Error(`Transaction failed: ${txResponse.error}`);
-        } else if (txResponse.signature) {
-          console.log('✅ Transaction successful!');
-          console.log('📋 Signature:', txResponse.signature);
-        }
-      }
-    }
-    
-    console.log('✅ Platform data updated successfully');
-    return { success: true, achievements, xp, response: { success: true } };
+    return { success: true, achievements, xp, response: txResponse };
     
   } catch (error) {
     console.error('Error updating platform data:', error);
