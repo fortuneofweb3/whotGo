@@ -624,9 +624,16 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
     if (needsXPMigration) {
       console.log('🔄 One-time XP migration detected. Migrating Firebase XP to Honeycomb...');
       
+      // Get the profile address for the migration
+      if (!honeycombProfile || !honeycombProfile.address) {
+        console.log('❌ No profile address found for XP migration');
+        return { success: false, error: 'No profile address found for XP migration' };
+      }
+      
       // Use server-side update for XP migration
       await updatePlatformData({
         publicKey,
+        profileAddress: honeycombProfile.address, // Pass the profile address
         xp: firebaseUserData.xp,
         achievements: firebaseUserData.achievements || [],
         customData: {
