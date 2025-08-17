@@ -33,8 +33,7 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
   }, [publicKey]);
 
   // Debug: Log the userProfile object to see what fields are available
-  console.log('🔍 ProfilePopup userProfile:', userProfile);
-  console.log('🔍 ProfilePopup userProfile.address:', userProfile?.address);
+  // Debug logging removed for cleaner console
 
   // Handle null userProfile
   if (!userProfile) {

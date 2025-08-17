@@ -617,6 +617,32 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
       return { success: false, error: 'No wallet or signMessage provided' };
     }
     
+    // Check if this is a one-time XP migration (if Firebase has XP but Honeycomb doesn't)
+    const honeycombProfile = await getUserProfile(publicKey);
+    const needsXPMigration = firebaseUserData.xp > 0 && (!honeycombProfile || honeycombProfile.xp === 0);
+    
+    if (needsXPMigration) {
+      console.log('🔄 One-time XP migration detected. Migrating Firebase XP to Honeycomb...');
+      
+      // Use server-side update for XP migration
+      await updatePlatformData({
+        publicKey,
+        xp: firebaseUserData.xp,
+        achievements: firebaseUserData.achievements || [],
+        customData: {
+          gamesPlayed: firebaseUserData.gamesPlayed || 0,
+          gamesWon: firebaseUserData.gamesWon || 0,
+          totalCardsPlayed: firebaseUserData.totalCardsPlayed || 0,
+          perfectWins: firebaseUserData.perfectWins || 0,
+          currentWinStreak: firebaseUserData.currentWinStreak || 0,
+          bestWinStreak: firebaseUserData.bestWinStreak || 0,
+          lastActive: Date.now().toString()
+        }
+      });
+      
+      console.log('✅ XP migration completed successfully');
+    }
+    
     // Prepare update data - EXCLUDE XP and achievements since they originate from Honeycomb
     const updateData = {
       username: firebaseUserData.username || '',
