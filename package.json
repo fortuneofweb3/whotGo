@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "create-badges": "node scripts/createBadges.js"
   },
   "dependencies": {
     "@honeycomb-protocol/edge-client": "0.0.7-beta.15",
@@ -20,6 +21,7 @@
     "@solana/web3.js": "^1.95.3",
     "bs58": "^5.0.0",
     "buffer": "^6.0.3",
+    "dotenv": "^17.2.1",
     "firebase": "^12.1.0",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.263.0",

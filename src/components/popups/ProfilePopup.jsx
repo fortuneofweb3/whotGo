@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { updateProfileInfo } from '../../utils/profile';
+import { syncHoneycombToFirebase, getUserProfile } from '../../utils/profileClient.js';
 
 const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboard }) => {
   const { publicKey, wallet, signMessage } = useWallet();
@@ -8,6 +8,33 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
   const [newBio, setNewBio] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [honeycombProfile, setHoneycombProfile] = useState(null);
+  const [syncedData, setSyncedData] = useState(null);
+
+  // Sync Honeycomb data when popup opens
+  useEffect(() => {
+    const syncData = async () => {
+      if (!publicKey) return;
+      
+      try {
+        // Get Honeycomb profile
+        const profile = await getUserProfile(publicKey);
+        setHoneycombProfile(profile);
+        
+        // Sync to Firebase
+        const synced = await syncHoneycombToFirebase(publicKey);
+        setSyncedData(synced);
+      } catch (error) {
+        console.error('Error syncing Honeycomb data:', error);
+      }
+    };
+
+    syncData();
+  }, [publicKey]);
+
+  // Debug: Log the userProfile object to see what fields are available
+  console.log('🔍 ProfilePopup userProfile:', userProfile);
+  console.log('🔍 ProfilePopup userProfile.address:', userProfile?.address);
 
   // Handle null userProfile
   if (!userProfile) {
@@ -70,12 +97,12 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
     }
   };
 
-  // Use Firebase data for level progress
+  // Use Honeycomb data for level progress if available, otherwise use Firebase data
   const playerProgress = {
-    level: userProfile?.level || 1,
-    totalXP: userProfile?.xp || 0,
-    currentLevelXP: userProfile?.currentLevelXP || 0,
-    xpNeededForNext: userProfile?.xpNeededForNext || 100
+    level: honeycombProfile ? Math.floor((honeycombProfile.xp || 0) / 100) + 1 : (userProfile?.level || 1),
+    totalXP: honeycombProfile?.xp || userProfile?.xp || 0,
+    currentLevelXP: honeycombProfile ? ((honeycombProfile.xp || 0) % 100) : (userProfile?.currentLevelXP || 0),
+    xpNeededForNext: 100
   };
 
   return (
@@ -94,6 +121,11 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
               <div className="text-gray-200 text-lg tracking-wider">
                 Your Game Performance
               </div>
+              {honeycombProfile && (
+                <div className="mt-2 text-sm text-green-400">
+                  ✅ Synced with Honeycomb
+                </div>
+              )}
             </div>
             <div className="space-y-6 max-w-4xl mx-auto">
               {/* Username Section */}
@@ -165,6 +197,57 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                 </div>
               </div>
 
+              {/* Address Section */}
+              <div className="bg-black p-6">
+                <h2 className="text-xl font-bold text-white mb-6 flex items-center">
+                  <span className="w-8 h-8 bg-green-600 flex items-center justify-center mr-3 text-white text-sm">
+                    🔗
+                  </span>
+                  Wallet & Profile Addresses
+                </h2>
+                <div className="space-y-4">
+                  {/* Wallet Address */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="text-white font-medium mr-4">Wallet Address:</span>
+                      <span className="text-gray-300 font-mono text-sm">{userProfile?.id || 'Not connected'}</span>
+                    </div>
+                    {userProfile?.id && (
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(userProfile.id);
+                          // You could add a toast notification here
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm flex items-center gap-1"
+                      >
+                        <span>📋</span>
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Honeycomb Profile Address */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="text-white font-medium mr-4">Honeycomb Profile:</span>
+                      <span className="text-gray-300 font-mono text-sm">{userProfile?.address || 'Not available'}</span>
+                    </div>
+                    {userProfile?.address && (
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(userProfile.address);
+                          // You could add a toast notification here
+                        }}
+                        className="px-3 py-1 bg-purple-600 text-white hover:bg-purple-700 transition-colors text-sm flex items-center gap-1"
+                      >
+                        <span>📋</span>
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Level Progress Section */}
               <div className="bg-black p-6">
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center">
@@ -208,15 +291,19 @@ const ProfilePopup = ({ userProfile, updateUsername, closePopup, onShowLeaderboa
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{userProfile?.gamesPlayed || 0}</div>
+                    <div className="text-2xl font-bold text-white">{honeycombProfile?.gamesPlayed || userProfile?.gamesPlayed || 0}</div>
                     <div className="text-gray-200 text-sm">Games Played</div>
                   </div>
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{userProfile?.gamesWon || 0}</div>
+                    <div className="text-2xl font-bold text-white">{honeycombProfile?.gamesWon || userProfile?.gamesWon || 0}</div>
                     <div className="text-gray-200 text-sm">Games Won</div>
                   </div>
                   <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <div className="text-2xl font-bold text-white">{userProfile?.gamesPlayed > 0 ? ((userProfile?.gamesWon || 0) / userProfile?.gamesPlayed * 100).toFixed(1) : 0}%</div>
+                    <div className="text-2xl font-bold text-white">
+                      {(honeycombProfile?.gamesPlayed || userProfile?.gamesPlayed || 0) > 0 
+                        ? (((honeycombProfile?.gamesWon || userProfile?.gamesWon || 0) / (honeycombProfile?.gamesPlayed || userProfile?.gamesPlayed || 0)) * 100).toFixed(1) 
+                        : 0}%
+                    </div>
                     <div className="text-gray-200 text-sm">Win Rate</div>
                   </div>
                   <div className="text-center p-4 bg-gray-800 rounded-lg">

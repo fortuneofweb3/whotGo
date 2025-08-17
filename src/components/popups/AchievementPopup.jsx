@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getAllBadges, getBadgeProgress, BADGE_CONDITIONS, claimSpecificBadge, claimSpecificBadgeWithSOLManagement } from '../../utils/honeycombBadges';
-import { getUserProfile } from '../../utils/profile';
+import { getUserProfile } from '../../utils/profileClient.js';
+import { 
+  ACHIEVEMENT_DEFINITIONS, 
+  getAchievementProgress, 
+  getAchievementName, 
+  getAchievementDescription,
+  hasAchievement 
+} from '../../utils/achievementService.js';
 
 const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievements: firebaseAchievements }) => {
   const { publicKey, wallet, signMessage } = useWallet();
@@ -24,71 +30,52 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
         const profile = await getUserProfile(publicKey);
         setHoneycombProfile(profile);
         
-        // Get all Honeycomb badges with earned status
-        const honeycombBadges = await getAllBadges(publicKey);
-        
-        // Create unified achievements list
+        // Create unified achievements list using the new achievement system
         const unified = [];
         
-        // Add Firebase achievements (if they exist and are not duplicates)
-        if (firebaseAchievements && firebaseAchievements.length > 0) {
-          firebaseAchievements.forEach(fbAchievement => {
-            // Find corresponding Honeycomb badge
-            const honeycombBadge = honeycombBadges.find(hb => hb.index === fbAchievement.id - 1);
-            
-            unified.push({
-              id: fbAchievement.id,
-              index: fbAchievement.id - 1, // Convert to Honeycomb index
-              name: fbAchievement.name,
-              description: fbAchievement.description,
-              icon: fbAchievement.icon,
-              reward: fbAchievement.reward,
-              unlocked: fbAchievement.unlocked || (honeycombBadge?.earned || false),
-              claimed: fbAchievement.claimed || (honeycombBadge?.earned || false),
-              earned: honeycombBadge?.earned || fbAchievement.unlocked || false,
-              earnedAt: honeycombBadge?.earnedAt || null,
-              source: 'unified'
-            });
+        // Combine Firebase profile data with Honeycomb data
+        const userStats = {
+          ...firebaseProfile,
+          ...(profile || {}),
+          achievementsUnlocked: (profile?.achievements || []).length
+        };
+        
+        // Use the new achievement definitions
+        ACHIEVEMENT_DEFINITIONS.forEach(achievement => {
+          const isUnlocked = hasAchievement(userStats, achievement.id);
+          const progress = getAchievementProgress(achievement.id, userStats);
+          
+          unified.push({
+            id: achievement.id,
+            name: achievement.name,
+            description: achievement.description,
+            unlocked: isUnlocked,
+            claimed: isUnlocked, // Achievements are auto-claimed
+            earned: isUnlocked,
+            earnedAt: null,
+            progress: progress,
+            xpReward: achievement.xpReward,
+            source: 'honeycomb'
           });
-        } else {
-          // If no Firebase achievements, use Honeycomb badges
-          honeycombBadges.forEach(badge => {
-            unified.push({
-              id: badge.index + 1,
-              index: badge.index,
-              name: badge.name,
-              description: badge.description,
-              icon: getBadgeIcon(badge.index),
-              reward: getBadgeReward(badge.index),
-              unlocked: badge.earned,
-              claimed: badge.earned,
-              earned: badge.earned,
-              earnedAt: badge.earnedAt,
-              source: 'honeycomb'
-            });
-          });
-        }
+        });
         
         setUnifiedAchievements(unified);
       } catch (error) {
         console.error('Error loading unified achievements:', error);
-        // Fallback to Firebase achievements only
-        if (firebaseAchievements && firebaseAchievements.length > 0) {
-          const fallback = firebaseAchievements.map(fb => ({
-            id: fb.id,
-            index: fb.id - 1,
-            name: fb.name,
-            description: fb.description,
-            icon: fb.icon,
-            reward: fb.reward,
-            unlocked: fb.unlocked,
-            claimed: fb.claimed,
-            earned: fb.unlocked,
-            earnedAt: null,
-            source: 'firebase'
-          }));
-          setUnifiedAchievements(fallback);
-        }
+        // Fallback to basic achievement list
+        const fallback = ACHIEVEMENT_DEFINITIONS.map(achievement => ({
+          id: achievement.id,
+          name: achievement.name,
+          description: achievement.description,
+          unlocked: false,
+          claimed: false,
+          earned: false,
+          earnedAt: null,
+          progress: { current: 0, target: 1, percentage: 0 },
+          xpReward: achievement.xpReward,
+          source: 'fallback'
+        }));
+        setUnifiedAchievements(fallback);
       } finally {
         setLoading(false);
       }
@@ -97,7 +84,8 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
     loadUnifiedAchievements();
   }, [publicKey, firebaseAchievements]);
 
-  const getBadgeIcon = (badgeIndex) => {
+  // Helper functions for achievement display
+  const getAchievementIcon = (achievementId) => {
     const icons = {
       0: '🏆', // First Victory
       1: '🎯', // Card Master
@@ -108,77 +96,73 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
       6: '👑', // Legendary Player
       7: '💎'  // Whot Grandmaster
     };
-    return icons[badgeIndex] || '🏅';
-  };
-
-  const getBadgeReward = (badgeIndex) => {
-    const rewards = {
-      0: '100 XP',  // First Victory
-      1: '200 XP',  // Card Master
-      2: '500 XP',  // Shadow Warrior
-      3: '1200 XP', // Strategic Mind
-      4: '1500 XP', // Century Club
-      5: '2000 XP', // Ultimate Champion
-      6: '3000 XP', // Legendary Player
-      7: '5000 XP'  // Whot Grandmaster
-    };
-    return rewards[badgeIndex] || '100 XP';
+    return icons[achievementId] || '🏅';
   };
 
   const getProgressInfo = (achievement) => {
-    // Use Honeycomb profile for progress if available, otherwise use Firebase profile
-    const profile = honeycombProfile || firebaseProfile;
-    if (!profile) return null;
+    // Use the progress data from the achievement object
+    if (achievement.progress) {
+      const labels = {
+        0: 'Games Won',
+        1: 'Cards Played', 
+        2: 'Perfect Wins',
+        3: 'Games Won',
+        4: 'Games Played',
+        5: 'Games Won',
+        6: 'Level',
+        7: 'Achievements Unlocked'
+      };
+      
+      return {
+        current: achievement.progress.current,
+        target: achievement.progress.target,
+        percentage: achievement.progress.percentage,
+        label: labels[achievement.id] || 'Progress'
+      };
+    }
     
-    const progress = getBadgeProgress(profile, achievement.index);
-    if (!progress) return null;
-    
-    return {
-      current: progress.current,
-      target: progress.target,
-      percentage: progress.percentage,
-      label: progress.label
-    };
+    return null;
   };
 
-  const handleClaimBadge = async (badgeIndex) => {
-    if (!publicKey || !wallet || !signMessage) {
-      console.error('Wallet not connected for claiming badge');
+  const handleClaimBadge = async (achievementId) => {
+    if (!publicKey) {
+      console.error('Wallet not connected for claiming achievement');
       return;
     }
 
-    setClaimingBadge(badgeIndex);
+    setClaimingBadge(achievementId);
     
     try {
+      // Find the achievement to get its reward
+      const achievement = unifiedAchievements.find(a => a.id === achievementId);
+      if (!achievement) {
+        throw new Error('Achievement not found');
+      }
 
+      // Use the new achievement system
+      const { updatePlatformData } = await import('../../utils/profileClient.js');
       
-      const result = await claimSpecificBadgeWithSOLManagement({
-        publicKey,
-        wallet,
-        signMessage,
-        badgeIndex,
-        currentUser: firebaseProfile
+      await updatePlatformData({
+        publicKey: publicKey,
+        achievements: [achievementId],
+        xp: achievement.xpReward,
+        customData: {}
       });
       
-      if (result.success) {
-
-        
-        // Refresh the achievements list
-        const updatedAchievements = unifiedAchievements.map(achievement => 
-          achievement.index === badgeIndex 
-            ? { ...achievement, claimed: true, earned: true }
-            : achievement
-        );
-        setUnifiedAchievements(updatedAchievements);
-        
-        // Refresh Honeycomb profile
-        const profile = await getUserProfile(publicKey);
-        setHoneycombProfile(profile);
-        
-      } else {
-        console.error(`Failed to claim badge ${badgeIndex}:`, result.error);
-        alert(`Failed to claim badge: ${result.error}`);
-      }
+      // Refresh the achievements list
+      const updatedAchievements = unifiedAchievements.map(a => 
+        a.id === achievementId
+          ? { ...a, claimed: true, earned: true }
+          : a
+      );
+      setUnifiedAchievements(updatedAchievements);
+      
+      // Refresh Honeycomb profile
+      const profile = await getUserProfile(publicKey);
+      setHoneycombProfile(profile);
+      
+      alert(`🎉 Achievement "${achievement.name}" claimed successfully! +${achievement.reward} XP`);
+      
     } catch (error) {
       console.error(`Error claiming badge ${badgeIndex}:`, error);
       alert(`Error claiming badge: ${error.message}`);
@@ -241,7 +225,7 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
                            : 'opacity-60'
                        }`}>
                          <div className="flex items-center mb-3">
-                           <span className="text-3xl mr-3">{achievement.icon}</span>
+                           <span className="text-3xl mr-3">{getAchievementIcon(achievement.id)}</span>
                            <div className="flex-1">
                              <h3 className="text-lg font-bold text-white">{achievement.name}</h3>
                              <p className="text-sm text-gray-300">{achievement.description}</p>
@@ -267,7 +251,7 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
                          )}
                          
                          <div className="flex justify-between items-center">
-                           <span className="text-xs text-gray-400">{achievement.reward}</span>
+                           <span className="text-xs text-gray-400">{achievement.xpReward} XP</span>
                            {achievement.earned ? (
                              <div className="flex items-center">
                                <span className="text-xs text-green-400 mr-2">✓ Earned</span>
@@ -279,11 +263,11 @@ const AchievementPopup = ({ closePopup, userProfile: firebaseProfile, achievemen
                              </div>
                            ) : achievement.unlocked && !achievement.claimed ? (
                              <button
-                               onClick={() => handleClaimBadge(achievement.index)}
-                               disabled={claimingBadge === achievement.index}
+                               onClick={() => handleClaimBadge(achievement.id)}
+                               disabled={claimingBadge === achievement.id}
                                className="px-3 py-1 text-xs bg-[#80142C] text-white hover:bg-[#a01d39] disabled:opacity-50 disabled:cursor-not-allowed"
                              >
-                               {claimingBadge === achievement.index ? 'Claiming...' : 'Claim Badge'}
+                               {claimingBadge === achievement.id ? 'Claiming...' : 'Claim Achievement'}
                              </button>
                            ) : (
                              <span className="text-xs text-gray-500">🔒 Locked</span>

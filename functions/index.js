@@ -10,16 +10,16 @@ try {
 } catch (e) {}
 const db = admin.database();
 
-// Achievement definitions
+// Achievement definitions - updated to match Honeycomb system
 const ACHIEVEMENTS = [
-  { id: 1,  name: 'First Victory',        check: u => (u.gamesWon || 0) >= 1 },
-  { id: 2,  name: 'Card Master',          check: u => (u.gamesPlayed || 0) >= 10 },
-  { id: 3,  name: 'Shadow Warrior',       check: u => (u.currentWinStreak || 0) >= 5 },
-  { id: 4,  name: 'Strategic Mind',       check: u => (u.gamesWon || 0) >= 20 },
-  { id: 5,  name: 'Century Club',         check: u => (u.gamesPlayed || 0) >= 100 },
-  { id: 6,  name: 'Ultimate Champion',    check: u => levelFromXP(u.xp || 0) >= 50 },
-  { id: 7,  name: 'Legendary Player',     check: u => levelFromXP(u.xp || 0) >= 75 },
-  { id: 8,  name: 'Whot Grandmaster',     check: u => levelFromXP(u.xp || 0) >= 100 }
+  { id: 0,  name: 'First Victory',        check: u => (u.gamesWon || 0) >= 1 },
+  { id: 1,  name: 'Card Master',          check: u => (u.gamesPlayed || 0) >= 10 },
+  { id: 2,  name: 'Shadow Warrior',       check: u => (u.currentWinStreak || 0) >= 5 },
+  { id: 3,  name: 'Strategic Mind',       check: u => (u.gamesWon || 0) >= 10 },
+  { id: 4,  name: 'Century Club',         check: u => (u.gamesPlayed || 0) >= 100 },
+  { id: 5,  name: 'Ultimate Champion',    check: u => (u.gamesWon || 0) >= 50 },
+  { id: 6,  name: 'Legendary Player',     check: u => levelFromXP(u.xp || 0) >= 50 },
+  { id: 7,  name: 'Whot Grandmaster',     check: u => (u.gamesWon || 0) >= 100 }
 ];
 // Callable function to claim an achievement reward securely
 exports.claimAchievement = functions
@@ -41,13 +41,47 @@ exports.claimAchievement = functions
     }
     const alreadyClaimed = (user.claimedAchievements || []).includes(achievementId);
     if (alreadyClaimed) return { ok: true, xp: user.xp || 0 };
-    // Reward table (match UI text)
-    const rewardById = { 1: 100, 2: 200, 3: 500, 4: 1200, 5: 1500, 6: 2000, 7: 3000, 8: 5000 };
+    // Reward table (match UI text) - updated for new achievement IDs
+    const rewardById = { 0: 100, 1: 200, 2: 500, 3: 1200, 4: 1500, 5: 2000, 6: 3000, 7: 5000 };
     const xpReward = rewardById[achievementId] || 0;
     const newXP = (user.xp || 0) + xpReward;
     const newClaimed = [...(user.claimedAchievements || []), achievementId];
     await userRef.update({ xp: newXP, claimedAchievements: newClaimed, lastActive: Date.now() });
     return { ok: true, xp: newXP };
+  });
+
+// Callable function to update platform data (XP and achievements) on Honeycomb
+exports.updatePlatformData = functions
+  .region(REGION)
+  .https.onCall(async (data, context) => {
+    try {
+      const { publicKey, achievements = [], xp = 0, customData = {} } = data;
+      
+      if (!publicKey) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing publicKey');
+      }
+      
+      console.log('🔄 Firebase function: Updating platform data for:', publicKey);
+      console.log('📊 Platform data:', { achievements, xp, customData });
+      
+      // Import the server-side updatePlatformData function
+      const { updatePlatformData } = require('../src/utils/profile.js');
+      
+      // Call the server-side function
+      const result = await updatePlatformData({
+        publicKey: { toBase58: () => publicKey }, // Mock the PublicKey interface
+        achievements,
+        xp,
+        customData
+      });
+      
+      console.log('✅ Platform data updated successfully:', result);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error in updatePlatformData Firebase function:', error);
+      throw new functions.https.HttpsError('internal', error.message);
+    }
   });
 
 
@@ -188,7 +222,10 @@ exports.finalizeRoomOnGameEnd = functions
       const newXP = (u.xp || 0) + xpGain;
       const newStreak = won ? (u.currentWinStreak || 0) + 1 : 0;
       const newBest = won ? Math.max(newStreak, u.bestWinStreak || 0) : (u.bestWinStreak || 0);
-      updates.push(userRef.update({
+      
+      // Check for new achievements
+      const updatedUser = {
+        ...u,
         gamesPlayed: newGamesPlayed,
         gamesWon: newGamesWon,
         xp: newXP,
@@ -196,6 +233,22 @@ exports.finalizeRoomOnGameEnd = functions
         bestWinStreak: newBest,
         lastMatchAt: finishedAt,
         lastActive: finishedAt
+      };
+      
+      const newAchievements = ACHIEVEMENTS.filter(a => a.check(updatedUser)).map(a => a.id);
+      const currentUnlocked = u.achievementsUnlocked || [];
+      const newlyUnlocked = newAchievements.filter(id => !currentUnlocked.includes(id));
+      
+      updates.push(userRef.update({
+        gamesPlayed: newGamesPlayed,
+        gamesWon: newGamesWon,
+        xp: newXP,
+        currentWinStreak: newStreak,
+        bestWinStreak: newBest,
+        lastMatchAt: finishedAt,
+        lastActive: finishedAt,
+        achievementsUnlocked: newAchievements,
+        newlyUnlockedAchievements: newlyUnlocked // Track newly unlocked for frontend
       }));
       updates.push(db.ref(`users/${uid}/history/${matchId}`).set({
         matchId,

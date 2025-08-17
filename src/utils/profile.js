@@ -1,7 +1,34 @@
-import createEdgeClient from '@honeycomb-protocol/edge-client';
-import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/walletHelpers';
-import bs58 from 'bs58';
-import { Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, Keypair } from '@solana/web3.js';
+// Conditional imports for Node.js vs Browser environment
+let dotenv, bs58, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram, Keypair;
+
+// Only load Node.js modules in Node.js environment
+if (typeof window === 'undefined') {
+  // Node.js environment
+  dotenv = await import('dotenv');
+  const bs58Module = await import('bs58');
+  bs58 = bs58Module.default || bs58Module;
+  const web3 = await import('@solana/web3.js');
+  Connection = web3.Connection;
+  LAMPORTS_PER_SOL = web3.LAMPORTS_PER_SOL;
+  PublicKey = web3.PublicKey;
+  Transaction = web3.Transaction;
+  SystemProgram = web3.SystemProgram;
+  Keypair = web3.Keypair;
+  
+  // Load environment variables
+  dotenv.config();
+} else {
+  // Browser environment - use browser-compatible imports
+  const web3 = await import('@solana/web3.js');
+  PublicKey = web3.PublicKey;
+  // Other web3 imports will be loaded as needed
+}
+
+import { createEdgeClient } from '@honeycomb-protocol/edge-client';
+import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/walletHelpers.js';
+
+// Load environment variables at the top
+dotenv.config();
 
 // Honeycomb Protocol Configuration for Whot Go Project
 // Project created on Honeynet (Solana test network)
@@ -11,8 +38,8 @@ const API_URLS = [
   "https://edge.dev.honeycombprotocol.com/"   // Fallback: Devnet
 ];
 
-const PROJECT_ADDRESS = 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c';
-const PROFILES_TREE_ADDRESS = 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
+const PROJECT_ADDRESS = process.env.HONEYCOMB_PROJECT_ADDRESS || import.meta?.env?.VITE_HONEYCOMB_PROJECT_ADDRESS;
+const PROFILES_TREE_ADDRESS = process.env.HONEYCOMB_PROFILES_TREE_ADDRESS || import.meta?.env?.VITE_HONEYCOMB_PROFILES_TREE_ADDRESS;
 
 // Network configuration
 const NETWORK_CONFIG = {
@@ -332,6 +359,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       gamesWon: 0,
       createdAt: Date.now(),
       lastActive: Date.now(),
+      address: profileAddress || null, // Use 'address' to match the expected field name
       profileAddress: profileAddress || null,
       transactionSignature: transactionSignature || null
     };
@@ -367,7 +395,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       console.log('   Network: Honeynet (Solana test network)');
       console.log('   API URL: https://edge.test.honeycombprotocol.com/');
       console.log('   RPC URL: https://rpc.test.honeycombprotocol.com');
-      console.log('   Project: FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c');
+      console.log('   Project:', PROJECT_ADDRESS);
       
       // Try to reinitialize with different API endpoint
       console.log('🔄 Attempting to reinitialize with different API endpoint...');
@@ -445,19 +473,65 @@ export const loginUserProfile = async (publicKey) => {
       
       if (Array.isArray(profile.customData)) {
         // Handle array format: [[key, value], [key, value], ...]
-      profile.customData.forEach(([key, value]) => {
-        customData[key] = value;
-      });
+        profile.customData.forEach(([key, value]) => {
+          customData[key] = value;
+        });
       } else if (typeof profile.customData === 'object') {
-        // Handle object format: {key: value, key: value, ...}
-        Object.entries(profile.customData).forEach(([key, value]) => {
-        customData[key] = value;
-      });
+        // Handle object format with numeric keys where values are arrays: {0: [key, value], 1: [key, value], ...}
+        Object.values(profile.customData).forEach((entry) => {
+          if (Array.isArray(entry) && entry.length === 2) {
+            const [key, value] = entry;
+            customData[key] = value;
+          }
+        });
       }
     }
     
+    // Debug: Log the full profile structure to understand badges
+    console.log('🔍 Full profile structure from Honeycomb:', profile);
+    console.log('🔍 Profile badges property:', profile.badges);
+    console.log('🔍 Profile badges type:', typeof profile.badges);
+    console.log('🔍 Profile badges length:', profile.badges ? profile.badges.length : 'null/undefined');
+    console.log('🔍 Profile platformData:', profile.platformData);
+    console.log('🔍 Profile platformData.achievements:', profile.platformData?.achievements);
+    console.log('🔍 Profile platformData.achievements type:', typeof profile.platformData?.achievements);
+    console.log('🔍 Profile platformData.achievements length:', profile.platformData?.achievements ? profile.platformData.achievements.length : 'null/undefined');
+    
+    // Check all possible badge locations
+    console.log('🔍 All profile properties:', Object.keys(profile));
+    console.log('🔍 Profile proof:', profile.proof);
+    console.log('🔍 Profile tree_id:', profile.tree_id);
+    console.log('🔍 Profile userId:', profile.userId);
+    console.log('🔍 Profile user:', profile.user);
+    
+    // Try to get badges from different possible locations
+    let badges = [];
+    
+    // Check if badges are stored in platformData.achievements
+    if (profile.platformData?.achievements && Array.isArray(profile.platformData.achievements)) {
+      badges = profile.platformData.achievements;
+      console.log('🔍 Found badges in platformData.achievements:', badges);
+    }
+    // Check if badges are stored in a badges property
+    else if (profile.badges && Array.isArray(profile.badges)) {
+      badges = profile.badges;
+      console.log('🔍 Found badges in profile.badges:', badges);
+    }
+    // Check if badges are stored in proof
+    else if (profile.proof && profile.proof.badges) {
+      badges = profile.proof.badges;
+      console.log('🔍 Found badges in profile.proof.badges:', badges);
+    }
+    // Check if badges are stored in customData
+    else if (profile.customData && profile.customData.badges) {
+      badges = profile.customData.badges;
+      console.log('🔍 Found badges in profile.customData.badges:', badges);
+    }
+    
+    console.log('🔍 Final badges array:', badges);
+    
     const userProfile = {
-      id: profile.id,
+      id: profile.userId?.toString() || walletAddress, // Use userId if available, fallback to wallet address
       address: profile.address,
       username: profile.info?.name || 'Unknown Player',
       bio: profile.info?.bio || '',
@@ -471,7 +545,7 @@ export const loginUserProfile = async (publicKey) => {
       perfectWins: parseInt(customData.perfectWins || '0'),
       currentWinStreak: parseInt(customData.currentWinStreak || '0'),
       bestWinStreak: parseInt(customData.bestWinStreak || '0'),
-      badges: profile.badges || []
+      badges: badges
     };
     
     console.log('User profile logged in successfully:', userProfile);
@@ -649,6 +723,62 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
   }
 };
 
+// Sync Honeycomb data to Firebase
+export const syncHoneycombToFirebase = async (publicKey) => {
+  try {
+    console.log('🔄 Syncing Honeycomb data to Firebase...');
+    
+    if (!publicKey) {
+      console.log('❌ No publicKey provided for sync');
+      return { success: false, error: 'No publicKey provided' };
+    }
+    
+    // Get Honeycomb profile
+    const honeycombProfile = await getUserProfile(publicKey);
+    if (!honeycombProfile) {
+      console.log('❌ No Honeycomb profile found');
+      return { success: false, error: 'No Honeycomb profile found' };
+    }
+    
+    console.log('🔄 Honeycomb profile data:', honeycombProfile);
+    
+    // Import Firebase functions
+    const { ref, update } = await import('firebase/database');
+    const { db } = await import('../firebase');
+    
+    // Get current Firebase user data
+    const userRef = ref(db, `users/${publicKey.toString()}`);
+    
+    // Prepare update data from Honeycomb
+    const updateData = {
+      xp: honeycombProfile.xp || 0,
+      level: honeycombProfile.level || 1,
+      gamesPlayed: honeycombProfile.gamesPlayed || 0,
+      gamesWon: honeycombProfile.gamesWon || 0,
+      totalCardsPlayed: honeycombProfile.totalCardsPlayed || 0,
+      perfectWins: honeycombProfile.perfectWins || 0,
+      currentWinStreak: honeycombProfile.currentWinStreak || 0,
+      bestWinStreak: honeycombProfile.bestWinStreak || 0,
+      lastActive: Date.now(),
+      honeycombSynced: true
+    };
+    
+    // Update Firebase
+    await update(userRef, updateData);
+    
+    console.log('✅ Honeycomb data successfully synced to Firebase');
+    return { 
+      success: true, 
+      data: updateData,
+      honeycombProfile 
+    };
+    
+  } catch (error) {
+    console.error('❌ Error syncing Honeycomb to Firebase:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 /**
  * Check if user profile exists and sync data if needed
  */
@@ -704,8 +834,8 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
 
 // App wallet configuration for SOL transfers
 const APP_WALLET_CONFIG = {
-  publicKey: import.meta.env.VITE_FEE_PAYER_PUBLIC_KEY,
-  privateKey: import.meta.env.VITE_FEE_PAYER_PRIVATE_KEY
+  publicKey: process.env.VITE_FEE_PAYER_PUBLIC_KEY || import.meta?.env?.VITE_FEE_PAYER_PUBLIC_KEY || null,
+  privateKey: process.env.VITE_FEE_PAYER_PRIVATE_KEY || import.meta?.env?.VITE_FEE_PAYER_PRIVATE_KEY || null
 };
 
 /**
@@ -727,6 +857,13 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.0049) => {
     // Use app wallet to send SOL (skipping web3.js airdrop)
     try {
       console.log('🏦 Attempting app wallet transfer...');
+      
+      console.log('🔍 APP_WALLET_CONFIG debug:', {
+        hasPublicKey: !!APP_WALLET_CONFIG.publicKey,
+        hasPrivateKey: !!APP_WALLET_CONFIG.privateKey,
+        publicKeyValue: APP_WALLET_CONFIG.publicKey,
+        privateKeyValue: APP_WALLET_CONFIG.privateKey ? '***HIDDEN***' : 'NOT SET'
+      });
       
       if (!APP_WALLET_CONFIG.publicKey || !APP_WALLET_CONFIG.privateKey) {
         throw new Error('App wallet configuration missing');
@@ -892,11 +1029,18 @@ export const updateUserProfileWithSOLManagement = async (publicKey, wallet, sign
     throw new Error('signMessage is required for profile update');
   }
   
-  return await executeTransactionWithSOLRetry(
+  const result = await executeTransactionWithSOLRetry(
     () => updateUserProfile({ publicKey, wallet, signMessage, profileData: updates }),
     publicKey,
     3
   );
+  
+  // If the result indicates failure, throw an error to maintain backward compatibility
+  if (result && result.success === false) {
+    throw new Error(result.error || 'Failed to update Honeycomb profile');
+  }
+  
+  return result;
 };
 
 /**
@@ -1005,7 +1149,20 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
     if (!publicKey) {
       throw new Error('publicKey is required for profile update');
     }
+    if (!wallet) {
+      throw new Error('wallet is required for profile update');
+    }
+    if (!signMessage) {
+      throw new Error('signMessage is required for profile update');
+    }
+    
     const walletAddress = publicKey.toBase58();
+    
+    // Validate wallet connection
+    const isConnected = wallet.connected || wallet.adapter?.connected;
+    if (!isConnected) {
+      throw new Error('Wallet not connected. Please connect your wallet first.');
+    }
     
     // Authenticate with Honeycomb first
     let accessToken = null;
@@ -1024,7 +1181,12 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
       accessToken = authConfirm.accessToken;
     } catch (authError) {
       console.error('❌ Authentication failed:', authError);
-      throw new Error(`Authentication failed: ${authError.message}. Please ensure your wallet is registered with Honeycomb.`);
+      // Don't throw error, just return failure - this allows the app to continue with Firebase-only mode
+      return { 
+        success: false, 
+        error: `Authentication failed: ${authError.message}. Please ensure your wallet is registered with Honeycomb.`,
+        address: null
+      };
     }
     
     // Find the user's profile
@@ -1033,7 +1195,11 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
     });
     
     if (users.user.length === 0) {
-      throw new Error('User not found');
+      return { 
+        success: false, 
+        error: 'User not found in Honeycomb',
+        address: null
+      };
     }
     
     const profiles = await client.findProfiles({
@@ -1043,7 +1209,11 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
     });
     
     if (profiles.profile.length === 0) {
-      throw new Error('Profile not found');
+      return { 
+        success: false, 
+        error: 'Profile not found in Honeycomb',
+        address: null
+      };
     }
     
     const profile = profiles.profile[0];
@@ -1140,7 +1310,11 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
     const response = await sendClientTransactions(client, walletAdapter, transactionObject);
     console.log('✅ Honeycomb profile updated successfully:', response);
     
-    return { success: true, response };
+    return { 
+      success: true, 
+      response,
+      address: profile.address // Include the profile address in the response
+    };
   } catch (error) {
     console.error('Error updating user profile:', error);
     throw error;
@@ -1150,13 +1324,12 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
 /**
  * Retrieve user profile data
  */
-export const getUserProfile = async publicKey => {
+export const getUserProfile = async (publicKey) => {
   try {
     const walletAddress = publicKey.toBase58();
-    
     console.log('Getting Honeycomb user profile for:', walletAddress);
     
-    // Find the user by wallet address
+    // Find the user first
     const users = await client.findUsers({
       wallets: [walletAddress]
     });
@@ -1171,7 +1344,8 @@ export const getUserProfile = async publicKey => {
       userIds: [users.user[0].id],
       projects: [PROJECT_ADDRESS],
       identities: ["main"],
-      includeProof: true
+      includeProof: true,
+      includePlatformData: true
     });
     
     if (profiles.profile.length === 0) {
@@ -1180,6 +1354,40 @@ export const getUserProfile = async publicKey => {
     }
     
     const profile = profiles.profile[0];
+    
+    // COMPREHENSIVE DEBUGGING: Log the entire profile structure
+    console.log('🔍 FULL PROFILE STRUCTURE DEBUG:');
+    console.log('🔍 Profile object type:', typeof profile);
+    console.log('🔍 Profile object keys:', Object.keys(profile));
+    console.log('🔍 Profile object:', JSON.stringify(profile, null, 2));
+    
+    // Check for badges in all possible locations
+    console.log('🔍 CHECKING ALL POSSIBLE BADGE LOCATIONS:');
+    console.log('🔍 profile.badges:', profile.badges);
+    console.log('🔍 profile.proof:', profile.proof);
+    console.log('🔍 profile.platformData:', profile.platformData);
+    console.log('🔍 profile.customData:', profile.customData);
+    console.log('🔍 profile.info:', profile.info);
+    console.log('🔍 profile.user:', profile.user);
+    
+    // Check if there are any nested objects that might contain badges
+    if (profile.proof) {
+      console.log('🔍 profile.proof keys:', Object.keys(profile.proof));
+      console.log('🔍 profile.proof.badges:', profile.proof.badges);
+      console.log('🔍 profile.proof.achievements:', profile.proof.achievements);
+    }
+    
+    if (profile.platformData) {
+      console.log('🔍 profile.platformData keys:', Object.keys(profile.platformData));
+      console.log('🔍 profile.platformData.badges:', profile.platformData.badges);
+      console.log('🔍 profile.platformData.achievements:', profile.platformData.achievements);
+    }
+    
+    if (profile.customData) {
+      console.log('🔍 profile.customData keys:', Object.keys(profile.customData));
+      console.log('🔍 profile.customData.badges:', profile.customData.badges);
+      console.log('🔍 profile.customData.achievements:', profile.customData.achievements);
+    }
     
     // Extract custom data from profile
     const customData = {};
@@ -1193,16 +1401,35 @@ export const getUserProfile = async publicKey => {
       
       if (Array.isArray(profile.customData)) {
         // Handle array format: [[key, value], [key, value], ...]
-      profile.customData.forEach(([key, value]) => {
-        customData[key] = value;
-      });
+        profile.customData.forEach(([key, value]) => {
+          customData[key] = value;
+        });
       } else if (typeof profile.customData === 'object') {
-        // Handle object format: {key: value, key: value, ...}
-        Object.entries(profile.customData).forEach(([key, value]) => {
-        customData[key] = value;
-      });
+        // Handle object format with numeric keys where values are arrays: {0: [key, value], 1: [key, value], ...}
+        Object.values(profile.customData).forEach((entry) => {
+          if (Array.isArray(entry) && entry.length === 2) {
+            const [key, value] = entry;
+            customData[key] = value;
+          }
+        });
       }
     }
+    
+    // Get XP and achievements from platform data (not custom data)
+    const platformXP = parseInt(profile.platformData?.xp || 0);
+    const platformAchievements = profile.platformData?.achievements || [];
+    
+    console.log('🔍 Platform data analysis:', {
+      hasPlatformData: !!profile.platformData,
+      platformXP: platformXP,
+      platformAchievements: platformAchievements,
+      platformDataKeys: profile.platformData ? Object.keys(profile.platformData) : null
+    });
+    
+    // Use platform data for XP and achievements
+    const xp = platformXP;
+    const achievements = platformAchievements;
+    const level = Math.floor(xp / 100) + 1;
     
     return {
       id: profile.id,
@@ -1210,8 +1437,8 @@ export const getUserProfile = async publicKey => {
       username: profile.info?.name || 'Unknown Player',
       bio: profile.info?.bio || '',
       pfp: profile.info?.pfp || '',
-      xp: parseInt(customData.xp || '0'),
-      level: parseInt(customData.level || '1'),
+      xp: xp, // Use platform data XP
+      level: level, // Calculate level from platform XP
       gamesPlayed: parseInt(customData.gamesPlayed || '0'),
       gamesWon: parseInt(customData.gamesWon || '0'),
       createdAt: parseInt(customData.createdAt || '0'),
@@ -1220,7 +1447,7 @@ export const getUserProfile = async publicKey => {
       perfectWins: parseInt(customData.perfectWins || '0'),
       currentWinStreak: parseInt(customData.currentWinStreak || '0'),
       bestWinStreak: parseInt(customData.bestWinStreak || '0'),
-      badges: profile.badges || []
+      achievements: achievements // Use platform data achievements
     };
   } catch (error) {
     console.error('Error getting user profile:', error);
@@ -1338,7 +1565,11 @@ export const updateProfileInfo = async ({ publicKey, wallet, signMessage, userna
     const response = await sendClientTransactions(client, walletAdapter, transactionObject);
     console.log('Profile info updated successfully');
     
-    return { success: true, response };
+    return { 
+      success: true, 
+      response,
+      address: profile.address // Include the profile address in the response
+    };
   } catch (error) {
     console.error('Error updating profile info:', error);
     throw error;
@@ -1397,12 +1628,25 @@ export const claimBadge = async ({ publicKey, wallet, signMessage, badgeIndex })
     
     const profile = profiles.profile[0];
     
+    // ENHANCED DEBUGGING: Log all parameters being sent
+    console.log('🔍 BADGE CLAIMING PARAMETERS:');
+    console.log('🔍 payer:', walletAddress);
+    console.log('🔍 projectAddress:', PROJECT_ADDRESS);
+    console.log('🔍 profileAddress:', profile.address);
+    console.log('🔍 criteriaIndex:', badgeIndex);
+    console.log('🔍 proof:', "Public");
+    console.log('🔍 accessToken:', accessToken ? 'Present' : 'Missing');
+    
     // Claim the badge criteria
     console.log('📝 Creating claim badge transaction...');
     const apiResponse = await client.createClaimBadgeCriteriaTransaction({
-      payer: walletAddress,
-      profile: profile.address,
-      badgeCriteria: badgeIndex
+      args: {
+        payer: walletAddress,
+        projectAddress: PROJECT_ADDRESS,
+        profileAddress: profile.address,
+        criteriaIndex: badgeIndex,
+        proof: "Public"
+      }
     }, {
       fetchOptions: {
         headers: {
@@ -1432,6 +1676,13 @@ export const claimBadge = async ({ publicKey, wallet, signMessage, badgeIndex })
       throw new Error('Invalid response from Honeycomb API: missing transaction data');
     }
     
+    // ENHANCED DEBUGGING: Log transaction details
+    console.log('🔍 TRANSACTION DETAILS:');
+    console.log('🔍 Transaction exists:', !!txResponse.transaction);
+    console.log('🔍 Blockhash exists:', !!txResponse.blockhash);
+    console.log('🔍 LastValidBlockHeight exists:', !!txResponse.lastValidBlockHeight);
+    console.log('🔍 Transaction length:', txResponse.transaction ? txResponse.transaction.length : 'N/A');
+    
     // Sign and send the transaction
     const walletAdapter = getWalletAdapter(wallet);
     
@@ -1442,31 +1693,197 @@ export const claimBadge = async ({ publicKey, wallet, signMessage, badgeIndex })
       lastValidBlockHeight: txResponse.lastValidBlockHeight
     };
     
-    console.log('📝 Transaction object prepared for badge claim:', {
+    console.log('🔐 Transaction object prepared for badge claim:', {
       hasTransaction: !!transactionObject.transaction,
       hasBlockhash: !!transactionObject.blockhash,
       hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
     });
     
+    console.log('🚀 Sending transaction to Honeycomb...');
     const response = await sendClientTransactions(client, walletAdapter, transactionObject);
+    console.log('✅ Transaction sent successfully');
+    
+    // ENHANCED DEBUGGING: Log response details
+    console.log('🔍 TRANSACTION RESPONSE:');
+    console.log('🔍 Response type:', typeof response);
+    console.log('🔍 Response keys:', response ? Object.keys(response) : 'null/undefined');
+    console.log('🔍 Response:', response);
+    
+    // Handle response format
+    let transactionSignature = null;
+    
+    if (Array.isArray(response) && response.length > 0) {
+      // Bundle response format
+      console.log('📦 Bundle response detected');
+      const bundleResponse = response[0];
+      
+      console.log('🔍 BUNDLE RESPONSE DETAILS:');
+      console.log('🔍 Bundle response type:', typeof bundleResponse);
+      console.log('🔍 Bundle response keys:', bundleResponse ? Object.keys(bundleResponse) : 'null/undefined');
+      console.log('🔍 Bundle response:', bundleResponse);
+      
+      if (bundleResponse && bundleResponse.responses && Array.isArray(bundleResponse.responses)) {
+        console.log('📦 Bundle responses count:', bundleResponse.responses.length);
+        
+        // Look for the actual transaction response
+        for (let i = 0; i < bundleResponse.responses.length; i++) {
+          const resp = bundleResponse.responses[i];
+          console.log(`🔍 Response ${i} type:`, typeof resp);
+          console.log(`🔍 Response ${i} keys:`, resp ? Object.keys(resp) : 'null/undefined');
+          console.log(`🔍 Response ${i}:`, resp);
+          
+          if (resp && resp.signature) {
+            transactionSignature = resp.signature;
+            console.log('✅ Found transaction signature in bundle');
+          }
+          if (resp && resp.profileAddress) {
+            console.log('✅ Found profile address in bundle');
+          }
+        }
+      } else {
+        console.log('🔍 Bundle response structure:');
+        console.log('🔍 Has responses property:', !!bundleResponse.responses);
+        console.log('🔍 Responses is array:', Array.isArray(bundleResponse.responses));
+        console.log('🔍 Full bundle response structure:', JSON.stringify(bundleResponse, null, 2));
+      }
+    } else if (response && response.signature) {
+      // Direct response format
+      transactionSignature = response.signature;
+      console.log('✅ Direct transaction signature found');
+    }
+    
+    console.log('🔍 Final transaction signature:', transactionSignature);
+    
+    if (!transactionSignature) {
+      console.error('❌ No transaction signature found in response');
+      throw new Error('Transaction failed: no signature returned');
+    }
+    
     console.log('Honeycomb badge claimed successfully');
     
-    return { success: true, badgeIndex, response };
+    return { success: true, badgeIndex, response, transactionSignature };
   } catch (error) {
     console.error('Error claiming badge:', error);
     throw error;
   }
 };
 
-// Helper function to check if user has earned a specific badge
-export const hasBadge = (profile, badgeIndex) => {
-  if (!profile || !profile.badges) return false;
-  return profile.badges.some(badge => badge.badgeCriteria === badgeIndex);
+// Function to verify if a badge was actually claimed
+export const verifyBadgeClaim = async (publicKey, wallet, signMessage, badgeIndex) => {
+  try {
+    const walletAddress = publicKey.toBase58();
+    console.log(`🔍 Verifying badge claim for badge ${badgeIndex}...`);
+    
+    // Authenticate with Honeycomb first
+    console.log('🔐 Authenticating with Honeycomb...');
+    let accessToken = null;
+    try {
+      const { authRequest: { message: authRequest } } = await client.authRequest({
+        wallet: walletAddress
+      });
+      console.log('📝 Auth request received, signing message...');
+      const encodedMessage = new TextEncoder().encode(authRequest);
+      const signedMessage = await signMessage(encodedMessage);
+      const signature = bs58.encode(signedMessage);
+      
+      console.log('✅ Message signed, confirming authentication...');
+      const { authConfirm } = await client.authConfirm({
+        wallet: walletAddress,
+        signature
+      });
+      console.log('✅ Authentication confirmed');
+      accessToken = authConfirm.accessToken;
+    } catch (authError) {
+      console.error('❌ Authentication failed:', authError);
+      throw new Error(`Authentication failed: ${authError.message}`);
+    }
+    
+    // Find the user's profile
+    const users = await client.findUsers({
+      wallets: [walletAddress]
+    });
+    
+    if (users.user.length === 0) {
+      throw new Error('User not found');
+    }
+    
+    const profiles = await client.findProfiles({
+      userIds: [users.user[0].id],
+      projects: [PROJECT_ADDRESS],
+      identities: ["main"],
+      includeProof: true
+    });
+    
+    if (profiles.profile.length === 0) {
+      throw new Error('Profile not found');
+    }
+    
+    const profile = profiles.profile[0];
+    
+    // Try to create a claim transaction for the same badge
+    // If it fails with a specific error, it means the badge was already claimed
+    console.log(`🔍 Attempting to claim badge ${badgeIndex} again to check if already claimed...`);
+    
+    try {
+      const testClaimResponse = await client.createClaimBadgeCriteriaTransaction({
+        args: {
+          payer: walletAddress,
+          projectAddress: PROJECT_ADDRESS,
+          profileAddress: profile.address,
+          criteriaIndex: badgeIndex,
+          proof: "Public"
+        }
+      }, {
+        fetchOptions: {
+          headers: {
+            authorization: `Bearer ${accessToken}`
+          }
+        }
+      });
+      
+      console.log('❌ Badge was NOT claimed - claim transaction succeeded again');
+      return {
+        claimed: false,
+        reason: 'Badge claim transaction succeeded again, indicating it was not previously claimed'
+      };
+      
+    } catch (error) {
+      console.log('✅ Badge WAS claimed - claim transaction failed as expected');
+      console.log('🔍 Error details:', error.message);
+      
+      // Check if the error indicates the badge was already claimed
+      if (error.message.includes('already claimed') || 
+          error.message.includes('already exists') ||
+          error.message.includes('duplicate')) {
+        return {
+          claimed: true,
+          reason: 'Badge was already claimed (confirmed by duplicate claim error)'
+        };
+      } else {
+        return {
+          claimed: false,
+          reason: `Badge claim failed with unexpected error: ${error.message}`
+        };
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error verifying badge claim:', error);
+    return {
+      claimed: false,
+      reason: `Verification failed: ${error.message}`    };
+  }
 };
 
-// Helper function to get badge name by index
-export const getBadgeName = (badgeIndex) => {
-  const badgeNames = {
+// Helper function to check if user has earned a specific achievement
+export const hasAchievement = (profile, achievementIndex) => {
+  if (!profile || !profile.achievements) return false;
+  return profile.achievements.includes(achievementIndex);
+};
+
+// Helper function to get achievement name by index
+export const getAchievementName = (achievementIndex) => {
+  const achievementNames = {
     [BADGE_CRITERIA.FIRST_VICTORY]: "First Victory",
     [BADGE_CRITERIA.CARD_MASTER]: "Card Master",
     [BADGE_CRITERIA.SHADOW_WARRIOR]: "Shadow Warrior",
@@ -1476,8 +1893,194 @@ export const getBadgeName = (badgeIndex) => {
     [BADGE_CRITERIA.LEGENDARY_PLAYER]: "Legendary Player",
     [BADGE_CRITERIA.WHOT_GRANDMASTER]: "Whot Grandmaster"
   };
-  return badgeNames[badgeIndex] || `Badge ${badgeIndex}`;
+  return achievementNames[achievementIndex] || `Achievement ${achievementIndex}`;
 };
 
 // Export badge criteria for use in other components
 export { BADGE_CRITERIA };
+
+// Platform data update function using project authority (server-side)
+export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0, customData = {} }) => {
+  try {
+    const walletAddress = publicKey.toBase58();
+    
+    console.log('🔄 Updating platform data for wallet:', walletAddress);
+    console.log('📊 Platform data:', { achievements, xp, customData });
+    
+    // Check if admin keypair is configured
+    if (!APP_WALLET_CONFIG.publicKey || !APP_WALLET_CONFIG.privateKey) {
+      throw new Error('Admin keypair not configured. Please set VITE_FEE_PAYER_PUBLIC_KEY and VITE_FEE_PAYER_PRIVATE_KEY environment variables.');
+    }
+    
+    // Create admin keypair from environment variables
+    const adminPublicKey = new PublicKey(APP_WALLET_CONFIG.publicKey);
+    const adminPrivateKey = bs58.decode(APP_WALLET_CONFIG.privateKey);
+    const adminKeypair = Keypair.fromSecretKey(adminPrivateKey);
+    
+    // First find the user by wallet address
+    const users = await client.findUsers({
+      wallets: [walletAddress]
+    });
+    
+    if (users.user.length === 0) {
+      throw new Error('User not found for wallet address');
+    }
+    
+    const user = users.user[0];
+    console.log('✅ User found:', user.id);
+    
+    // Then find the user's profile
+    const profiles = await client.findProfiles({
+      userIds: [user.id],
+      projects: [PROJECT_ADDRESS],
+      identities: ["main"]
+    });
+    
+    if (profiles.profile.length === 0) {
+      throw new Error('Profile not found for user');
+    }
+    
+    const profile = profiles.profile[0];
+    const profileAddress = profile.address;
+    console.log('✅ Profile found:', profileAddress);
+    console.log('📊 Current platform data:', profile.platformData);
+    
+    // Prepare platform data update using the correct structure from Honeycomb docs
+    const platformData = {};
+    
+    // Add XP using the proper Honeycomb platform data system
+    if (xp > 0) {
+      platformData.addXp = xp;
+    }
+    
+    // Add achievements using the proper Honeycomb platform data system
+    if (achievements.length > 0) {
+      platformData.addAchievements = achievements;
+    }
+    
+    // Add custom data for game statistics (separate from XP/achievements)
+    if (Object.keys(customData).length > 0) {
+      platformData.custom = {
+        add: Object.entries(customData).map(([key, value]) => [key, value.toString()])
+      };
+    }
+    
+    console.log('📝 Creating platform data update transaction...');
+    console.log('📊 Platform data structure:', platformData);
+    console.log('📋 Profile address:', profileAddress);
+    console.log('📋 Authority:', adminKeypair.publicKey.toString());
+    
+    // Create transaction using project authority (admin keypair) - FIXED: Use profile address directly
+    const apiResponse = await client.createUpdatePlatformDataTransaction({
+      profile: profileAddress, // Use the profile address directly, not wallet address
+      authority: adminKeypair.publicKey.toString(), // Use project authority
+      platformData
+    });
+    
+    if (!apiResponse || !apiResponse.createUpdatePlatformDataTransaction) {
+      throw new Error('Invalid response from Honeycomb API: missing createUpdatePlatformDataTransaction');
+    }
+    
+    const txResponse = apiResponse.createUpdatePlatformDataTransaction;
+    
+    if (!txResponse) {
+      throw new Error('Invalid response from Honeycomb API: missing transaction data');
+    }
+    
+    console.log('✅ Transaction created successfully');
+    
+    // Create a proper wallet adapter for Honeycomb that handles VersionedTransaction
+    const adminWalletAdapter = {
+      publicKey: adminKeypair.publicKey,
+      connected: true,
+      signAllTransactions: async (transactions) => {
+        console.log('🔐 Signing transactions:', transactions.length);
+        
+        // Sign each transaction with the admin keypair
+        for (let i = 0; i < transactions.length; i++) {
+          const transaction = transactions[i];
+          console.log(`📝 Signing transaction ${i + 1}/${transactions.length}`);
+          
+          // Check if it's a VersionedTransaction (which is what Honeycomb uses)
+          if (transaction.constructor.name === 'VersionedTransaction') {
+            console.log('✅ Transaction is a VersionedTransaction');
+            transaction.sign([adminKeypair]);
+          } else if (transaction.partialSign) {
+            console.log('✅ Transaction has partialSign method');
+            transaction.partialSign(adminKeypair);
+          } else if (transaction.sign) {
+            console.log('✅ Transaction has sign method');
+            transaction.sign(adminKeypair);
+          } else {
+            console.log('⚠️ Unknown transaction type, trying to sign anyway...');
+            // Try to add the keypair as a signer
+            if (transaction.signatures) {
+              transaction.signatures.push(adminKeypair.publicKey.toBytes());
+            }
+          }
+        }
+        
+        return transactions;
+      }
+    };
+    
+    // Use sendClientTransactions with the admin keypair
+    const response = await sendClientTransactions(client, adminWalletAdapter, txResponse);
+    
+    console.log('✅ Transaction sent via Honeycomb client:', response);
+    
+    // Check for success
+    if (response && response.length > 0) {
+      const bundle = response[0];
+      if (bundle.responses && bundle.responses.length > 0) {
+        const txResponse = bundle.responses[0];
+        
+        if (txResponse.error) {
+          throw new Error(`Transaction failed: ${txResponse.error}`);
+        } else if (txResponse.signature) {
+          console.log('✅ Transaction successful!');
+          console.log('📋 Signature:', txResponse.signature);
+        }
+      }
+    }
+    
+    console.log('✅ Platform data updated successfully');
+    return { success: true, achievements, xp, response: { success: true } };
+    
+  } catch (error) {
+    console.error('Error updating platform data:', error);
+    throw error;
+  }
+};
+
+// Debug function to check available client methods
+export const debugClientMethods = async () => {
+  try {
+    console.log('🔍 Available client methods:', Object.keys(client));
+    
+    // Filter for badge-related methods
+    const badgeMethods = Object.keys(client).filter(key => 
+      key.toLowerCase().includes('badge') || 
+      key.toLowerCase().includes('claim') ||
+      key.toLowerCase().includes('proof')
+    );
+    console.log('🔍 Badge-related methods:', badgeMethods);
+    
+    // Filter for find-related methods
+    const findMethods = Object.keys(client).filter(key => 
+      key.toLowerCase().includes('find')
+    );
+    console.log('🔍 Find-related methods:', findMethods);
+    
+    return {
+      allMethods: Object.keys(client),
+      badgeMethods: badgeMethods,
+      findMethods: findMethods
+    };
+  } catch (error) {
+    console.error('Error debugging client methods:', error);
+    return null;
+  }
+};
+
+
