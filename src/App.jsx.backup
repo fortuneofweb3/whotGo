@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ref, push, set, onValue, off, update, remove, serverTimestamp, onDisconnect, get } from 'firebase/database';
 import { db, functions as fbFunctions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import { createUserProfile, createUserProfileWithSOLManagement, checkUserProfileExists, checkUserProfileExistsWithRetry, testHoneycombConnection, testRPCConnection, ensureWalletHasSOL, loginUserProfile, updateUserProfile, updateUserProfileWithSOLManagement, updateProfileInfo, checkProjectExists, getApiStatus, syncFirebaseToHoneycomb, executeTransactionWithSOLRetry } from './utils/profile';
-import { calculateLevel, getGameXPReward } from './utils/achievementService';
+import { getUserProfile, syncHoneycombToFirebase, checkUserProfileExists, checkUserProfileExistsWithRetry, loginUserProfile, updateProfileInfo, createUserProfile, updateUserProfile, syncFirebaseToHoneycomb } from './utils/profileClient';
 import Game from './components/Game';
 import AchievementPopup from './components/popups/AchievementPopup';
 import GameLogPopup from './components/popups/GameLogPopup';
@@ -105,6 +104,8 @@ const App = () => {
   const [showRoundEndPopup, setShowRoundEndPopup] = useState(false);
   const [roundEndData, setRoundEndData] = useState(null);
   const [unlockableBadges, setUnlockableBadges] = useState([]);
+  const [newlyUnlockedAchievements, setNewlyUnlockedAchievements] = useState([]);
+  const [showAchievementPopup, setShowAchievementPopup] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [profileCreationError, setProfileCreationError] = useState(null);
   const [honeycombProfileExists, setHoneycombProfileExists] = useState(false);
@@ -381,8 +382,6 @@ const App = () => {
   }, []);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [achievements, setAchievements] = useState([]);
-  const [showAchievementPopup, setShowAchievementPopup] = useState(false);
-  const [newlyUnlockedAchievements, setNewlyUnlockedAchievements] = useState([]);
   const [showSyncPopup, setShowSyncPopup] = useState(false);
   const [syncPopupData, setSyncPopupData] = useState(null);
   const [musicVolume, setMusicVolume] = useState(75);
@@ -676,18 +675,349 @@ const App = () => {
   }, [currentUser, publicKey]);
 
 
-            
+            const testBadgeClaiming = async () => {
+              if (!publicKey || !wallet || !signMessage) {
+                console.error('❌ Wallet not connected');
+                return;
+              }
 
+              if (!currentUser || !currentUser.id) {
+                console.error('❌ User data not loaded, please wait a moment and try again');
+                return;
+              }
 
+              console.log('🧪 Testing badge claiming...');
 
+              try {
+                // Note: findBadgeCriteria is not available on edge client
+                // Badge criteria existence is verified by successful badge creation
+                
 
+                // Get current profile
+                const { getUserProfile } = await import('./utils/profile');
+                const profile = await getUserProfile(publicKey);
+                
+                if (!profile) {
+                  console.error('❌ No profile found');
+                  return;
+                }
+                
+                console.log('🧪 Current profile stats:', {
+                  gamesPlayed: profile.gamesPlayed,
+                  gamesWon: profile.gamesWon,
+                  xp: profile.xp
+                });
+                
+                // Test different badge scenarios
+                const testScenarios = [
+                  {
+                    name: 'Card Master (100+ cards)',
+                    stats: { ...profile, cardsPlayed: 150, gamesPlayed: profile.gamesPlayed, gamesWon: profile.gamesWon, xp: profile.xp, level: profile.level, perfectWins: profile.perfectWins }
+                  },
+                  {
+                    name: 'Strategic Mind (10+ wins)',
+                    stats: { ...profile, cardsPlayed: profile.totalCardsPlayed, gamesPlayed: profile.gamesPlayed, gamesWon: 15, xp: profile.xp, level: profile.level, perfectWins: profile.perfectWins }
+                  },
+                  {
+                    name: 'Century Club (100+ games)',
+                    stats: { ...profile, cardsPlayed: profile.totalCardsPlayed, gamesPlayed: 120, gamesWon: profile.gamesWon, xp: profile.xp, level: profile.level, perfectWins: profile.perfectWins }
+                  }
+                ];
+                
+                let claimedBadge = null;
+                
+                for (const scenario of testScenarios) {
+                  console.log(`🧪 Testing scenario: ${scenario.name}`);
+                  
+                  const unlockableBadges = await checkUnlockableBadges({
+                    publicKey,
+                    stats: scenario.stats,
+                    currentUser
+                  });
 
+                  console.log(`🧪 Unlockable badges for ${scenario.name}:`, unlockableBadges);
 
+                  if (unlockableBadges.length > 0) {
+                    console.log(`🧪 Testing claim for ${scenario.name} badge:`, unlockableBadges[0]);
 
+                    const result = await claimSpecificBadgeWithSOLManagement({
+                      publicKey,
+                      wallet,
+                      signMessage,
+                      badgeIndex: unlockableBadges[0].index,
+                      currentUser
+                    });
 
+                    console.log(`🧪 Claim result for ${scenario.name}:`, result);
+                    
+                    if (result.success) {
+                      claimedBadge = { scenario: scenario.name, badge: unlockableBadges[0], result };
+              
+                      break; // Stop after first successful claim
+                    }
+                  } else {
+                    console.log(`🧪 No unlockable badges for ${scenario.name}`);
+                  }
+                }
+                
+                                if (!claimedBadge) {
+                  console.log('🧪 No badges could be claimed in any scenario');
+                } else {
+                  // Update Firebase with the claimed badge
+                  console.log('🔄 Updating Firebase with claimed badge...');
+                  const { ref, update } = await import('firebase/database');
+                  const { db } = await import('./firebase');
+                  
+                  const userRef = ref(db, `users/${currentUser.id}`);
+                  const currentBadges = currentUser.honeycombBadges || [];
+                  const { BADGE_CONDITIONS } = await import('./utils/honeycombBadges');
+                  const badgeInfo = BADGE_CONDITIONS[claimedBadge.badge.index];
+                  const updatedBadges = [...currentBadges, {
+                    index: claimedBadge.badge.index,
+                    name: badgeInfo?.name || `Badge ${claimedBadge.badge.index}`,
+                    description: badgeInfo?.description || '',
+                    earnedAt: Date.now()
+                  }];
 
+                  await update(userRef, {
+                    honeycombBadges: updatedBadges,
+                    lastActive: Date.now()
+                  });
+                  
+                  console.log('✅ Firebase updated with claimed badge');
+                  console.log('🔍 Updated badges array:', updatedBadges);
+                  
+                  // Refresh achievements to show the claimed badge
+                  console.log('🔄 Refreshing achievements...');
+                  
+                  // Wait a moment for the badge to appear on-chain
+                  console.log('⏳ Waiting for badge to appear on-chain...');
+                  await new Promise(resolve => setTimeout(resolve, 3000));
+                  
+                  const updatedUserData = {
+                    ...currentUser,
+                    honeycombBadges: updatedBadges
+                  };
+                  await initializeAchievements(updatedUserData);
+                  
+                  // Also update currentUser state
+                  setCurrentUser(updatedUserData);
 
+                }
+              } catch (error) {
+                console.error('🧪 Test failed:', error);
+              }
+            };
+            const createBadges = async () => {
+              if (!publicKey || !wallet || !signMessage) {
+                console.error('❌ Wallet not connected');
+                return;
+              }
 
+              console.log('🏗️ Creating badge criteria...');
+
+              try {
+                const { setupBadgeCriteria } = await import('./utils/badgeSetup');
+                
+                // Create Honeycomb client directly
+                const { default: createEdgeClient } = await import('@honeycomb-protocol/edge-client');
+                const client = createEdgeClient('https://edge.test.honeycombprotocol.com/', true);
+                
+                // Get project details
+                const authorityPublicKey = publicKey; // Project authority (your wallet)
+                const projectAddress = import.meta.env.VITE_HONEYCOMB_PROJECT_ADDRESS || process.env.HONEYCOMB_PROJECT_ADDRESS;
+                
+                console.log('🔍 Project details:', {
+                  authority: authorityPublicKey.toString(),
+                  projectAddress: projectAddress
+                });
+                
+                // Create badge criteria
+                const result = await setupBadgeCriteria(client, authorityPublicKey, projectAddress);
+                
+                console.log('✅ Badge creation completed:', result);
+                
+              } catch (error) {
+                console.error('🧪 Badge creation failed:', error);
+              }
+            };
+
+            // Test function for badge system testing (remove in production)
+            const testBadgeSystem = async () => {
+              if (!publicKey || !wallet || !signMessage) {
+                console.error('❌ Wallet not connected');
+                return;
+              }
+
+              console.log('🧪 Testing badge system...');
+
+              try {
+                const { testBadgeSystem: testBadgeSystemFunction } = await import('./utils/badgeSetup');
+                
+                // Create Honeycomb client directly
+                const { default: createEdgeClient } = await import('@honeycomb-protocol/edge-client');
+                const client = createEdgeClient('https://edge.test.honeycombprotocol.com/', true);
+                
+                console.log('🔍 Project details:', {
+                  authority: publicKey.toString(),
+                  projectAddress: import.meta.env.VITE_HONEYCOMB_PROJECT_ADDRESS || process.env.HONEYCOMB_PROJECT_ADDRESS
+                });
+                
+                // Test the badge system
+                const result = await testBadgeSystemFunction(client, wallet, signMessage);
+                
+                console.log('✅ Badge system test completed:', result);
+                
+              } catch (error) {
+                console.error('🧪 Badge system test failed:', error);
+              }
+            };
+
+            // Test function for achievement assignment (remove in production)
+            const testAchievementAssignment = async () => {
+              if (!publicKey || !wallet || !signMessage) {
+                console.error('❌ Wallet not connected');
+                return;
+              }
+
+              if (!currentUser || !currentUser.id) {
+                console.error('❌ User data not loaded, please wait a moment and try again');
+                return;
+              }
+
+              console.log('🧪 Testing achievement assignment...');
+
+              try {
+                // Get current profile
+                const { getUserProfile } = await import('./utils/profile');
+                const profile = await getUserProfile(publicKey);
+                
+                if (!profile) {
+                  console.error('❌ No profile found');
+                  return;
+                }
+                
+                console.log('🧪 Current profile stats:', {
+                  gamesPlayed: profile.gamesPlayed,
+                  gamesWon: profile.gamesWon,
+                  xp: profile.xp
+                });
+                
+                // Simulate winning a game to unlock First Victory achievement
+                const statsForAchievementCheck = {
+                  gamesPlayed: profile.gamesPlayed,
+                  gamesWon: 1, // Simulate winning 1 game to unlock First Victory
+                  xp: profile.xp,
+                  level: profile.level,
+                  cardsPlayed: profile.totalCardsPlayed,
+                  perfectWins: profile.perfectWins
+                };
+                
+                console.log('🧪 Simulated stats for achievement check:', statsForAchievementCheck);
+                
+                // Check if First Victory achievement should be unlocked
+                const shouldUnlockFirstVictory = statsForAchievementCheck.gamesWon >= 1;
+                
+                if (shouldUnlockFirstVictory) {
+                  console.log('🎉 First Victory achievement should be unlocked!');
+                  console.log('📝 Note: Achievement assignment requires project authority signature');
+                  console.log('📝 This would typically be done by the game server when a player wins');
+                } else {
+                  console.log('❌ First Victory achievement not yet unlockable');
+                }
+                
+              } catch (error) {
+                console.error('🧪 Test failed:', error);
+              }
+            };
+
+            // Test function for debugging client methods (remove in production)
+            const debugClientMethods = async () => {
+              if (!publicKey || !wallet || !signMessage) {
+                console.error('❌ Wallet not connected');
+                return;
+              }
+
+              console.log('🔍 Debugging client methods...');
+
+              try {
+                const { debugClientMethods: debugClientMethodsFunction } = await import('./utils/profile');
+                
+                // Create Honeycomb client directly
+                const { default: createEdgeClient } = await import('@honeycomb-protocol/edge-client');
+                const client = createEdgeClient('https://edge.test.honeycombprotocol.com/', true);
+                
+                // Debug client methods
+                const result = await debugClientMethodsFunction();
+                
+                console.log('✅ Client methods debug completed:', result);
+                
+              } catch (error) {
+                console.error('🔍 Client methods debug failed:', error);
+              }
+            };
+
+            // Test function for verifying badge claims (remove in production)
+            const verifyBadgeClaim = async (badgeIndex) => {
+              if (!publicKey || !wallet || !signMessage) {
+                console.error('❌ Wallet not connected');
+                return;
+              }
+
+              console.log(`🔍 Verifying badge claim for badge ${badgeIndex}...`);
+
+              try {
+                const { verifyBadgeClaim: verifyBadgeClaimFunction } = await import('./utils/profile');
+                
+                const result = await verifyBadgeClaimFunction(publicKey, wallet, signMessage, badgeIndex);
+                
+                console.log('✅ Badge claim verification completed:', result);
+                
+                return result;
+                
+              } catch (error) {
+                console.error('🔍 Badge claim verification failed:', error);
+                return { claimed: false, reason: `Verification failed: ${error.message}` };
+              }
+            };
+
+            // Expose test functions globally (remove in production)
+            if (typeof window !== 'undefined') {
+              window.testBadgeClaiming = testBadgeClaiming;
+              window.createBadges = createBadges;
+              window.testBadgeSystem = testBadgeSystem;
+              window.testAchievementAssignment = testAchievementAssignment;
+              window.debugClientMethods = debugClientMethods;
+              window.verifyBadgeClaim = verifyBadgeClaim;
+
+              
+              // Simple direct badge claiming function
+              window.claimBadgeDirect = async (badgeIndex) => {
+                try {
+                  console.log('🔍 Direct badge claiming for badge:', badgeIndex);
+                  
+                  // Call the API directly without authentication
+                  console.log('📝 Calling createClaimBadgeCriteriaTransaction directly...');
+                  
+                  const apiResponse = await client.createClaimBadgeCriteriaTransaction({
+                    args: {
+                      payer: publicKey.toString(), // Use the logged-in user's wallet address
+                      projectAddress: import.meta.env.VITE_HONEYCOMB_PROJECT_ADDRESS || process.env.HONEYCOMB_PROJECT_ADDRESS,
+                      profileAddress: currentUser.address || publicKey.toString(), // Use the logged-in user's profile address
+                      criteriaIndex: badgeIndex,
+                      proof: 'Public'
+                    }
+                  });
+                  
+                  console.log('✅ API call successful:', apiResponse);
+                  return { success: true, response: apiResponse };
+                  
+                } catch (error) {
+                  console.error('❌ Direct badge claim error:', error);
+                  throw error;
+                }
+              };
+            }
 
   // Firebase real-time user data sync (always active when user exists)
   useEffect(() => {
@@ -982,13 +1312,15 @@ const App = () => {
         // Ensure the address from fresh Honeycomb data is used
         if (userData) {
           userData.address = honeycombData.value.address;
-
+          console.log('🔍 Updated userData.address with fresh Honeycomb data:', userData.address);
         }
       }
       
       if (userData) {
         // Debug: Log the userData to see what's available
-
+        console.log('🔍 initializeUserFromBothSources userData:', userData);
+        console.log('🔍 userData.address:', userData.address);
+        console.log('🔍 userData.honeycombProfile:', userData.honeycombProfile);
         
         // Ensure user data has all required fields
         const levelData = calculateLevel(userData.xp || 0);
@@ -1013,7 +1345,7 @@ const App = () => {
           lastActive: Date.now()
         };
         
-
+        console.log('🔍 completeUserData:', completeUserData);
         
   
         setCurrentUser(completeUserData);
@@ -1097,8 +1429,8 @@ const App = () => {
           bestWinStreak: loginResult.profile.bestWinStreak,
           totalCardsPlayed: loginResult.profile.totalCardsPlayed,
           perfectWins: loginResult.profile.perfectWins,
-          achievementsUnlocked: loginResult.profile.achievements || [],
-          claimedAchievements: loginResult.profile.achievements || [],
+          achievementsUnlocked: loginResult.profile.badges?.map(b => b.badgeCriteria) || [],
+          claimedAchievements: loginResult.profile.badges?.map(b => b.badgeCriteria) || [],
           honeycombProfile: loginResult.profile,
           createdAt: loginResult.profile.createdAt,
           lastActive: loginResult.profile.lastActive
@@ -1280,8 +1612,8 @@ const App = () => {
               bestWinStreak: loginResult.profile.bestWinStreak,
               totalCardsPlayed: loginResult.profile.totalCardsPlayed,
               perfectWins: loginResult.profile.perfectWins,
-              achievementsUnlocked: loginResult.profile.achievements || [],
-              claimedAchievements: loginResult.profile.achievements || [],
+              achievementsUnlocked: loginResult.profile.badges?.map(b => b.badgeCriteria) || [],
+              claimedAchievements: loginResult.profile.badges?.map(b => b.badgeCriteria) || [],
               createdAt: loginResult.profile.createdAt,
               lastActive: loginResult.profile.lastActive,
               honeycombProfile: loginResult.profile
@@ -1508,38 +1840,42 @@ const App = () => {
     if (!userData || !publicKey) return;
     
     try {
-      // Get achievement data directly from Honeycomb
+      // Get badge data directly from Honeycomb
       const { getUserProfile } = await import('./utils/profileClient');
       const honeycombProfile = await getUserProfile(publicKey);
       
       if (!honeycombProfile) {
+        console.log('❌ No Honeycomb profile found for achievements');
         return;
       }
       
-      // Get achievements directly from Honeycomb profile
-      const honeycombAchievements = honeycombProfile.achievements || [];
+      console.log('🔍 Full Honeycomb profile structure:', honeycombProfile);
       
-      // Import achievement definitions from the service
-      const { ACHIEVEMENT_DEFINITIONS, getAchievementProgress } = await import('./utils/achievementService');
+    const userXP = userData?.xp || 0;
+    const userGamesPlayed = userData?.gamesPlayed || 0;
+      const userGamesWon = 1; // Use simulated gamesWon for badge unlocking
+    const userLevel = calculateLevel(userXP).level;
+    const userPerfectWins = userData?.perfectWins || 0;
+    const userTotalCardsPlayed = userData?.totalCardsPlayed || 0;
+    
+      // Get badges directly from Honeycomb profile
+      const honeycombBadges = honeycombProfile.badges || [];
+      console.log('🔍 Honeycomb badges from on-chain profile:', honeycombBadges);
+    
+    // Match the BADGE_CRITERIA constants from honeycombBadges.js
+    const achievementsList = [
+        { id: 0, name: 'First Victory', description: 'Win your first game', unlocked: userGamesWon >= 1, claimed: honeycombBadges.some(b => b.badgeCriteria === 0), icon: '🏆', reward: '100 XP' },
+        { id: 1, name: 'Card Master', description: 'Master all card types', unlocked: userTotalCardsPlayed >= 100, claimed: honeycombBadges.some(b => b.badgeCriteria === 1), icon: '🎯', reward: '200 XP' },
+        { id: 2, name: 'Shadow Warrior', description: 'Win a game without losing a life', unlocked: userPerfectWins >= 1, claimed: honeycombBadges.some(b => b.badgeCriteria === 2), icon: '⚔️', reward: '500 XP' },
+        { id: 3, name: 'Strategic Mind', description: 'Win 10 games with strategic plays', unlocked: userGamesWon >= 10, claimed: honeycombBadges.some(b => b.badgeCriteria === 3), icon: '🧠', reward: '1200 XP' },
+        { id: 4, name: 'Century Club', description: 'Play 100 games', unlocked: userGamesPlayed >= 100, claimed: honeycombBadges.some(b => b.badgeCriteria === 4), icon: '💯', reward: '1500 XP' },
+        { id: 5, name: 'Ultimate Champion', description: 'Win 50 games', unlocked: userGamesWon >= 50, claimed: honeycombBadges.some(b => b.badgeCriteria === 5), icon: '🌟', reward: '2000 XP' },
+        { id: 6, name: 'Legendary Player', description: 'Reach level 50', unlocked: userLevel >= 50, claimed: honeycombBadges.some(b => b.badgeCriteria === 6), icon: '👑', reward: '3000 XP' },
+        { id: 7, name: 'Whot Grandmaster', description: 'Achieve all other badges', unlocked: honeycombBadges.length >= 7, claimed: honeycombBadges.some(b => b.badgeCriteria === 7), icon: '💎', reward: '5000 XP' }
+      ];
       
-      // Create achievements list with progress from Honeycomb
-      const achievementsList = ACHIEVEMENT_DEFINITIONS.map(achievement => {
-        const progress = getAchievementProgress(achievement.id, userData);
-        const unlocked = honeycombAchievements.includes(achievement.id);
-        
-        return {
-          id: achievement.id,
-          name: achievement.name,
-          description: achievement.description,
-          unlocked: unlocked,
-          claimed: unlocked, // Achievements are automatically claimed when unlocked
-          icon: '🏆', // Default icon
-          reward: `${achievement.xpReward} XP`,
-          progress: progress
-        };
-      });
-      
-      setAchievements(achievementsList);
+      console.log('🔍 Achievements list with Honeycomb data:', achievementsList);
+    setAchievements(achievementsList);
     } catch (error) {
       console.error('❌ Error initializing achievements from Honeycomb:', error);
     }
@@ -1669,75 +2005,294 @@ const App = () => {
     }
   };
 
+  const claimAchievement = async (achievementId) => {
+    if (!currentUser) return;
+    const achievement = achievements.find(a => a.id === achievementId);
+    if (!achievement || !achievement.unlocked || achievement.claimed) return;
+    
+    try {
   
+      
+      // Claim badge in Honeycomb if wallet is connected
+      if (publicKey && wallet && signMessage) {
+        try {
+          await claimBadge({
+            publicKey,
+            wallet,
+            signMessage,
+            badgeCriteria: achievementId
+          });
+          
+  
+          
+          // Update local achievement state
+          setAchievements(prev => prev.map(a => 
+            a.id === achievementId ? { ...a, claimed: true } : a
+          ));
+          
+          // Refresh user profile to get updated XP from claimed badge
+          if (publicKey) {
+            try {
+              const loginResult = await loginUserProfile(publicKey);
+              if (loginResult.exists && loginResult.profile) {
+                const levelData = calculateLevel(loginResult.profile.xp || 0);
+                const updatedUserData = {
+                  ...currentUser,
+                  xp: loginResult.profile.xp,
+                  level: levelData.level,
+                  currentLevelXP: levelData.currentLevelXP,
+                  xpNeededForNext: levelData.xpNeededForNext,
+                  claimedAchievements: loginResult.profile.badges?.map(b => b.badgeCriteria) || []
+                };
+                
+                setCurrentUser(updatedUserData);
+                
+                // Update Firebase with new data
+                const userRef = ref(db, `users/${currentUser.id}`);
+                await update(userRef, {
+                  xp: loginResult.profile.xp,
+                  level: levelData.level,
+                  currentLevelXP: levelData.currentLevelXP,
+                  xpNeededForNext: levelData.xpNeededForNext,
+                  claimedAchievements: loginResult.profile.badges?.map(b => b.badgeCriteria) || []
+                });
+                
+                // Update leaderboard with new XP and level
+                const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
+                await update(leaderboardRef, {
+                  xp: loginResult.profile.xp,
+                  level: levelData.level
+                });
+                
+        
+              }
+            } catch (error) {
+              console.error('❌ Error refreshing user profile after claiming:', error);
+            }
+          }
+          
+        } catch (error) {
+          console.error(`❌ Error claiming achievement in Honeycomb: ${achievementId}`, error);
+          
+          // Fallback to Firebase function if Honeycomb fails
+      const claimFn = httpsCallable(fbFunctions, 'claimAchievement');
+      await claimFn({ userId: currentUser.id, achievementId });
+          
+      // Refresh user profile snapshot and update level data
+      const userRef = ref(db, `users/${currentUser.id}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const firebaseData = snapshot.val();
+        const levelData = calculateLevel(firebaseData.xp || 0);
+        const updatedUserData = {
+          id: currentUser.id,
+          ...firebaseData,
+          level: levelData.level,
+          currentLevelXP: levelData.currentLevelXP,
+          xpNeededForNext: levelData.xpNeededForNext
+        };
+        setCurrentUser(updatedUserData);
+        // Update Firebase with new level data
+        await update(userRef, {
+          level: levelData.level,
+          currentLevelXP: levelData.currentLevelXP,
+          xpNeededForNext: levelData.xpNeededForNext
+        });
+            
+            // Update leaderboard with new level data
+            const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
+            await update(leaderboardRef, {
+              level: levelData.level
+            });
+            
+    
+      }
+      setAchievements(prev => prev.map(a => a.id === achievementId ? { ...a, claimed: true } : a));
+        }
+      } else {
+        // Fallback to Firebase function if no wallet
+        const claimFn = httpsCallable(fbFunctions, 'claimAchievement');
+        await claimFn({ userId: currentUser.id, achievementId });
+        
+        // Refresh user profile snapshot and update level data
+        const userRef = ref(db, `users/${currentUser.id}`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          const firebaseData = snapshot.val();
+          const levelData = calculateLevel(firebaseData.xp || 0);
+          const updatedUserData = {
+            id: currentUser.id,
+            ...firebaseData,
+            level: levelData.level,
+            currentLevelXP: levelData.currentLevelXP,
+            xpNeededForNext: levelData.xpNeededForNext
+          };
+          setCurrentUser(updatedUserData);
+          // Update Firebase with new level data
+          await update(userRef, {
+            level: levelData.level,
+            currentLevelXP: levelData.currentLevelXP,
+            xpNeededForNext: levelData.xpNeededForNext
+          });
+          
+          // Update leaderboard with new level data
+          const leaderboardRef = ref(db, `leaderboard/users/${currentUser.id}`);
+          await update(leaderboardRef, {
+            level: levelData.level
+          });
+          
+  
+        }
+        setAchievements(prev => prev.map(a => a.id === achievementId ? { ...a, claimed: true } : a));
+      }
+      
+  
+      
+    } catch (error) {
+      console.error('❌ Error claiming achievement:', error);
+    }
+  };
+
+  const calculateLevel = (xp) => {
+    let totalXPNeeded = 0;
+    let level = 1;
+    while (level <= 100) {
+      const xpForThisLevel = 100 + (level - 1) * 150 + Math.floor((level - 1) / 10) * 500;
+      if (totalXPNeeded + xpForThisLevel > xp) {
+        break;
+      }
+      totalXPNeeded += xpForThisLevel;
+      level++;
+    }
+    return {
+      level: Math.min(level, 100),
+      currentLevelXP: xp - totalXPNeeded,
+      xpNeededForNext: level <= 100 ? 100 + level * 150 + Math.floor(level / 10) * 500 : 0,
+      totalXP: xp
+    };
+  };
+
+  const getXPFromGame = (won, roundsPlayed, cardsPlayed) => {
+    let baseXP = 50;
+    if (won) baseXP += 100;
+    baseXP += roundsPlayed * 25;
+    baseXP += Math.floor(cardsPlayed / 5) * 10;
+    return baseXP;
+  };
+
+  // Check for unlockable achievements based on user stats
+  const checkAndUnlockAchievements = async (userData) => {
+    if (!publicKey) return;
+    
+
+    
+    try {
+      // Check for unlockable badges using the Honeycomb badge system
+      const unlockableBadges = await checkUnlockableBadges({
+        publicKey,
+        stats: userData,
+        currentUser: userData
+      });
+      
+      if (unlockableBadges.length > 0) {
+    
+        
+        // Show achievement popup for unlockable badges
+        setAchievementPopupData({
+          achievements: unlockableBadges.map(badge => ({
+            id: badge.index,
+            title: badge.name,
+            description: badge.description,
+            unlocked: true,
+            claimed: false // Ready to be claimed manually
+          }))
+        });
+        setShowAchievementPopup(true);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error checking unlockable achievements:', error);
+    }
+  };
 
 
 
-
-
-
-
-    // Comprehensive game tracking and statistics update with bidirectional sync
+    // Comprehensive game tracking and statistics update with achievement system
   const updateGameStatistics = async (gameData, isWinner, gameMode = 'ai') => {
     if (!currentUser) {
       return null;
     }
 
-    // Use the achievement service to handle XP and achievements from Honeycomb
-    const { updateUserStatsAndAchievements } = await import('./utils/achievementService.js');
-    
-    // Prepare game data for the service
-    const gameDataForService = {
-      roundsPlayed: gameData.roundNumber || 1,
-      totalCardsPlayed: 5 // Each game gives 5 "cards" for achievement tracking
-    };
-
-    // Update user stats and achievements using Honeycomb
-    const updatedUserData = await updateUserStatsAndAchievements(
-      { ...currentUser, publicKey: publicKey },
-      gameDataForService,
-      isWinner
-    );
-
-    // Update Firebase with the data returned from Honeycomb
     try {
+      // Import the achievement service
+      const { updateUserStatsAndAchievements } = await import('./utils/achievementService.js');
+      
+      // Update user stats and achievements using the new system
+      const updatedUser = await updateUserStatsAndAchievements(currentUser, gameData, isWinner);
+      
+      // Update Firebase with the new data
       const userRef = ref(db, `users/${currentUser.id}`);
       const firebaseUpdateData = {
-        gamesPlayed: updatedUserData.gamesPlayed,
-        gamesWon: updatedUserData.gamesWon,
-        totalCardsPlayed: updatedUserData.totalCardsPlayed,
-        perfectWins: updatedUserData.perfectWins,
-        currentWinStreak: updatedUserData.currentWinStreak,
-        bestWinStreak: updatedUserData.bestWinStreak,
-        xp: updatedUserData.xp, // XP from Honeycomb
-        level: updatedUserData.level, // Level calculated from Honeycomb XP
-        achievements: updatedUserData.achievements, // Achievements from Honeycomb
-        lastActive: serverTimestamp(),
-        honeycombSynced: true
+        gamesPlayed: updatedUser.gamesPlayed,
+        gamesWon: updatedUser.gamesWon,
+        xp: updatedUser.xp,
+        level: updatedUser.level,
+        currentWinStreak: updatedUser.currentWinStreak,
+        bestWinStreak: updatedUser.bestWinStreak,
+        totalCardsPlayed: updatedUser.totalCardsPlayed,
+        perfectWins: updatedUser.perfectWins,
+        achievements: updatedUser.achievements,
+        lastActive: serverTimestamp()
       };
       
       await update(userRef, firebaseUpdateData);
-  
+      
+      // Update local state
+      setCurrentUser(updatedUser);
+      
+      // Show achievement notifications if any were unlocked
+      if (updatedUser.newlyUnlockedAchievements && updatedUser.newlyUnlockedAchievements.length > 0) {
+        setNewlyUnlockedAchievements(updatedUser.newlyUnlockedAchievements);
+        setShowAchievementPopup(true);
+      }
+      
+      return updatedUser;
+      
     } catch (error) {
-      console.error('❌ Error updating Firebase stats:', error);
+      console.error('❌ Error updating game statistics:', error);
+      return null;
     }
-
-    // Update leaderboard
-    await updateLeaderboardEntry(updatedUserData);
-
-    // Update local state
-    setCurrentUser(updatedUserData);
-
-    // Check for newly unlocked achievements to show popup
-    if (updatedUserData.newlyUnlockedAchievements && updatedUserData.newlyUnlockedAchievements.length > 0) {
-      setNewlyUnlockedAchievements(updatedUserData.newlyUnlockedAchievements);
-      setShowAchievementPopup(true);
-    }
-
-    return updatedUserData;
+  };
   };
 
-
+  // Handle pending Honeycomb syncs
+  const handlePendingHoneycombSyncs = async () => {
+    if (!currentUser || !publicKey) return;
+    
+    try {
+      const userRef = ref(db, `users/${currentUser.id}`);
+      const userSnap = await get(userRef);
+      const userData = userSnap.val();
+      
+      if (userData?.pendingHoneycombSync) {
+        const { updatePlatformData } = await import('./utils/profileClient.js');
+        
+        await updatePlatformData({
+          publicKey: publicKey,
+          achievements: userData.pendingHoneycombSync.newlyUnlockedAchievements || [],
+          xp: userData.pendingHoneycombSync.xpEarned || 0,
+          customData: userData.pendingHoneycombSync.customData || {}
+        });
+        
+        // Clear pending sync data
+        await update(userRef, {
+          pendingHoneycombSync: null
+        });
+      }
+    } catch (error) {
+      // Silent fail for pending sync processing
+    }
+  };
 
   const startConfetti = () => {
     setConfettiActive(true);
@@ -1787,57 +2342,7 @@ const App = () => {
     animate();
   };
 
-  const createDeck = () => {
-    const deck = [];
-    let cardIdCounter = 0;
-    const cardDefinitions = [
-      { shape: '●', numbers: [1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 14] },
-      { shape: '▲', numbers: [1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 14] },
-      { shape: '✚', numbers: [1, 2, 3, 5, 7, 10, 11, 13, 14] },
-      { shape: '■', numbers: [1, 2, 3, 5, 7, 10, 11, 13, 14] },
-      { shape: '★', numbers: [1, 2, 3, 4, 5, 7, 8] }
-    ];
-    const createdCards = new Map();
-    cardDefinitions.forEach(({ shape, numbers }) => {
-      numbers.forEach(number => {
-        const cardKey = `${shape}-${number}`;
-        if (createdCards.has(cardKey)) {
-          console.error(`CRITICAL ERROR: Attempted to create duplicate card: ${cardKey}`);
-          throw new Error(`Duplicate card creation attempted: ${cardKey}`);
-        }
-        const card = { shape, number, id: `unique-${shape}-${number}-${Date.now()}-${cardIdCounter++}` };
-        if (number === 1) card.special = 'holdon';
-        else if (number === 2) card.special = 'pick2';
-        else if (number === 14) card.special = 'generalmarket';
-        createdCards.set(cardKey, true);
-        deck.push(card);
-      });
-    });
-    for (let i = 0; i < 5; i++) {
-      deck.push({ shape: '🔥', number: 'WHOT', id: `whot-${i}-${Date.now()}-${cardIdCounter++}`, special: 'whot' });
-    }
-    const regularCards = deck.filter(card => card.special !== 'whot');
-    const cardKeys = regularCards.map(card => `${card.shape}-${card.number}`);
-    const uniqueKeys = new Set(cardKeys);
-    if (cardKeys.length !== uniqueKeys.size) {
-      console.error('CRITICAL: Duplicate cards found in deck after creation!');
-      
-      const duplicates = cardKeys.filter((key, index) => cardKeys.indexOf(key) !== index);
-      console.error('Duplicate cards found:', [...new Set(duplicates)]);
-      throw new Error('Deck creation failed - duplicate cards detected');
-    }
-    
-    return deck;
-  };
 
-  const shuffleDeck = (deck) => {
-    const shuffled = [...deck];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
 
 
 
@@ -4658,7 +5163,7 @@ const App = () => {
   };
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden" style={pageStyles[gameState]}>
       <style jsx>{`
         body, html {
           margin: 0 !important;
@@ -4996,6 +5501,11 @@ const App = () => {
       `}</style>
       {renderContent()}
       {showGameLog && gameData && <GameLogPopup gameData={gameData} selectedLogRound={selectedLogRound} setSelectedLogRound={setSelectedLogRound} closePopup={() => setShowGameLog(false)} />}
+      {showAchievementPopup && <AchievementPopup 
+        closePopup={() => setShowAchievementPopup(false)}
+        userProfile={currentUser}
+        achievements={newlyUnlockedAchievements}
+      />}
               {showRoundEndPopup && roundEndData && <RoundEndPopup 
           roundEndData={roundEndData} 
           onContinue={handleContinueToNextRound}

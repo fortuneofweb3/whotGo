@@ -21,14 +21,23 @@ if (typeof window === 'undefined') {
   // Browser environment - use browser-compatible imports
   const web3 = await import('@solana/web3.js');
   PublicKey = web3.PublicKey;
-  // Other web3 imports will be loaded as needed
+  Connection = web3.Connection;
+  LAMPORTS_PER_SOL = web3.LAMPORTS_PER_SOL;
+  Transaction = web3.Transaction;
+  SystemProgram = web3.SystemProgram;
+  Keypair = web3.Keypair;
+  // Load bs58 for browser environment
+  const bs58Module = await import('bs58');
+  bs58 = bs58Module.default || bs58Module;
 }
 
 import { createEdgeClient } from '@honeycomb-protocol/edge-client';
 import { sendClientTransactions } from '@honeycomb-protocol/edge-client/client/walletHelpers.js';
 
-// Load environment variables at the top
-dotenv.config();
+// Load environment variables at the top (only in Node.js environment)
+if (typeof window === 'undefined' && dotenv) {
+  dotenv.config();
+}
 
 // Honeycomb Protocol Configuration for Whot Go Project
 // Project created on Honeynet (Solana test network)
@@ -38,8 +47,8 @@ const API_URLS = [
   "https://edge.dev.honeycombprotocol.com/"   // Fallback: Devnet
 ];
 
-const PROJECT_ADDRESS = process.env.HONEYCOMB_PROJECT_ADDRESS || import.meta?.env?.VITE_HONEYCOMB_PROJECT_ADDRESS;
-const PROFILES_TREE_ADDRESS = process.env.HONEYCOMB_PROFILES_TREE_ADDRESS || import.meta?.env?.VITE_HONEYCOMB_PROFILES_TREE_ADDRESS;
+const PROJECT_ADDRESS = process.env.HONEYCOMB_PROJECT_ADDRESS || import.meta?.env?.HONEYCOMB_PROJECT_ADDRESS || 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c';
+const PROFILES_TREE_ADDRESS = process.env.HONEYCOMB_PROFILES_TREE_ADDRESS || import.meta?.env?.HONEYCOMB_PROFILES_TREE_ADDRESS || 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 
 // Network configuration
 const NETWORK_CONFIG = {
@@ -65,22 +74,14 @@ let currentApiUrl = API_URLS[0]; // Start with test network
 
 // Initialize client with fallback
 const initializeClient = () => {
-  console.log('🔗 Initializing Honeycomb client for Honeynet test network...');
-  console.log('📋 Network config:', NETWORK_CONFIG);
+
   
   for (const apiUrl of API_URLS) {
     try {
-      console.log(`🔗 Trying Honeycomb API endpoint: ${apiUrl}`);
+
       client = createEdgeClient(apiUrl, true);
       currentApiUrl = apiUrl;
-      console.log(`✅ Honeycomb client initialized successfully with ${apiUrl}`);
-      
-      // Log network information
-      if (apiUrl === NETWORK_CONFIG.apiUrl) {
-        console.log('🎯 Connected to correct test network (Honeynet)');
-      } else {
-        console.log('⚠️ Connected to fallback network');
-      }
+
       
       return true;
     } catch (error) {
@@ -88,8 +89,7 @@ const initializeClient = () => {
     }
   }
   
-  // If all API endpoints fail, throw error
-  console.log('🚨 All Honeycomb API endpoints failed');
+
   throw new Error('Failed to connect to any Honeycomb API endpoint');
 };
 
@@ -101,9 +101,7 @@ initializeClient();
 // Function to check if project exists
 export const checkProjectExists = async () => {
   try {
-    console.log('Checking if project exists...');
-    console.log('Project address:', PROJECT_ADDRESS);
-    console.log('Current API endpoint:', currentApiUrl);
+
     
       // Try to find the project (simple way to check if it exists)
   // Debug API call for troubleshooting
@@ -111,7 +109,7 @@ export const checkProjectExists = async () => {
       wallets: ['dummy'] // Use dummy wallet to test connection
     });
     
-    console.log('Project check result:', result);
+
     return true;
   } catch (error) {
     console.error('Project check failed:', error);
@@ -201,13 +199,12 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     
     // For new user creation, we don't need authentication
     // Authentication is only required for existing users
-    console.log('🔐 Creating new user - no authentication required');
+
     let accessToken = null;
     
     // Create new user with profile using Honeycomb Protocol
     // Following the official documentation pattern
-    console.log('📝 Creating profile transaction...');
-    console.log('📋 Transaction parameters configured');
+
     
     const transactionParams = {
       project: PROJECT_ADDRESS,
@@ -233,15 +230,13 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       }
     };
     
-    console.log('📝 Calling createNewUserWithProfileTransaction...');
+
     
     let apiResponse;
     try {
-      console.log('📝 About to call createNewUserWithProfileTransaction...');
+  
       apiResponse = await client.createNewUserWithProfileTransaction(transactionParams);
-          console.log('📝 API response received');
-    console.log('📝 API response type:', typeof apiResponse);
-    console.log('📝 API response keys:', apiResponse ? Object.keys(apiResponse) : 'null/undefined');
+      
     } catch (apiError) {
       console.error('❌ API call failed:', apiError);
       console.error('❌ API error details:', {
@@ -253,9 +248,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       throw apiError;
     }
     
-    console.log('📝 Checking API response structure...');
-    console.log('📝 apiResponse exists:', !!apiResponse);
-    console.log('📝 Transaction data exists:', !!(apiResponse && apiResponse.createNewUserWithProfileTransaction));
+
     
     if (!apiResponse || !apiResponse.createNewUserWithProfileTransaction) {
       console.error('❌ Invalid API response structure:', apiResponse);
@@ -265,31 +258,12 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     // The API returns the transaction data directly, not nested under 'tx'
     const txResponse = apiResponse.createNewUserWithProfileTransaction;
     
-    console.log('📝 Transaction response exists:', !!txResponse);
-    console.log('📝 Transaction response type:', typeof txResponse);
-    console.log('📝 Transaction response keys:', txResponse ? Object.keys(txResponse) : 'null/undefined');
-    
     if (!txResponse) {
-      console.error('❌ Missing transaction data in response:', apiResponse.createNewUserWithProfileTransaction);
       throw new Error('Invalid response from Honeycomb API: missing transaction data');
     }
     
-    console.log('✅ Profile transaction created, requesting wallet signature...');
-    
     // Sign and send the transaction - this will prompt the user to approve
     const walletAdapter = getWalletAdapter(wallet);
-    console.log('🔐 Using wallet adapter for transaction');
-    console.log('🔐 Adapter name:', walletAdapter.name);
-    console.log('🔐 Connected:', walletAdapter.connected);
-    console.log('🔐 Has required methods:', {
-      signAllTransactions: !!walletAdapter.signAllTransactions,
-      signTransaction: !!walletAdapter.signTransaction,
-      signMessage: !!walletAdapter.signMessage
-    });
-    
-    console.log('🔐 Transaction data ready for signing');
-    console.log('🔐 Transaction type:', typeof txResponse);
-    console.log('🔐 Transaction keys:', txResponse ? Object.keys(txResponse) : null);
     
     // Wrap transaction in object format expected by sendClientTransactions
     const transactionObject = {
@@ -298,16 +272,7 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       lastValidBlockHeight: txResponse.lastValidBlockHeight
     };
     
-    console.log('🔐 Transaction object prepared for profile creation:', {
-      hasTransaction: !!transactionObject.transaction,
-      hasBlockhash: !!transactionObject.blockhash,
-      hasLastValidBlockHeight: !!transactionObject.lastValidBlockHeight
-    });
-    
     const response = await sendClientTransactions(client, walletAdapter, transactionObject);
-    console.log('✅ Honeycomb user profile created successfully');
-    console.log('📋 Transaction response type:', typeof response);
-    console.log('📋 Transaction response keys:', response ? Object.keys(response) : null);
     
     // Handle bundle response format
     let transactionSignature = null;
@@ -315,21 +280,16 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
     
     if (Array.isArray(response) && response.length > 0) {
       // Bundle response format
-      console.log('📦 Bundle response detected');
       const bundleResponse = response[0];
       
       if (bundleResponse && bundleResponse.responses && Array.isArray(bundleResponse.responses)) {
-        console.log('📦 Bundle responses count:', bundleResponse.responses.length);
-        
         // Look for the actual transaction response
         for (const resp of bundleResponse.responses) {
           if (resp && resp.signature) {
             transactionSignature = resp.signature;
-            console.log('✅ Found transaction signature in bundle');
           }
           if (resp && resp.profileAddress) {
             profileAddress = resp.profileAddress;
-            console.log('✅ Found profile address in bundle');
           }
         }
       }
@@ -337,17 +297,6 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       // Direct response format
       transactionSignature = response.signature;
       profileAddress = response.profileAddress;
-      console.log('✅ Direct transaction signature found');
-      console.log('✅ Direct profile address found');
-    }
-    
-    // Verify the transaction was successful
-    if (transactionSignature) {
-      console.log('✅ Transaction signature confirmed');
-      console.log('✅ Profile address confirmed');
-    } else {
-      console.error('❌ Transaction response missing signature');
-      console.error('❌ Response structure available for debugging');
     }
     
     return {
@@ -391,18 +340,15 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
       console.error('4. The project needs to be created first on Honeynet');
       console.error('5. Network connectivity issues with Honeynet');
       
-      console.log('🔍 Expected configuration:');
-      console.log('   Network: Honeynet (Solana test network)');
-      console.log('   API URL: https://edge.test.honeycombprotocol.com/');
-      console.log('   RPC URL: https://rpc.test.honeycombprotocol.com');
-      console.log('   Project:', PROJECT_ADDRESS);
+      
+  
       
       // Try to reinitialize with different API endpoint
-      console.log('🔄 Attempting to reinitialize with different API endpoint...');
+  
       const reinitialized = initializeClient();
       
       if (reinitialized && currentApiUrl !== API_URLS[0]) {
-        console.log('🔄 Reinitialized with different endpoint, retrying...');
+    
         throw new Error('Project not found on any Honeycomb endpoint. Please verify project configuration.');
       }
     }
@@ -488,21 +434,10 @@ export const loginUserProfile = async (publicKey) => {
     }
     
     // Debug: Log the full profile structure to understand badges
-    console.log('🔍 Full profile structure from Honeycomb:', profile);
-    console.log('🔍 Profile badges property:', profile.badges);
-    console.log('🔍 Profile badges type:', typeof profile.badges);
-    console.log('🔍 Profile badges length:', profile.badges ? profile.badges.length : 'null/undefined');
-    console.log('🔍 Profile platformData:', profile.platformData);
-    console.log('🔍 Profile platformData.achievements:', profile.platformData?.achievements);
-    console.log('🔍 Profile platformData.achievements type:', typeof profile.platformData?.achievements);
-    console.log('🔍 Profile platformData.achievements length:', profile.platformData?.achievements ? profile.platformData.achievements.length : 'null/undefined');
+
     
     // Check all possible badge locations
-    console.log('🔍 All profile properties:', Object.keys(profile));
-    console.log('🔍 Profile proof:', profile.proof);
-    console.log('🔍 Profile tree_id:', profile.tree_id);
-    console.log('🔍 Profile userId:', profile.userId);
-    console.log('🔍 Profile user:', profile.user);
+
     
     // Try to get badges from different possible locations
     let badges = [];
@@ -510,25 +445,25 @@ export const loginUserProfile = async (publicKey) => {
     // Check if badges are stored in platformData.achievements
     if (profile.platformData?.achievements && Array.isArray(profile.platformData.achievements)) {
       badges = profile.platformData.achievements;
-      console.log('🔍 Found badges in platformData.achievements:', badges);
+  
     }
     // Check if badges are stored in a badges property
     else if (profile.badges && Array.isArray(profile.badges)) {
       badges = profile.badges;
-      console.log('🔍 Found badges in profile.badges:', badges);
+  
     }
     // Check if badges are stored in proof
     else if (profile.proof && profile.proof.badges) {
       badges = profile.proof.badges;
-      console.log('🔍 Found badges in profile.proof.badges:', badges);
+  
     }
     // Check if badges are stored in customData
     else if (profile.customData && profile.customData.badges) {
       badges = profile.customData.badges;
-      console.log('🔍 Found badges in profile.customData.badges:', badges);
+  
     }
     
-    console.log('🔍 Final badges array:', badges);
+
     
     const userProfile = {
       id: profile.userId?.toString() || walletAddress, // Use userId if available, fallback to wallet address
@@ -548,7 +483,7 @@ export const loginUserProfile = async (publicKey) => {
       badges: badges
     };
     
-    console.log('User profile logged in successfully:', userProfile);
+
     return { exists: true, profile: userProfile };
   } catch (error) {
     console.error('Error logging in user profile:', error);
@@ -664,13 +599,7 @@ const checkProfileDataConsistency = async (honeycombProfile, firebaseUserData) =
 // Sync Firebase data to Honeycomb profile
 export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, wallet, signMessage) => {
   try {
-    console.log('🔄 Syncing Firebase data to Honeycomb...');
-    console.log('🔄 Parameters received:', {
-      publicKey: publicKey ? 'present' : 'missing',
-      firebaseUserData: firebaseUserData ? 'present' : 'missing',
-      wallet: wallet ? 'present' : 'missing',
-      signMessage: signMessage ? 'present' : 'missing'
-    });
+
     
     // Validate required parameters
     if (!publicKey) {
@@ -688,10 +617,9 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
       return { success: false, error: 'No wallet or signMessage provided' };
     }
     
-    // Prepare update data - only sync fields that both Firebase and Honeycomb have
+    // Prepare update data - EXCLUDE XP and achievements since they originate from Honeycomb
     const updateData = {
       username: firebaseUserData.username || '',
-      xp: firebaseUserData.xp || 0,
       gamesPlayed: firebaseUserData.gamesPlayed || 0,
       gamesWon: firebaseUserData.gamesWon || 0,
       totalCardsPlayed: firebaseUserData.totalCardsPlayed || 0,
@@ -749,10 +677,11 @@ export const syncHoneycombToFirebase = async (publicKey) => {
     // Get current Firebase user data
     const userRef = ref(db, `users/${publicKey.toString()}`);
     
-    // Prepare update data from Honeycomb
+    // Prepare update data from Honeycomb - INCLUDE XP and achievements since they originate from Honeycomb
     const updateData = {
       xp: honeycombProfile.xp || 0,
       level: honeycombProfile.level || 1,
+      achievements: honeycombProfile.achievements || [],
       gamesPlayed: honeycombProfile.gamesPlayed || 0,
       gamesWon: honeycombProfile.gamesWon || 0,
       totalCardsPlayed: honeycombProfile.totalCardsPlayed || 0,
@@ -858,12 +787,7 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.0049) => {
     try {
       console.log('🏦 Attempting app wallet transfer...');
       
-      console.log('🔍 APP_WALLET_CONFIG debug:', {
-        hasPublicKey: !!APP_WALLET_CONFIG.publicKey,
-        hasPrivateKey: !!APP_WALLET_CONFIG.privateKey,
-        publicKeyValue: APP_WALLET_CONFIG.publicKey,
-        privateKeyValue: APP_WALLET_CONFIG.privateKey ? '***HIDDEN***' : 'NOT SET'
-      });
+
       
       if (!APP_WALLET_CONFIG.publicKey || !APP_WALLET_CONFIG.privateKey) {
         throw new Error('App wallet configuration missing');
@@ -877,7 +801,7 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.0049) => {
       const appWalletBalance = await connection.getBalance(appWalletPublicKey);
       const appWalletSolBalance = appWalletBalance / LAMPORTS_PER_SOL;
       
-      console.log('🏦 App wallet balance:', appWalletSolBalance.toFixed(4), 'SOL');
+
       
       if (appWalletSolBalance < 0.01) {
         throw new Error('App wallet has insufficient balance for transfer');
@@ -913,8 +837,7 @@ export const ensureWalletHasSOL = async (publicKey, minSOL = 0.0049) => {
       const finalBalance = await connection.getBalance(publicKey);
       const finalSolBalance = finalBalance / LAMPORTS_PER_SOL;
       
-      console.log('✅ App wallet transfer successful!');
-      console.log('💰 Balance increased from', solBalance.toFixed(4), 'to', finalSolBalance.toFixed(4), 'SOL');
+
       
       return { 
         success: true, 
@@ -1904,8 +1827,7 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
   try {
     const walletAddress = publicKey.toBase58();
     
-    console.log('🔄 Updating platform data for wallet:', walletAddress);
-    console.log('📊 Platform data:', { achievements, xp, customData });
+
     
     // Check if admin keypair is configured
     if (!APP_WALLET_CONFIG.publicKey || !APP_WALLET_CONFIG.privateKey) {
@@ -1927,7 +1849,7 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
     }
     
     const user = users.user[0];
-    console.log('✅ User found:', user.id);
+
     
     // Then find the user's profile
     const profiles = await client.findProfiles({
@@ -1942,8 +1864,7 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
     
     const profile = profiles.profile[0];
     const profileAddress = profile.address;
-    console.log('✅ Profile found:', profileAddress);
-    console.log('📊 Current platform data:', profile.platformData);
+
     
     // Prepare platform data update using the correct structure from Honeycomb docs
     const platformData = {};
@@ -1965,10 +1886,7 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
       };
     }
     
-    console.log('📝 Creating platform data update transaction...');
-    console.log('📊 Platform data structure:', platformData);
-    console.log('📋 Profile address:', profileAddress);
-    console.log('📋 Authority:', adminKeypair.publicKey.toString());
+
     
     // Create transaction using project authority (admin keypair) - FIXED: Use profile address directly
     const apiResponse = await client.createUpdatePlatformDataTransaction({
@@ -1987,7 +1905,7 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
       throw new Error('Invalid response from Honeycomb API: missing transaction data');
     }
     
-    console.log('✅ Transaction created successfully');
+
     
     // Create a proper wallet adapter for Honeycomb that handles VersionedTransaction
     const adminWalletAdapter = {

@@ -17,7 +17,7 @@ console.log('bs58 type:', typeof bs58);
 console.log('sendClientTransactions type:', typeof sendClientTransactions);
 
 // Configuration
-const PROJECT_ADDRESS = process.env.HONEYCOMB_PROJECT_ADDRESS;
+const PROJECT_ADDRESS = 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c';
 const API_URL = 'https://edge.test.honeycombprotocol.com/';
 const RPC_URL = 'https://rpc.test.honeycombprotocol.com';
 

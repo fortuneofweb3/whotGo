@@ -9,8 +9,8 @@ const API_URLS = [
   "https://edge.dev.honeycombprotocol.com/"   // Fallback: Devnet
 ];
 
-const PROJECT_ADDRESS = import.meta.env.VITE_HONEYCOMB_PROJECT_ADDRESS || process.env.HONEYCOMB_PROJECT_ADDRESS;
-const PROFILES_TREE_ADDRESS = import.meta.env.VITE_HONEYCOMB_PROFILES_TREE_ADDRESS || process.env.HONEYCOMB_PROFILES_TREE_ADDRESS;
+const PROJECT_ADDRESS = process.env.HONEYCOMB_PROJECT_ADDRESS || import.meta?.env?.HONEYCOMB_PROJECT_ADDRESS || 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c';
+const PROFILES_TREE_ADDRESS = process.env.HONEYCOMB_PROFILES_TREE_ADDRESS || import.meta?.env?.HONEYCOMB_PROFILES_TREE_ADDRESS || 'CcCvQWcjZpkgNAZChq2o2DRT1WonSN2RyBg6F6Wq9M4U';
 
 // Network configuration
 const NETWORK_CONFIG = {
@@ -36,22 +36,14 @@ let currentApiUrl = API_URLS[0]; // Start with test network
 
 // Initialize client with fallback
 const initializeClient = () => {
-  console.log('🔗 Initializing Honeycomb client for Honeynet test network...');
-  console.log('📋 Network config:', NETWORK_CONFIG);
+
   
   for (const apiUrl of API_URLS) {
     try {
-      console.log(`🔗 Trying Honeycomb API endpoint: ${apiUrl}`);
+
       client = createEdgeClient(apiUrl, true);
       currentApiUrl = apiUrl;
-      console.log(`✅ Honeycomb client initialized successfully with ${apiUrl}`);
-      
-      // Log network information
-      if (apiUrl === NETWORK_CONFIG.apiUrl) {
-        console.log('🎯 Connected to correct test network (Honeynet)');
-      } else {
-        console.log('⚠️ Connected to fallback network');
-      }
+
       
       return true;
     } catch (error) {
@@ -59,8 +51,7 @@ const initializeClient = () => {
     }
   }
   
-  // If all API endpoints fail, throw error
-  console.log('🚨 All Honeycomb API endpoints failed');
+
   throw new Error('Failed to connect to any Honeycomb API endpoint');
 };
 
@@ -71,12 +62,12 @@ initializeClient();
 export const getUserProfile = async (publicKey) => {
   try {
     if (!publicKey) {
-      console.log('❌ No publicKey provided');
+  
       return null;
     }
 
     const walletAddress = publicKey.toString();
-    console.log('Getting Honeycomb user profile for wallet:', walletAddress);
+
 
     // First find the user by wallet address
     const users = await client.findUsers({
@@ -84,12 +75,12 @@ export const getUserProfile = async (publicKey) => {
     });
 
     if (users.user.length === 0) {
-      console.log('❌ User not found for wallet address');
+  
       return null;
     }
 
     const user = users.user[0];
-    console.log('✅ User found:', user.id);
+
 
     // Then find the user's profile
     const profiles = await client.findProfiles({
@@ -100,12 +91,12 @@ export const getUserProfile = async (publicKey) => {
     });
 
     if (profiles.profile.length === 0) {
-      console.log('❌ Profile not found for user');
+  
       return null;
     }
 
     const profile = profiles.profile[0];
-    console.log('✅ Profile found:', profile.address);
+
     
     // Read XP and achievements from platform data
     const platformXP = parseInt(profile.platformData?.xp || 0);
@@ -170,19 +161,19 @@ export const getAchievementName = (achievementIndex) => {
 // Sync Honeycomb data to Firebase (client-side version)
 export const syncHoneycombToFirebase = async (publicKey) => {
   try {
-    console.log('🔄 Syncing Honeycomb data to Firebase...');
+
     if (!publicKey) {
-      console.log('❌ No publicKey provided for sync');
+      
       return { success: false, error: 'No publicKey provided' };
     }
     
     const honeycombProfile = await getUserProfile(publicKey);
     if (!honeycombProfile) {
-      console.log('❌ No Honeycomb profile found');
+
       return { success: false, error: 'No Honeycomb profile found' };
     }
     
-    console.log('🔄 Honeycomb profile data:', honeycombProfile);
+    
     
     const { ref, update } = await import('firebase/database');
     const { db } = await import('../firebase');
@@ -191,6 +182,7 @@ export const syncHoneycombToFirebase = async (publicKey) => {
     const updateData = {
       xp: honeycombProfile.xp || 0,
       level: honeycombProfile.level || 1,
+      achievements: honeycombProfile.achievements || [],
       gamesPlayed: honeycombProfile.gamesPlayed || 0,
       gamesWon: honeycombProfile.gamesWon || 0,
       totalCardsPlayed: honeycombProfile.totalCardsPlayed || 0,
@@ -202,7 +194,7 @@ export const syncHoneycombToFirebase = async (publicKey) => {
     };
     
     await update(userRef, updateData);
-    console.log('✅ Honeycomb data successfully synced to Firebase');
+    
     
     return {
       success: true,
@@ -219,17 +211,17 @@ export const syncHoneycombToFirebase = async (publicKey) => {
 export const checkUserProfileExists = async (publicKey, firebaseUserData = null) => {
   try {
     if (!publicKey) {
-      console.log('❌ No publicKey provided for profile check');
+
       return { exists: false, error: 'No publicKey provided' };
     }
 
-    console.log('🔍 Checking if user profile exists...');
+
     
     // First check Honeycomb profile
     const honeycombProfile = await getUserProfile(publicKey);
     
     if (honeycombProfile) {
-      console.log('✅ Honeycomb profile found');
+
       return { 
         exists: true, 
         honeycombProfile,
@@ -237,7 +229,7 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
       };
     }
     
-    console.log('❌ No Honeycomb profile found');
+    
     return { 
       exists: false, 
       honeycombProfile: null,
@@ -257,37 +249,37 @@ export const checkUserProfileExists = async (publicKey, firebaseUserData = null)
 // Check user profile exists with retry (client-side version)
 export const checkUserProfileExistsWithRetry = async (publicKey, firebaseUserData = null, maxRetries = 5, delayMs = 3000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    console.log(`🔄 Profile check attempt ${attempt}/${maxRetries}`);
+    
     
     const result = await checkUserProfileExists(publicKey, firebaseUserData);
     
     if (result.exists) {
-      console.log('✅ Profile found on attempt', attempt);
+
       return result;
     }
     
     if (attempt < maxRetries) {
-      console.log(`⏳ Waiting ${delayMs}ms before retry...`);
+
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
   
-  console.log('❌ Profile not found after all retries');
+  
   return { exists: false, error: 'Profile not found after retries' };
 };
 
 // Login user profile (client-side version - simplified)
 export const loginUserProfile = async (publicKey) => {
   try {
-    console.log('🔐 Logging in user profile...');
+
     
     const profileResult = await checkUserProfileExists(publicKey);
     
     if (profileResult.exists) {
-      console.log('✅ User profile login successful');
+
       return { success: true, profile: profileResult.honeycombProfile };
     } else {
-      console.log('❌ User profile not found');
+      
       return { success: false, error: 'Profile not found' };
     }
     
@@ -300,10 +292,10 @@ export const loginUserProfile = async (publicKey) => {
 // Update profile info (client-side version - simplified)
 export const updateProfileInfo = async ({ publicKey, wallet, signMessage, username, bio, pfp }) => {
   try {
-    console.log('📝 Updating profile info...');
+
     
     // For client-side, we'll just return success since actual updates are server-side
-    console.log('✅ Profile info update request received');
+    
     return { success: true, message: 'Profile update request received' };
     
   } catch (error) {
@@ -315,10 +307,10 @@ export const updateProfileInfo = async ({ publicKey, wallet, signMessage, userna
 // Create user profile (client-side version - simplified)
 export const createUserProfile = async ({ publicKey, wallet, signMessage, username = null }) => {
   try {
-    console.log('👤 Creating user profile...');
+
     
     // For client-side, we'll just return success since actual creation is server-side
-    console.log('✅ User profile creation request received');
+    
     return { success: true, message: 'Profile creation request received' };
     
   } catch (error) {
@@ -330,10 +322,10 @@ export const createUserProfile = async ({ publicKey, wallet, signMessage, userna
 // Update user profile (client-side version - simplified)
 export const updateUserProfile = async ({ publicKey, wallet, signMessage, profileData }) => {
   try {
-    console.log('🔄 Updating user profile...');
+
     
     // For client-side, we'll just return success since actual updates are server-side
-    console.log('✅ User profile update request received');
+    
     return { success: true, message: 'Profile update request received' };
     
   } catch (error) {
@@ -345,10 +337,10 @@ export const updateUserProfile = async ({ publicKey, wallet, signMessage, profil
 // Sync Firebase to Honeycomb (client-side version - simplified)
 export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, wallet, signMessage) => {
   try {
-    console.log('🔄 Syncing Firebase to Honeycomb...');
+
     
     // For client-side, we'll just return success since actual sync is server-side
-    console.log('✅ Firebase to Honeycomb sync request received');
+    
     return { success: true, message: 'Sync request received' };
     
   } catch (error) {
@@ -360,8 +352,7 @@ export const syncFirebaseToHoneycomb = async (publicKey, firebaseUserData, walle
 // Update platform data (client-side version - calls Firebase function)
 export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0, customData = {} }) => {
   try {
-    console.log('🔄 Updating platform data (client-side)...');
-    console.log('📊 Platform data:', { achievements, xp, customData });
+
     
     // Import Firebase functions
     const { getFunctions, httpsCallable } = await import('firebase/functions');
@@ -378,7 +369,7 @@ export const updatePlatformData = async ({ publicKey, achievements = [], xp = 0,
       customData
     });
     
-    console.log('✅ Platform data update completed:', result.data);
+    
     return result.data;
     
   } catch (error) {

@@ -144,7 +144,7 @@ const checkBadgeCriteria = async (client, badgeIndex) => {
     const testResponse = await client.createClaimBadgeCriteriaTransaction({
       args: {
         payer: 'test', // Dummy payer for testing
-        projectAddress: import.meta.env.VITE_HONEYCOMB_PROJECT_ADDRESS || process.env.HONEYCOMB_PROJECT_ADDRESS,
+        projectAddress: process.env.HONEYCOMB_PROJECT_ADDRESS || import.meta?.env?.HONEYCOMB_PROJECT_ADDRESS || 'FJ96yFfdiKfmmHTqxpKuYnaroLMWHNCYxjNFmvn8Ut7c',
         profileAddress: 'test', // Dummy profile for testing
         criteriaIndex: badgeIndex,
         proof: "Public"
