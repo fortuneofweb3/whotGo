@@ -296,11 +296,11 @@ const testAchievementSystem = async (client, wallet, signMessage) => {
     
     console.log('🧪 Testing achievement claiming for all achievements...');
     const claimingResults = await testAllAchievementClaiming(client, wallet, signMessage);
-    
-    return {
-      success: true,
-      claimingResults: claimingResults
-    };
+      
+      return {
+        success: true,
+        claimingResults: claimingResults
+      };
     
   } catch (error) {
     console.error('❌ Achievement system test failed:', error);

@@ -9,11 +9,157 @@ import RoundEndPopup from './popups/RoundEndPopup';
 import EliminatedPopup from './popups/EliminatedPopup';
 import LottieConfetti from './LottieConfetti';
 import { playSoundEffect } from '../utils/soundEffects';
-import { getCardSVGContent, getCardBackSVG } from '../utils/cardSVG';
-
 
 
 const MAX_VISIBLE_AI_CARDS = 3;
+
+const getCardSVGContent = card => {
+  const numberText = card.number;
+  if (card.special === 'whot' || card.shape === '🔥') {
+    const hasChosenShape = card.chosenShape;
+    const firstWhotY = hasChosenShape ? "110" : "120";
+    const secondWhotY = hasChosenShape ? "150" : "140";
+    const chosenShapeElement = hasChosenShape ? `<text x="93.15" y="180" font-family="Helvetica, Arial, sans-serif" font-size="36px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">${card.chosenShape}</text>` : '';
+    return `
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+      <g>
+        <path fill="white" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+          c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+        <text transform="matrix(1 0 0 1 15.942 31.6153)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
+        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#7D1228" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">20</text>
+        <text x="93.15" y="${firstWhotY}" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle">Whot</text>
+        <text x="93.15" y="${secondWhotY}" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="#7D1228" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 ${secondWhotY})">Whot</text>
+        ${chosenShapeElement}
+      </g>
+      </svg>
+    `;
+  }
+  const svgTemplates = {
+    '●': num => `
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+      <g>
+        <g>
+          <path fill="#F4F4F2" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+            c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+        </g>
+        <rect x="14.4" y="18" fill="none" width="27.8" height="27.3"/>
+        <rect x="137.4" y="209.4" fill="none" width="27.8" height="27.3"/>
+        <circle fill="#7D1228" cx="97.8" cy="127.8" r="57.2"/>
+        <circle fill="#7D1228" cx="23.6" cy="54.5" r="9.3"/>
+        <circle fill="#7D1228" cx="155.1" cy="198.2" r="9.3"/>
+        <text transform="matrix(1 0 0 1 15.942 31.6153)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+      </g>
+      </svg>
+    `,
+    '✚': num => `
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+      <g>
+        <g>
+          <path fill="#F4F4F2" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+            c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+        </g>
+        <rect x="14.4" y="18" fill="none" width="27.8" height="27.3"/>
+        <rect x="137.4" y="209.4" fill="none" width="27.8" height="27.3"/>
+        <g>
+          <rect x="17.9" y="91.9" fill="#7D1228" width="153.3" height="52.3"/>
+          <rect x="68.4" y="45.3" fill="#7D1228" width="52.3" height="153.3"/>
+        </g>
+        <g>
+          <rect x="10.3" y="49.4" fill="#7D1228" width="21.3" height="7.3"/>
+          <rect x="17.3" y="42.9" fill="#7D1228" width="7.3" height="21.3"/>
+        </g>
+        <g>
+          <rect x="144.4" y="200" fill="#7D1228" width="21.3" height="7.3"/>
+          <rect x="151.4" y="193.5" fill="#7D1228" width="7.3" height="21.3"/>
+        </g>
+        <text transform="matrix(1 0 0 1 13.2988 34.2585)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+      </g>
+      </svg>
+    `,
+    '■': num => `
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+      <g>
+        <g>
+          <path fill="#F4F4F2" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+            c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+        </g>
+        <rect x="14.4" y="18" fill="none" width="27.8" height="27.3"/>
+        <rect x="137.4" y="209.4" fill="none" width="27.8" height="27.3"/>
+        <rect x="33.1" y="67.9" fill="#7D1228" width="121.1" height="121.1"/>
+        <rect x="11.9" y="45.3" fill="#7D1228" width="21.2" height="18.5"/>
+        <rect x="144.5" y="195.5" fill="#7D1228" width="21.2" height="18.5"/>
+        <text transform="matrix(1 0 0 1 13.2988 34.2585)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+      </g>
+      </svg>
+    `,
+    '▲': num => `
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+      <g>
+        <g>
+          <path fill="#F4F4F2" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+            c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+        </g>
+        <rect x="14.4" y="18" fill="none" width="27.8" height="27.3"/>
+        <rect x="137.4" y="209.4" fill="none" width="27.8" height="27.3"/>
+        <g transform="translate(40, 75) scale(2)">
+          <polygon stroke="#791026" points="25, 0, 0, 48, 50, 48" fill-opacity="null" stroke-opacity="null" stroke-width="2" fill="#791026"/>
+        </g>
+        <g transform="translate(13, 42) scale(0.4)">
+          <polygon stroke="#791026" points="25, 0, 0, 48, 50, 48" fill-opacity="null" stroke-opacity="null" stroke-width="5" fill="#791026"/>
+        </g>
+        <g transform="translate(166.5, 210) scale(0.4) rotate(180)">
+          <polygon stroke="#791026" points="25, 0, 0, 48, 50, 48" fill-opacity="null" stroke-opacity="null" stroke-width="5" fill="#791026"/>
+        </g>
+        <text transform="matrix(1 0 0 1 13.2988 34.2585)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+      </g>
+      </svg>
+    `,
+    '★': num => `
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+        viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+      <g>
+        <g>
+          <path fill="#F4F4F2" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+            c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+        </g>
+        <rect x="14.4" y="18" fill="none" width="27.8" height="27.3"/>
+        <rect x="137.4" y="209.4" fill="none" width="27.8" height="27.3"/>
+        <polygon fill="#7D1228" points="93.6,56.9 114.5,99.2 161.2,106 127.4,138.9 135.4,185.4 93.6,163.5 51.9,185.4 59.8,138.9 26.1,106
+          72.8,99.2 "/>
+        <polygon fill="#7D1228" points="21,37.8 24.1,44 31,45.1 26,50 27.2,56.9 21,53.6 14.8,56.9 16,50 10.9,45.1 17.9,44 "/>
+        <polygon fill="#7D1228" points="155.1,192.3 158.2,198.6 165.1,199.6 160.1,204.5 161.3,211.4 155.1,208.2 148.9,211.4 150,204.5
+          145,199.6 152,198.6 "/>
+        <text transform="matrix(1 0 0 1 13.2988 34.2585)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+        <text transform="matrix(1 0 0 1 147.3851 236.655)" fill="#791026" font-family="Helvetica, Arial, sans-serif" font-size="26.9039px">${num}</text>
+      </g>
+      </svg>
+    `
+  };
+  return svgTemplates[card.shape] ? svgTemplates[card.shape](numberText) : '';
+};
+
+const getCardBackSVG = () => {
+  return `
+    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+      viewBox="0 0 186.3 255.5" style="enable-background:new 0 0 186.3 255.5;" xml:space="preserve">
+    <g>
+      <path fill="#7D1228" stroke="#000000" d="M182.9,237.7c0,7.8-6.3,14.2-14.2,14.2H18.5c-7.8,0-14.2-6.3-14.2-14.2V16.6c0-7.8,6.3-14.2,14.2-14.2h150.2
+        c7.8,0,14.2,6.3,14.2,14.2V237.7z"/>
+      <text x="93.15" y="120" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">Whot</text>
+      <text x="93.15" y="140" font-family="Pacifico, cursive" font-size="32px" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle" transform="rotate(180 93.15 140)">Whot</text>
+    </g>
+    </svg>
+  `;
+};
 
 const Game = ({
   gameData,
@@ -55,7 +201,7 @@ const Game = ({
   handleMultiplayerRoundEnd,
   handleRoundEnd
 }) => {
-  // Safety check - if gameData is missing or invalid, show loading
+  // Early safety check - if gameData is missing or invalid, show loading
   if (!gameData || !Array.isArray(gameData.players) || gameData.players.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-white">
@@ -103,7 +249,7 @@ const Game = ({
   const [selectedLogRound, setSelectedLogRound] = React.useState(1);
   const [playPilePositions, setPlayPilePositions] = React.useState([]);
   const dealtCountsByPlayer = React.useMemo(() => {
-    // Read from parent via props if passed in future; fallback to zero reveal
+    // Read from parent via props if passed in future; fallback to zero reveal (handled in App for now)
     return [];
   }, []);
   const [showWhotChoice, setShowWhotChoice] = React.useState(false);
@@ -113,20 +259,24 @@ const Game = ({
   const isCurrentUserTurn = gameData.currentPlayer === currentUserActualIndex;
   
   React.useEffect(() => {
-    if (gameData && gameData.drawPile && (needNewMarketPositions || marketCardPositionsRef.current.length === 0)) {
-      const positions = Array.from({
-        length: 8
-      }, (_, index) => {
-        const randomX = (Math.random() - 0.5) * 8;
-        const randomY = (Math.random() - 0.5) * 8;
-        const randomRotate = (Math.random() - 0.5) * 15;
-        return {
-          transform: `translate(${randomX}px, ${randomY}px) rotate(${randomRotate}deg)`,
-          zIndex: index
-        };
-      });
-      marketCardPositionsRef.current = positions;
-      setMarketCardPositions(positions);
+    if (gameData && gameData.drawPile && needNewMarketPositions) {
+      if (marketCardPositionsRef.current.length === 0) {
+        const positions = Array.from({
+          length: 8
+        }, (_, index) => {
+          const randomX = (Math.random() - 0.5) * 8;
+          const randomY = (Math.random() - 0.5) * 8;
+          const randomRotate = (Math.random() - 0.5) * 15;
+          return {
+            transform: `translate(${randomX}px, ${randomY}px) rotate(${randomRotate}deg)`,
+            zIndex: index
+          };
+        });
+        marketCardPositionsRef.current = positions;
+        setMarketCardPositions(positions);
+      } else {
+        setMarketCardPositions(marketCardPositionsRef.current);
+      }
       setNeedNewMarketPositions(false);
     }
   }, [gameData?.drawPile, needNewMarketPositions]);
@@ -252,7 +402,7 @@ const Game = ({
 
 
 
-  // shuffleDeck imported from utils/deck
+  // shuffleDeck now imported from utils/deck
 
   const getXPFromGame = (won, roundsPlayed, cardsPlayed) => {
     let baseXP = 50;
@@ -309,7 +459,7 @@ const Game = ({
     }
   };
 
-  // createDeck imported from utils/deck
+  // createDeck now imported from utils/deck
 
 
 
@@ -535,7 +685,7 @@ const Game = ({
       };
       setAnimatingCards(prev => [...prev, animatingCard]);
       
-      // Play sound effect based on card type
+      // Play sound effect immediately based on card type
       if (cardToPlay.special === 'whot' || cardToPlay.special === 'pick2' || cardToPlay.special === 'holdon' || cardToPlay.special === 'generalmarket') {
         playSoundEffect.specialPlay();
       } else {
@@ -584,8 +734,8 @@ const Game = ({
         };
       }
       if ((currentPlayer.cards || []).length === 0) {
-          // Play end sound when game ends
-  playSoundEffect.end();
+        // Play end sound immediately when game ends
+        playSoundEffect.end();
         // Use appropriate round end handler based on game mode
         if (currentRoom) {
           await handleMultiplayerRoundEnd(newGameData);
@@ -679,7 +829,16 @@ const Game = ({
 
 
   const chooseWhotShape = async shape => {
+    console.log('🎯 chooseWhotShape called', {
+      shape,
+      hasPendingWhotCard: !!pendingWhotCard,
+      isPlayerActionInProgress,
+      isAnyAnimationInProgress,
+      showWhotChoice
+    });
+    
     if (!pendingWhotCard || isPlayerActionInProgress || isAnyAnimationInProgress) {
+      console.log('❌ chooseWhotShape blocked by guard clause');
       return;
     }
     
@@ -748,7 +907,7 @@ const Game = ({
       setShowWhotChoice(false);
       setPendingWhotCard(null);
       if (currentPlayer.cards.length === 0) {
-        // Play end sound when game ends
+        // Play end sound immediately when game ends
         playSoundEffect.end();
         // Use appropriate round end handler based on game mode
         if (currentRoom) {
@@ -769,7 +928,7 @@ const Game = ({
             [newGameData.roundNumber]: [...(newGameData.gameLog[newGameData.roundNumber] || []), 'General Market effect ended - all players have drawn']
           };
         }
-        // Update local state for better responsiveness
+        // Update local state immediately for better responsiveness
         setGameData(newGameData);
         await update(ref(db, `rooms/${currentRoom.id}/gameData`), newGameData);
       }
@@ -784,7 +943,7 @@ const Game = ({
       setShowWhotChoice(false);
       setPendingWhotCard(null);
       if (newGameData.players[0].cards.length === 0) {
-        // Play end sound when game ends
+        // Play end sound immediately when game ends
         playSoundEffect.end();
         handleRoundEnd(newGameData);
       } else {
@@ -859,7 +1018,7 @@ const Game = ({
     };
     setAnimatingCards(prev => [...(prev || []), animatingCard]);
     
-    // Play sound effect based on card type
+    // Play sound effect immediately based on card type
     if (card.special === 'whot' || card.special === 'pick2' || card.special === 'holdon' || card.special === 'generalmarket') {
       playSoundEffect.specialPlay();
     } else {
@@ -962,9 +1121,9 @@ const Game = ({
       return;
     }
     try {
-      // Handle WHOT cards differently - show popup without animation
+      // Handle WHOT cards differently - show popup immediately without animation
       if (card.special === 'whot') {
-    
+        console.log('🎴 WHOT card clicked, showing popup');
         setIsPlayerActionInProgress(true);
         setPendingWhotCard(card);
         setShowWhotChoice(true);
@@ -996,7 +1155,7 @@ const Game = ({
       };
       setAnimatingCards(prev => [...(prev || []), animatingCard]);
       
-      // Play sound based on card type
+      // Play sound based on card type immediately
       if (card.special === 'pick2' || card.special === 'holdon' || card.special === 'generalmarket') {
         playSoundEffect.specialPlay();
       } else {
@@ -1057,7 +1216,7 @@ const Game = ({
         };
       }
       if ((currentPlayer.cards || []).length === 0) {
-        // Play end sound when game ends
+        // Play end sound immediately when game ends
         playSoundEffect.end();
         await handleMultiplayerRoundEnd(newGameData);
       } else {
@@ -1087,7 +1246,18 @@ const Game = ({
   };
 
   const handleDrawMultiplayerCard = async () => {
+    console.log('🔍 handleDrawMultiplayerCard called', {
+      hasGameData: !!gameData,
+      hasCurrentRoom: !!currentRoom,
+      hasCurrentUser: !!currentUser,
+      isPlayerActionInProgress,
+      isAnyAnimationInProgress,
+      showWhotChoice,
+      pendingWhotCard: !!pendingWhotCard
+    });
+    
     if (!gameData || !currentRoom || !currentUser || isPlayerActionInProgress) {
+      console.log('❌ handleDrawMultiplayerCard blocked by guard clause');
       return;
     }
     const players = ensurePlayersArray(gameData.players);
@@ -1134,7 +1304,7 @@ const Game = ({
         };
         setAnimatingCards(prev => [...prev, animatingCard]);
         
-        // Play market sound when card starts drawing
+        // Play market sound immediately when card starts drawing
         playSoundEffect.market();
         
         await new Promise(resolve => {
@@ -1177,7 +1347,7 @@ const Game = ({
       const nextPlayerIndex = getNextPlayer(newGameData);
       newGameData.currentPlayer = nextPlayerIndex;
       
-      // Check if General Market effect should end when turn comes back to originator
+      // Check if General Market effect should end (when turn comes back to originator)
       if (newGameData.generalMarketActive && nextPlayerIndex === newGameData.generalMarketOriginatorId) {
         newGameData.generalMarketActive = false;
         newGameData.generalMarketOriginatorId = null;
@@ -1201,7 +1371,7 @@ const Game = ({
   };
 
   return (
-    <div className="game-container min-h-screen relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%)', perspective: '1000px' }}>
+    <div className="min-h-screen relative overflow-hidden" style={{ background: 'radial-gradient(ellipse at center, #1a1a1a 0%, #000000 70%)', perspective: '1000px' }}>
       <div className="fixed top-4 left-4 z-30">
         <button onClick={() => {
           playSoundEffect.back();
@@ -1232,7 +1402,7 @@ const Game = ({
           </button>
         </div>
       )}
-      <div className={`fixed top-4 right-4 z-30 text-white flex ${window.innerWidth < 768 ? 'gap-2' : 'gap-3'}`} style={{ transform: 'scale(0.75)', transformOrigin: 'top right' }}>
+      <div className={`fixed top-4 right-4 z-30 text-white flex ${window.innerWidth < 768 ? 'gap-2' : 'gap-3'}`}>
         <div className={`bg-gray-900 bg-opacity-60 ${window.innerWidth < 768 ? 'p-2' : 'p-3'} border border-gray-600 flex items-center justify-center ${window.innerWidth < 768 ? 'min-w-[40px]' : 'min-w-[60px]'}`}>
           <div className={`${window.innerWidth < 768 ? 'text-lg' : 'text-2xl'} font-bold`}>
             {(() => {
@@ -1331,7 +1501,14 @@ const Game = ({
               className={`absolute ${window.innerWidth < 768 ? 'w-[72px] h-[100px]' : window.innerWidth < 1024 ? 'w-[100px] h-36' : 'w-[130px] h-[172px]'} shadow-2xl ${index === Math.min((gameData.drawPile || []).length, 8) - 1 && (animatingCards || []).length === 0 && !isPlayerActionInProgress ? 'hover:scale-105 cursor-pointer' : ''}`}
               style={{ ...getMarketCardPosition(index) }}
               onClick={() => {
-
+                console.log('🎯 Market card clicked', {
+                  isTopCard: index === Math.min((gameData.drawPile || []).length, 8) - 1,
+                  noAnimatingCards: (animatingCards || []).length === 0,
+                  notPlayerActionInProgress: !isPlayerActionInProgress,
+                  notAnyAnimationInProgress: !isAnyAnimationInProgress,
+                  showWhotChoice,
+                  pendingWhotCard: !!pendingWhotCard
+                });
                 
                 if (index === Math.min((gameData.drawPile || []).length, 8) - 1 && (animatingCards || []).length === 0 && !isPlayerActionInProgress && !isAnyAnimationInProgress) {
                   if (currentRoom) {
@@ -1428,8 +1605,8 @@ const Game = ({
          // During dealing, progressively reveal cards: own cards face-up, opponent cards as backs
          let baseVisible = isCurrentUserPlayer ? (player.cards || []).slice(playerScrollIndex, playerScrollIndex + maxVisibleCards) : (player.cards || []).slice(0, maxVisibleCards);
          if (isDealingPhase) {
-             // During dealing phase, show cards that have already been dealt
-  // The animation system handles the flying cards, but we should show the cards that have arrived
+           // During dealing phase, show cards that have already been dealt (they're in the player's hand)
+           // The animation system handles the flying cards, but we should show the cards that have arrived
            baseVisible = isCurrentUserPlayer ? (player.cards || []).slice(playerScrollIndex, playerScrollIndex + maxVisibleCards) : (player.cards || []).slice(0, maxVisibleCards);
          }
          const visibleCards = baseVisible;
@@ -1466,9 +1643,6 @@ const Game = ({
                                       {(visibleCards || []).map((card, cardIndex) => {
                     const canPlayAnyCard = isCurrentUserPlayer && isCurrentUserTurn && canPlayerPlay && gameData.pendingPickCount === 0 && !(gameData.generalMarketActive && gameData.currentPlayer !== gameData.generalMarketOriginatorId) && !isAnyAnimationInProgress;
                     const isThisCardPlayable = canPlayAnyCard && isCardPlayable(card, topCard);
-                    
-
-                    
                     return (
                       <div
                         key={`${card.id}-${cardIndex}`}
@@ -1476,15 +1650,10 @@ const Game = ({
                         style={{ 
                           backgroundColor: isCurrentUserPlayer ? 'transparent' : '#2a2a2a', 
                           zIndex: cardIndex, 
-                          transform: 'translateZ(0)', 
+                          transform: 'none', 
                           opacity: isCurrentUserPlayer ? (isThisCardPlayable || !canPlayAnyCard ? 1 : 0.4) : 1,
                           touchAction: 'manipulation',
-                          WebkitTapHighlightColor: 'transparent',
-                          willChange: 'transform, opacity',
-                          backfaceVisibility: 'hidden',
-                          WebkitBackfaceVisibility: 'hidden',
-                          MozBackfaceVisibility: 'hidden',
-                          msBackfaceVisibility: 'hidden'
+                          WebkitTapHighlightColor: 'transparent'
                         }}
                         onClick={(e) => {
                           if (isThisCardPlayable && isCurrentUserPlayer && isCurrentUserTurn) {
@@ -1509,23 +1678,12 @@ const Game = ({
                           e.preventDefault();
                         }}
                       >
-                        <div className="h-full flex flex-col items-center justify-center text-white font-bold relative" style={{
-                          willChange: 'transform',
-                          backfaceVisibility: 'hidden',
-                          WebkitBackfaceVisibility: 'hidden',
-                          MozBackfaceVisibility: 'hidden',
-                          msBackfaceVisibility: 'hidden',
-                          backgroundColor: 'transparent',
-                          border: '2px solid #333',
-                          borderRadius: '8px'
-                        }}>
-                          {/* SVG Content - Using the same pattern as play pile and market cards */}
-                          <div className="h-full w-full" dangerouslySetInnerHTML={{ __html:
+                        <div className="h-full flex flex-col items-center justify-center text-white font-bold relative">
+                          <div className="flex items-center justify-center w-full h-full" dangerouslySetInnerHTML={{ __html:
                             isCurrentUserPlayer
                               ? getCardSVGContent(card)
                               : (isDealingPhase ? getCardBackSVG() : (isAdmin && adminCardsRevealed ? getCardSVGContent(card) : getCardBackSVG()))
                           }} />
-                          
                           {card.special && (isCurrentUserPlayer || (isAdmin && adminCardsRevealed && !isDealingPhase)) && (
                             <div className="absolute bottom-1 text-xs bg-gray-900 bg-opacity-70 px-1">
                               {card.special === 'holdon' && 'HOLD'}
@@ -1654,25 +1812,7 @@ const Game = ({
         </div>
       )}
       {showWhotChoice && <WhotShapePopup selectShape={chooseWhotShape} closePopup={() => setShowWhotChoice(false)} />}
-      {showRoundEndPopup && roundEndData && <RoundEndPopup 
-        roundEndData={roundEndData} 
-        isMultiplayer={!!currentRoom} 
-        currentUser={currentUser}
-        onContinue={() => {
-          // Check if current user is eliminated
-          const players = ensurePlayersArray(gameData.players);
-          const currentUserActualIndex = currentRoom ? players.findIndex(p => p.id === currentUser?.id) : 0;
-          const currentUserPlayer = players[currentUserActualIndex];
-          
-          if (currentUserPlayer && currentUserPlayer.eliminated) {
-            // Player is eliminated - return to menu
-            returnToMenu();
-          } else {
-            // Player is not eliminated - continue to next round
-            setShowRoundEndPopup(false);
-          }
-        }}
-      />}
+      {showRoundEndPopup && roundEndData && <RoundEndPopup roundEndData={roundEndData} isMultiplayer={!!currentRoom} currentUser={currentUser} />}
       {showEliminatedPopup && <EliminatedPopup setShowEliminatedPopup={setShowEliminatedPopup} returnToMenu={returnToMenu} />}
       {showAdminDeckOverview && isAdmin && (
         <div className="absolute inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[100] fade-in">
