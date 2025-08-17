@@ -22,17 +22,18 @@ Whot is a popular African card game similar to Crazy Eights, where players try t
 - **Live Chat**: Communicate with other players during games
 - **Match History**: Track your games and performance over time
 
-### ⛓️ **Blockchain Integration**
+### ⚡ **Blockchain Integration**
 - **Solana Network**: Fast, low-cost transactions on Solana blockchain
 - **Honeycomb Protocol**: On-chain user profiles and achievements
 - **Wallet Integration**: Connect with Phantom, Solflare, and other Solana wallets
-- **Achievement System**: Earn badges and track progress on-chain
+- **Achievement System**: Earn achievements and track progress on-chain
 
 ### 🏆 **Achievement System**
-- **Game-based Badges**: Earn badges for wins, perfect games, and special plays
-- **On-chain Storage**: All achievements stored securely on Solana
-- **Profile System**: Create and customize your gaming profile
-- **Leaderboards**: Compete with other players globally
+- **Automatic Unlocking**: Achievements unlock automatically when requirements are met
+- **XP Rewards**: Earn XP for completing games and unlocking achievements
+- **On-chain Storage**: All achievements and XP stored securely on Solana
+- **Progress Tracking**: Real-time progress monitoring for all achievements
+- **Level System**: Level up based on XP earned from games and achievements
 
 ### 🎵 **Immersive Experience**
 - **Sound Effects**: Authentic card sounds and game audio
@@ -58,7 +59,7 @@ Whot is a popular African card game similar to Crazy Eights, where players try t
 2. **Create Profile**: Set up your on-chain gaming profile
 3. **Choose Mode**: Select single-player or multiplayer
 4. **Start Playing**: Join a room or create your own
-5. **Earn Achievements**: Complete games to earn badges and XP
+5. **Earn Achievements**: Complete games to earn XP and unlock achievements
 
 ### **Game Rules**
 - Match cards by suit or number
@@ -66,7 +67,7 @@ Whot is a popular African card game similar to Crazy Eights, where players try t
 - Be the first to get rid of all your cards
 - Watch out for Whot cards - they can change the game!
 
-## 🏗️ **Project Structure**
+## 📁 **Project Structure**
 
 ```
 whotgo/
@@ -85,18 +86,19 @@ whotgo/
 │   │   │   ├── SettingsPopup.jsx       # Game settings and preferences
 │   │   │   ├── SyncPopup.jsx           # Data synchronization status
 │   │   │   └── WhotShapePopup.jsx      # WHOT card shape selection interface
-│   │   ├── BadgeNotification.jsx       # Achievement badge notifications
+│   │   ├── BadgeNotification.jsx       # Achievement notification system
 │   │   ├── ErrorBoundary.jsx           # Error handling and recovery
 │   │   ├── LottieConfetti.jsx          # Celebration animations
 │   │   ├── ProfileCreationStatus.jsx   # Profile creation progress UI
 │   │   └── WalletProvider.jsx          # Solana wallet connection provider
 │   ├── utils/                   # Utility functions and business logic
-│   │   ├── profile.js           # Honeycomb Protocol integration and SOL airdrops
+│   │   ├── profile.js           # Server-side Honeycomb Protocol integration and profile management
+│   │   ├── profileClient.js     # Client-side profile operations
+│   │   ├── achievementService.js # Achievement system, XP management, and game rewards
 │   │   ├── soundEffects.js      # Audio system with Web Audio API
 │   │   ├── cardSVG.js           # Card graphics and SVG rendering
 │   │   ├── deck.js              # Card deck creation and shuffling
-│   │   ├── gameUtils.js         # Game logic utilities and helpers
-│   │   └── honeycombBadges.js   # Achievement system and badge unlocking logic
+│   │   └── gameUtils.js         # Game logic utilities and helpers
 │   ├── assets/                  # Static assets and resources
 │   │   └── confetti-celebration.json   # Lottie animation data
 │   ├── App.jsx                  # Main application component and state management
@@ -130,7 +132,7 @@ whotgo/
 └── README.md                    # This documentation file
 ```
 
-### **📁 Directory Structure Explained**
+### **🔧 Directory Structure Explained**
 
 #### **`src/` - Main Source Code**
 The heart of the application containing all React components, utilities, and business logic.
@@ -142,12 +144,13 @@ The heart of the application containing all React components, utilities, and bus
   - **Supporting Components**: Error handling, notifications, and wallet integration
 
 - **`utils/`**: Business logic and utility functions
-  - **`profile.js`**: Honeycomb Protocol integration, SOL airdrops, and user profile management
+  - **`profile.js`**: Server-side Honeycomb Protocol integration and profile management
+  - **`profileClient.js`**: Client-side profile operations and data fetching
+  - **`achievementService.js`**: Achievement system, XP management, and game rewards
   - **`soundEffects.js`**: Complete audio system using Web Audio API for mobile compatibility
   - **`cardSVG.js`**: Card graphics generation and SVG rendering optimization
   - **`deck.js`**: Card deck creation, shuffling, and validation
   - **`gameUtils.js`**: Game logic helpers and utility functions
-  - **`honeycombBadges.js`**: Achievement system and badge unlocking logic
 
 - **`assets/`**: Static resources like animations and configuration files
 
@@ -191,8 +194,9 @@ Helper scripts and tools for development and build processes.
 - **`src/utils/gameUtils.js`**: Game state utilities, player calculations, and helper functions
 
 #### **Blockchain Integration**
-- **`src/utils/profile.js`**: Honeycomb Protocol integration, SOL airdrops, and profile management
-- **`src/utils/honeycombBadges.js`**: Achievement system with badge unlocking and progress tracking
+- **`src/utils/profile.js`**: Server-side Honeycomb Protocol integration and profile management
+- **`src/utils/profileClient.js`**: Client-side profile operations and data fetching
+- **`src/utils/achievementService.js`**: Achievement system with XP management and game rewards
 - **`src/components/WalletProvider.jsx`**: Solana wallet connection and adapter management
 
 #### **Audio and Graphics**
@@ -212,12 +216,12 @@ Helper scripts and tools for development and build processes.
 2. **Game Initialization**: Deck creation → Player setup → Game state initialization
 3. **Gameplay Loop**: Card actions → State updates → Firebase sync → UI updates
 4. **Multiplayer Sync**: Real-time updates via Firebase → Player coordination
-5. **Achievement Tracking**: Progress monitoring → Badge unlocking → Blockchain updates
+5. **Achievement Tracking**: Progress monitoring → Achievement unlocking → Blockchain updates
 
 #### **State Management**
 - **Local State**: React hooks for UI state and component data
 - **Firebase**: Real-time game state, user profiles, and multiplayer data
-- **Honeycomb Protocol**: On-chain achievements, badges, and user profiles
+- **Honeycomb Protocol**: On-chain achievements, XP, and user profiles
 - **LocalStorage**: User preferences, session data, and cached information
 
 #### **Component Hierarchy**
@@ -250,7 +254,7 @@ This structure provides a clear separation of concerns, making the codebase main
 - **Graphics**: SVG with browser optimization
 - **Deployment**: Netlify
 
-## 🌍 **Live Demo**
+## 🌐 **Live Demo**
 
 **Play Now**: [https://whotgo.netlify.app](https://whotgo.netlify.app)
 

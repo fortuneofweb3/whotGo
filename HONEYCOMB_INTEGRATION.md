@@ -62,20 +62,28 @@ Following the official Honeycomb documentation, user profiles are created with:
 - **Profile Info Updates**: Username, bio, and profile picture
 - **Transaction Signing**: All updates require wallet approval
 
-## Badge System
+## Achievement System
 
-### Badge Criteria (Indices 0-7)
+### Achievement Definitions
 
-| Index | Badge Name | Description | Transaction Signature |
-|-------|------------|-------------|----------------------|
-| 0 | First Victory | Win your first game | `27P8tNMzYGBaLqLLzVj94iShtFVkUQe6MRrEyg3sGY2ad78uCcsmN1rUwtwzEj7Rdh8HL1Zn4SyGSY1iz1UtU7sL` |
-| 1 | Card Master | Master all card types | `5QnTvZ5otF3eXJSAYfmFAqvT6LsCfyiEmLmXb14MN8BVWXZL9S991831ziYTiGGWGtuyZ1JPWDsswRXbm7ove1HJ` |
-| 2 | Shadow Warrior | Win a game without losing a life | `4K5qP3hLHJ9zpFxHcge4NtPj5L1nuAkdxJM6sZb9x4M61xdn9tuCehHEzuNgSncsxbXCFohCW6XbNSRwA4eWUFxm` |
-| 3 | Strategic Mind | Win 10 games with strategic plays | `5bb67fYv8hyWe5w23bUqEMacwXEvPrE816EzjYwG2DsJkdsvJ8oPfcBRTNSCUXcx3nuBqordg6LhQWf7aoTyB74o` |
-| 4 | Century Club | Play 100 games | `2ugeYYq4BYbwGtW7z7LNL7vJ62mzzWbjcFcm614kU54vsHEX49FMzgm1hMokauqyNmt1LMf2o6ZUFrLCT2jYQf8D` |
-| 5 | Ultimate Champion | Win 50 games | `5QozmC6kMYqshdCECSgFFq2qTB2xAEoRGQWZcdREapRVq4e9bKA4RSb6t4B8v8taWywt8F1w2YBkMNAgJct9HLdT` |
-| 6 | Legendary Player | Reach level 50 | `rzkJKEQvgTZBLvLchyfMackkSEmSa9U7dN8Leu7JgjBD19wmhcVjYeVmoa8dhf5gRf9a8vnbyTcM6tqxuHW5x2b` |
-| 7 | Whot Grandmaster | Achieve all other badges | `2vwPwXSFzPhwWGP2RGZe4hmML3zu55TVJYTmVKFY5DhGbFmVkfxLmEK18y777yDPadj78zRg9pSoG69njdAFAKRg` |
+The game features a comprehensive achievement system with automatic unlocking and XP rewards:
+
+| Achievement ID | Name | Description | XP Reward | Unlock Condition |
+|----------------|------|-------------|-----------|------------------|
+| `first_win` | First Victory | Win your first game | 50 XP | Win 1 game |
+| `card_master` | Card Master | Play 100 cards | 100 XP | Play 100 cards total |
+| `perfect_win` | Perfect Win | Win without losing any cards | 200 XP | Win with 0 cards lost |
+| `streak_master` | Streak Master | Win 5 games in a row | 150 XP | Achieve 5-game win streak |
+| `century_club` | Century Club | Play 100 games | 300 XP | Complete 100 games |
+| `ultimate_champion` | Ultimate Champion | Win 50 games | 500 XP | Win 50 games total |
+| `legendary_player` | Legendary Player | Reach level 25 | 1000 XP | Reach level 25 |
+| `whot_grandmaster` | Whot Grandmaster | Unlock all achievements | 2000 XP | Unlock all other achievements |
+
+### XP System
+- **Base Game XP**: 10 XP per game played, 25 XP per game won
+- **Achievement XP**: Bonus XP for unlocking achievements
+- **Level Calculation**: Level = Math.floor(XP / 100) + 1
+- **Progress Tracking**: Real-time progress monitoring for all achievements
 
 ## Implementation Details
 
@@ -90,12 +98,13 @@ Complete Honeycomb profile management including:
 - **Badge claiming** functionality
 - **Profile data updates**
 
-#### 2. `src/utils/honeycombBadges.js`
-Badge management system including:
-- **Badge condition definitions**
-- **Progress tracking**
-- **Achievement checking**
-- **Statistics updates**
+#### 2. `src/utils/achievementService.js`
+Achievement management system including:
+- **Achievement definitions and conditions**
+- **XP calculation and level management**
+- **Progress tracking and monitoring**
+- **Automatic achievement unlocking**
+- **Game statistics integration**
 
 #### 3. `src/components/popups/AchievementPopup.jsx`
 Updated achievement display with:
@@ -138,24 +147,22 @@ await updateProfileInfo({ publicKey, wallet, username, bio, pfp });
 const profile = await getUserProfile(publicKey);
 ```
 
-#### Badge System
+#### Achievement System
 ```javascript
-// Claim a badge
-await claimBadge({ publicKey, wallet, badgeIndex });
+// Update user stats and achievements
+const result = await updateUserStatsAndAchievements(user, gameData, isWinner);
 
-// Check badge earned status
-const earned = await checkBadgeEarned(publicKey, badgeIndex);
+// Get achievement progress
+const progress = getAchievementProgress(achievementId, userData);
 
-// Get all badges with progress
-const badges = await getAllBadges(publicKey);
+// Check if user has achievement
+const hasAchievement = user.achievements.includes(achievementId);
 
-// Update game stats and check badges
-const result = await updateGameStats({ 
-  publicKey, 
-  wallet, 
-  gameResult, 
-  gameStats 
-});
+// Calculate level from XP
+const level = calculateLevel(user.xp);
+
+// Get game XP reward
+const xpReward = getGameXPReward(isWinner, roundsPlayed, cardsPlayed);
 ```
 
 ### Game Integration
@@ -163,11 +170,12 @@ const result = await updateGameStats({
 The Honeycomb system is integrated into the game flow:
 
 1. **User Initialization**: Automatic profile creation/login on wallet connection
-2. **Game End**: Automatically checks for new badges
-3. **Statistics Update**: Updates on-chain profile data
-4. **Badge Notification**: Shows real-time achievement notifications
-5. **Progress Tracking**: Monitors badge progress in real-time
+2. **Game End**: Automatically calculates XP and checks for new achievements
+3. **Statistics Update**: Updates on-chain profile data with XP and achievements
+4. **Achievement Notification**: Shows real-time achievement unlock notifications
+5. **Progress Tracking**: Monitors achievement progress in real-time
 6. **Profile Management**: Users can edit their profile info
+7. **Data Synchronization**: XP and achievements flow from Honeycomb to Firebase
 
 ## Configuration
 
@@ -237,33 +245,30 @@ await updateProfileInfo({
 });
 ```
 
-### Checking Badges
+### Checking Achievements
 ```javascript
-import { getAllBadges } from './utils/honeycombBadges';
+import { ACHIEVEMENT_DEFINITIONS, getAchievementProgress } from './utils/achievementService';
 
-const badges = await getAllBadges(publicKey);
-badges.forEach(badge => {
-  console.log(`${badge.name}: ${badge.earned ? 'Earned' : 'Locked'}`);
+ACHIEVEMENT_DEFINITIONS.forEach(achievement => {
+  const progress = getAchievementProgress(achievement.id, userData);
+  console.log(`${achievement.name}: ${progress.current}/${progress.target}`);
 });
 ```
 
-### Updating Game Statistics
+### Updating Game Statistics and Achievements
 ```javascript
-import { updateGameStats } from './utils/honeycombBadges';
+import { updateUserStatsAndAchievements } from './utils/achievementService';
 
-const result = await updateGameStats({
-  publicKey,
-  wallet,
-  gameResult: 'win',
-  gameStats: {
-    xp: 150,
-    cardsPlayed: 25,
-    perfectWin: true
-  }
-});
+const gameData = {
+  roundsPlayed: 5,
+  totalCardsPlayed: 25
+};
 
-if (result.newlyEarnedBadges.length > 0) {
-  console.log('New badges earned:', result.newlyEarnedBadges);
+const result = await updateUserStatsAndAchievements(user, gameData, true);
+
+if (result.newlyUnlockedAchievements.length > 0) {
+  console.log('New achievements unlocked:', result.newlyUnlockedAchievements);
+  console.log('Total XP earned:', result.xpEarned);
 }
 ```
 
@@ -298,9 +303,39 @@ The integration includes comprehensive error handling:
 - Real transaction signing and submission
 - Live profile tracking and badge verification
 
+## Data Flow Architecture
+
+### Honeycomb ↔ Firebase Synchronization
+
+The system implements a sophisticated data flow between Honeycomb Protocol and Firebase:
+
+#### **Honeycomb → Firebase (XP & Achievements)**
+- **XP Data**: User XP and level calculated from Honeycomb platform data
+- **Achievements**: Achievement unlock status and progress from Honeycomb
+- **Profile Data**: User profile information and statistics
+
+#### **Firebase → Honeycomb (Game Statistics)**
+- **Game Stats**: Games played, games won, win streaks, etc.
+- **Custom Data**: Game-specific statistics and metrics
+- **User Activity**: Last active timestamps and session data
+
+#### **Game Flow Integration**
+1. **Game Completion**: `updateUserStatsAndAchievements()` calculates XP and achievements
+2. **Honeycomb Update**: Server-side update to Honeycomb platform data
+3. **Firebase Sync**: Updated data flows to Firebase for real-time access
+4. **UI Updates**: Achievement popups and progress indicators
+
+### Server-Side Operations
+
+All Honeycomb updates use server-side operations with admin keypair:
+- **No Client Authentication**: Uses project authority for all updates
+- **Secure Transactions**: All updates signed with admin keypair
+- **Automatic Retries**: Built-in retry mechanisms for failed transactions
+- **Error Handling**: Comprehensive error handling and fallbacks
+
 ## Future Enhancements
 
-1. **Additional Badge Types**: More complex achievement conditions
+1. **Additional Achievement Types**: More complex achievement conditions
 2. **Social Features**: Profile sharing and leaderboards
 3. **NFT Integration**: Profile NFTs and collectible achievements
 4. **Cross-Game Integration**: Profiles that work across multiple games
