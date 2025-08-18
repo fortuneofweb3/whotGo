@@ -2717,14 +2717,188 @@ const App = () => {
           }
           
           return nextRoundGameData;
+        } else {
+          // Continue to next round
+          const newDeck = createDeck();
+          const shuffledNewDeck = shuffleDeck(newDeck);
+          
+          // Reset all players' cards
+          nextRoundGameData.players.forEach(player => {
+            player.cards = [];
+          });
+          
+          // Reset game state
+          nextRoundGameData.playPile = [];
+          nextRoundGameData.drawPile = shuffledNewDeck;
+          nextRoundGameData.pendingPickCount = 0;
+          nextRoundGameData.generalMarketActive = false;
+          nextRoundGameData.generalMarketOriginatorId = null;
+          nextRoundGameData.skipNextPlayer = false;
+          nextRoundGameData.gamePhase = 'dealingCards';
+          nextRoundGameData.lastAction = 'Dealing cards...';
+          nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [
+            `Round ${nextRoundGameData.roundNumber} begins with remaining players.`,
+            `New deck created and shuffled.`
+          ];
+          
+          // Set current player to first non-eliminated player
+          const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
+          nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
+          
+          // Update Firebase with next round data
+          update(ref(db, `rooms/${currentRoom.id}/gameData`), nextRoundGameData);
+          
+          // Reset UI state
+          setAnimatingCards([]);
+          setPlayerScrollIndex(0);
+          setNeedNewMarketPositions(true);
+          playPilePositionsRef.current = [];
+          setPlayPileCardPositions({});
+          setIsAITurnInProgress(false);
+          setIsPlayerActionInProgress(false);
+          setIsAnyAnimationInProgress(false);
+          setSelectedLogRound(nextRoundGameData.roundNumber);
+          setShowRoundEndPopup(false);
+          setRoundEndData(null);
+          setConfettiActive(false);
+          
+          // Start dealing animation - only deal to non-eliminated players
+          setTimeout(() => {
+            const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
+            // Filter out eliminated players from the game data for dealing
+            const activePlayersForDealing = nextRoundGameData.players.filter(p => !p.eliminated);
+            startDealingAnimation([...shuffledNewDeck], activePlayersForDealing, cardsPerPlayer);
+          }, 100);
+          
+          return nextRoundGameData;
         }
-        
-        // Continue to next round
-        return nextRoundGameData;
       });
-      
-      setShowRoundEndPopup(false);
+      return;
     }
+    
+    // Handle single player case
+    if (!roundEndData) {
+      return;
+    }
+    
+    const eliminatedPlayer = roundEndData.eliminatedPlayer;
+    const remainingPlayers = gameData.players.filter(p => !p.eliminated);
+    
+    setGameData(prevData => {
+      if (!prevData) return prevData;
+      const nextRoundGameData = { ...prevData };
+      const eliminatedPlayerInNewData = (nextRoundGameData.players || []).find(p => p.id === eliminatedPlayer.id);
+      if (eliminatedPlayerInNewData) {
+        eliminatedPlayerInNewData.eliminated = true;
+      }
+      nextRoundGameData.lastAction = `${eliminatedPlayer.name.split(' ')[0]} eliminated`;
+      nextRoundGameData.gameLog = {
+        ...nextRoundGameData.gameLog,
+        [nextRoundGameData.roundNumber]: [
+          ...(nextRoundGameData.gameLog[nextRoundGameData.roundNumber] || []),
+          `Round ${nextRoundGameData.roundNumber}: ${eliminatedPlayer.name} eliminated with ${roundEndData.maxCards} total card points`
+        ]
+      };
+      nextRoundGameData.roundNumber++;
+      
+      if (remainingPlayers.length <= 1) {
+        nextRoundGameData.gamePhase = 'gameEnd';
+        const winner = remainingPlayers.length > 0 ? remainingPlayers[0] : roundEndData.winner;
+        nextRoundGameData.winner = winner;
+        nextRoundGameData.lastAction = `${winner.name.split(' ')[0]} wins!`;
+        nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`GAME OVER: ${winner.name} wins the game!`];
+        setShowRoundEndPopup(false);
+        if (currentUser) {
+          const isWinner = winner.id === currentUser.id;
+          const newXP = (currentUser.xp || 0) + (isWinner ? 150 : 50);
+          const levelData = calculateLevel(newXP);
+          
+          // Update Firebase stats
+          update(ref(db, `users/${currentUser.id}`), {
+              gamesPlayed: (currentUser.gamesPlayed || 0) + 1,
+              gamesWon: isWinner ? (currentUser.gamesWon || 0) + 1 : currentUser.gamesWon || 0,
+              xp: newXP,
+              level: levelData.level,
+              currentLevelXP: levelData.currentLevelXP,
+              xpNeededForNext: levelData.xpNeededForNext,
+              currentWinStreak: isWinner ? (currentUser.currentWinStreak || 0) + 1 : 0,
+              bestWinStreak: isWinner ? Math.max((currentUser.currentWinStreak || 0) + 1, currentUser.bestWinStreak || 0) : currentUser.bestWinStreak || 0,
+              totalCardsPlayed: (currentUser.totalCardsPlayed || 0) + 5,
+              perfectWins: isWinner && (gameData?.roundsPlayed || 1) === 1 ? (currentUser.perfectWins || 0) + 1 : currentUser.perfectWins || 0
+          });
+          
+          // Update Honeycomb stats and check for badges
+          if (publicKey && wallet) {
+            const gameStats = {
+              xp: isWinner ? 150 : 50,
+              cardsPlayed: 5,
+              perfectWin: isWinner && (gameData?.roundsPlayed || 1) === 1 // Perfect win if won in first round
+            };
+            
+            // Handle async operation outside of setGameData callback
+            updateGameStats({
+              publicKey,
+              wallet,
+              signMessage,
+              gameResult: isWinner ? 'win' : 'loss',
+              gameStats,
+              currentUser
+            }).then(result => {
+              if (result.success && result.unlockableBadges.length > 0) {
+                setUnlockableBadges(result.unlockableBadges);
+              }
+            }).catch(error => {
+              console.error('Error updating Honeycomb stats:', error);
+            });
+          }
+        }
+        setTimeout(() => {
+          setGameState('menu');
+          setGameData(null);
+        }, 10000);
+        return nextRoundGameData;
+      } else {
+        const newDeck = createDeck();
+        const shuffledNewDeck = shuffleDeck(newDeck);
+        nextRoundGameData.players.forEach(player => {
+          player.cards = [];
+        });
+        nextRoundGameData.playPile = [];
+        nextRoundGameData.drawPile = shuffledNewDeck;
+        const nextPlayers = ensurePlayersArray(nextRoundGameData.players);
+        const firstPlayerIndex = nextPlayers.findIndex(p => !p.eliminated);
+        nextRoundGameData.currentPlayer = firstPlayerIndex !== -1 ? firstPlayerIndex : 0;
+        nextRoundGameData.pendingPickCount = 0;
+        nextRoundGameData.generalMarketActive = false;
+        nextRoundGameData.generalMarketOriginatorId = null;
+        nextRoundGameData.skipNextPlayer = false;
+        nextRoundGameData.gamePhase = 'dealingCards';
+        nextRoundGameData.lastAction = 'Dealing cards...';
+        nextRoundGameData.gameLog[nextRoundGameData.roundNumber] = [`Round ${nextRoundGameData.roundNumber} begins with remaining players.`, `New deck created and shuffled.`];
+        setAnimatingCards([]);
+        setPlayerScrollIndex(0);
+        setNeedNewMarketPositions(true);
+        playPilePositionsRef.current = [];
+        // play pile positions are managed in Game.jsx
+        setPlayPileCardPositions({});
+        setIsAITurnInProgress(false);
+        setIsPlayerActionInProgress(false);
+        isAnimationInProgressRef.current = false;
+        setIsAnyAnimationInProgress(false);
+        setSelectedLogRound(nextRoundGameData.roundNumber);
+        setShowRoundEndPopup(false);
+        setRoundEndData(null);
+        setConfettiActive(false);
+        
+        setTimeout(() => {
+          const cardsPerPlayer = getCardsPerPlayer(remainingPlayers.length);
+          // Filter out eliminated players from the game data for dealing
+          const activePlayersForDealing = nextRoundGameData.players.filter(p => !p.eliminated);
+          startDealingAnimation([...shuffledNewDeck], activePlayersForDealing, cardsPerPlayer);
+        }, 100);
+        return nextRoundGameData;
+      }
+    });
   };
 
   const handleRoundEnd = async gameData => {
