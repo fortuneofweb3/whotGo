@@ -1005,6 +1005,7 @@ const App = () => {
           bestWinStreak: userData.bestWinStreak || 0,
           totalCardsPlayed: userData.totalCardsPlayed || 0,
           perfectWins: userData.perfectWins || 0,
+          achievements: userData.achievements || userData.achievementsUnlocked || [], // Use achievements field for consistency
           achievementsUnlocked: userData.achievementsUnlocked || [],
           claimedAchievements: userData.claimedAchievements || [],
           honeycombProfile: userData.honeycombProfile,
@@ -1744,8 +1745,8 @@ const App = () => {
     // Update local state
     setCurrentUser(updatedUserData);
 
-    // Check for newly unlocked achievements to show popup
-    if (updatedUserData.newlyUnlockedAchievements && updatedUserData.newlyUnlockedAchievements.length > 0) {
+    // Check for newly unlocked achievements to show popup (only if this is an actual game result)
+    if (updatedUserData.newlyUnlockedAchievements && updatedUserData.newlyUnlockedAchievements.length > 0 && gameMode !== 'initialization') {
       setNewlyUnlockedAchievements(updatedUserData.newlyUnlockedAchievements);
       setShowAchievementPopup(true);
     }
